@@ -21,7 +21,10 @@ public static class PlayCapture
 {
     static double t0;
     static bool entered;
-    const double HardTimeoutS = 1800.0;
+    // The mission battery now flies the WHOLE BANK (42 missions x 300 s at 8x is about
+    // 26 minutes of wall clock before overhead), not the original twelve. 1800 s used to
+    // be generous and would now time out most of the way through.
+    const double HardTimeoutS = 5400.0;
 
     /// <summary>Timed play-mode run for the COCKPIT/VISUAL verification tools
     /// (ScreenProbe -screens, YokeProbe -probe, YokeShot, FlightTest -flighttest).

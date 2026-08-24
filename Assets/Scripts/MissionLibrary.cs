@@ -83,11 +83,93 @@ public static class MissionLibrary
 
     static List<MissionDefinition> all;
 
+    /// <summary>How many interchangeable variants every (phase, class) cell has.</summary>
+    public const int VariantCount = 3;
+
+    /// <summary>THE WHOLE BANK — 36 cognitive-axis missions (4 phases x 3 classes x 3
+    /// variants) plus 6 psychomotor-axis crosswind missions. A participant flies TWELVE
+    /// of these, never all of them; see SessionMissions() and MISSION_BANK_DESIGN.md.</summary>
     public static List<MissionDefinition> All()
     {
         if (all == null)
+        {
             all = new List<MissionDefinition> { L1(), L2(), L3(), L4(), M1(), M2(), M3(), M4(), H1(), H2(), H3(), H4() };
+            all.AddRange(MissionLibraryV2.All());
+            all.AddRange(MissionLibraryV3.All());
+            all.AddRange(MissionLibraryCrosswind.All());
+        }
         return all;
+    }
+
+    /// <summary>The cognitive-axis missions only — the main experiment's 36.</summary>
+    public static List<MissionDefinition> CognitiveAxis()
+    {
+        var o = new List<MissionDefinition>();
+        foreach (var m in All()) if (m.Axis == LoadAxis.Cognitive) o.Add(m);
+        return o;
+    }
+
+    /// <summary>The crosswind set — the psychomotor-integrated axis's 6.</summary>
+    public static List<MissionDefinition> PsychomotorAxis()
+    {
+        var o = new List<MissionDefinition>();
+        foreach (var m in All()) if (m.Axis == LoadAxis.PsychomotorIntegrated) o.Add(m);
+        return o;
+    }
+
+    /// <summary>The four phase rows of the crossed grid, in flight order. Published so
+    /// the session builder and the equivalence report agree on what a "row" is.</summary>
+    public static readonly FlightPhase[] Rows =
+        { FlightPhase.Takeoff, FlightPhase.Climb, FlightPhase.Cruise, FlightPhase.Approach };
+
+    /// <summary>The one mission in a (phase, class) cell for a given variant index.</summary>
+    public static MissionDefinition Cell(FlightPhase phase, WorkloadClass cls, int variant)
+    {
+        foreach (var m in All())
+            if (m.Axis == LoadAxis.Cognitive && m.Phase == phase && m.Class == cls && m.Variant == variant)
+                return m;
+        return null;
+    }
+
+    /// <summary>THE TWELVE MISSIONS ONE PARTICIPANT FLIES.
+    ///
+    /// The bank is 36; a session is 12, because 36 x 300 s is three hours of flying
+    /// inside one EEG session and fatigue would dominate every contrast the study is
+    /// trying to measure. The session design is therefore EXACTLY the verified
+    /// 4 x 3 crossed grid it always was — the bank changes which realisation of each
+    /// cell a given participant meets, not how many cells there are.
+    ///
+    /// The variant index is rotated PER PHASE ROW:
+    ///
+    ///     variant(participant, row) = (participantNumber + rowIndex) % VariantCount
+    ///
+    /// which buys two things at once:
+    ///   * within a row all three classes share one variant, so the Low-Medium-High
+    ///     contrast is always variant-matched and variant cannot masquerade as class;
+    ///   * across rows a participant meets different variants, so variant is not
+    ///     perfectly nested in participant and a variant effect is partly estimable
+    ///     within subject.</summary>
+    public static List<MissionDefinition> SessionMissions(int participantNumber)
+    {
+        var o = new List<MissionDefinition>();
+        for (int r = 0; r < Rows.Length; r++)
+        {
+            int v = ((participantNumber + r) % VariantCount) + 1;
+            foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+            {
+                var m = Cell(Rows[r], c, v);
+                if (m != null) o.Add(m);
+            }
+        }
+        return o;
+    }
+
+    /// <summary>Which variant index a participant flies in a given phase row. Recorded
+    /// in session.json so the realised assignment is reconstructible.</summary>
+    public static int VariantForRow(int participantNumber, FlightPhase phase)
+    {
+        int r = System.Array.IndexOf(Rows, phase);
+        return r < 0 ? 1 : ((participantNumber + r) % VariantCount) + 1;
     }
 
     public static List<MissionDefinition> ForClass(WorkloadClass c)
@@ -110,19 +192,20 @@ public static class MissionLibrary
         return null;
     }
 
-    static MissionDefinition Base(string id, string name, WorkloadClass cls, FlightPhase phase) =>
+    public static MissionDefinition Base(string id, string name, WorkloadClass cls, FlightPhase phase, int variant = 1) =>
         new MissionDefinition
         {
             Id = id, Name = name, Class = cls, Phase = phase,
             DurationS = StandardDurationS, InTaskBaselineS = StandardBaselineS,
             StartFuelL = 180f, StartAirspeedKmh = 180f,
+            Variant = variant, Axis = LoadAxis.Cognitive,
         };
 
     // Common set-up for the taxi/take-off row: parked on stand 1, taxi clearance up
     // front, then the phase-specific manipulation.
-    static MissionDefinition TaxiBase(string id, string name, WorkloadClass cls)
+    public static MissionDefinition TaxiBase(string id, string name, WorkloadClass cls, int variant = 1)
     {
-        var m = Base(id, name, cls, FlightPhase.Takeoff);
+        var m = Base(id, name, cls, FlightPhase.Takeoff, variant);
         m.Start = ScenarioStart.Runway;          // ground start; the engine puts it on the stand
         m.Goal = ScenarioGoal.TaxiTakeoff;
         m.StartAltitudeM = 0f; m.StartAirspeedKmh = 0f;
@@ -133,9 +216,9 @@ public static class MissionLibrary
         return m;
     }
 
-    static MissionDefinition ClimbBase(string id, string name, WorkloadClass cls)
+    public static MissionDefinition ClimbBase(string id, string name, WorkloadClass cls, int variant = 1)
     {
-        var m = Base(id, name, cls, FlightPhase.Climb);
+        var m = Base(id, name, cls, FlightPhase.Climb, variant);
         m.Start = ScenarioStart.Airborne; m.Goal = ScenarioGoal.HoldTargets;
         m.StartPos = ClimbStart;
         m.StartAltitudeM = ClimbStartAltM; m.TargetAltitudeM = ClimbStartAltM;
@@ -144,9 +227,9 @@ public static class MissionLibrary
         return m;
     }
 
-    static MissionDefinition CruiseBase(string id, string name, WorkloadClass cls)
+    public static MissionDefinition CruiseBase(string id, string name, WorkloadClass cls, int variant = 1)
     {
-        var m = Base(id, name, cls, FlightPhase.Cruise);
+        var m = Base(id, name, cls, FlightPhase.Cruise, variant);
         m.Start = ScenarioStart.Airborne; m.Goal = ScenarioGoal.HoldTargets;
         m.StartPos = CruiseStart;
         m.StartAltitudeM = CruiseAltM; m.TargetAltitudeM = CruiseAltM;
@@ -155,9 +238,9 @@ public static class MissionLibrary
         return m;
     }
 
-    static MissionDefinition ApproachBase(string id, string name, WorkloadClass cls)
+    public static MissionDefinition ApproachBase(string id, string name, WorkloadClass cls, int variant = 1)
     {
-        var m = Base(id, name, cls, FlightPhase.Approach);
+        var m = Base(id, name, cls, FlightPhase.Approach, variant);
         m.Start = ScenarioStart.Airborne; m.Goal = ScenarioGoal.Land;
         m.StartPos = ApproachStart;
         m.StartAltitudeM = ApproachAltM; m.TargetAltitudeM = ApproachAltM;
@@ -179,6 +262,7 @@ public static class MissionLibrary
                   "take off, and climb straight ahead to 600 m. Clear day, no other traffic.";
         m.Events.Add(MissionDefinition.Msg(1f, "TAXI VIA ALPHA, HOLD SHORT RUNWAY 01."));
         m.Events.Add(MissionDefinition.TakeoffClearance(88f, "climb runway heading to 600 m.", 6f));
+        m.Mechanism = "reference - single-threaded procedure";
         m.Profile = new WorkloadProfile {
             MentalDemand = 1, TemporalDemand = 1, DecisionComplexity = 1, WorkingMemory = 1,
             AttentionSwitching = 1, SituationAwareness = 1, Perception = 2, ManualControl = 2,
@@ -234,6 +318,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Atc(158f, ScenarioEventType.AltitudeChange, 700f, "climb and maintain 700 m"));
         m.Events.Add(MissionDefinition.Probe(230f, "OPS CHECK — respond", 5f, 12f));
         m.TargetAltitudeM = 700f;
+        m.Mechanism = "visual search + procedure";
         m.Profile = new WorkloadProfile {
             MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 2,
             AttentionSwitching = 3, SituationAwareness = 2, Perception = 3, ManualControl = 2,
@@ -301,6 +386,7 @@ public static class MissionLibrary
                      "TRAFFIC 1 O'CLOCK CROSSING, SAME LEVEL — respond", true, 6f, 14f));
         m.Events.Add(MissionDefinition.Decide(248f, "TURN OR CLIMB? — decide", 7f, 10f));
         m.TargetAltitudeM = 800f;
+        m.Mechanism = "concurrency under time pressure";
         m.Profile = new WorkloadProfile {
             MentalDemand = 4, TemporalDemand = 4, DecisionComplexity = 3, WorkingMemory = 4,
             AttentionSwitching = 4, SituationAwareness = 3, Perception = 3, ManualControl = 2,
@@ -355,6 +441,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Msg(1f, "DEPARTURE — maintain 400 m, heading 000°."));
         m.Events.Add(MissionDefinition.Atc(BaselineEndT, ScenarioEventType.AltitudeChange, 900f, "climb and maintain 900 m"));
         m.TargetAltitudeM = 400f;
+        m.Mechanism = "reference - steady-state tracking";
         m.Profile = new WorkloadProfile {
             MentalDemand = 1, TemporalDemand = 0, DecisionComplexity = 0, WorkingMemory = 1,
             AttentionSwitching = 1, SituationAwareness = 1, Perception = 1, ManualControl = 2,
@@ -392,6 +479,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Atc(205f, ScenarioEventType.HeadingChange, 330f, "left heading 330°", 12f));
         m.Events.Add(MissionDefinition.Probe(250f, "OPS CHECK — respond", 5f, 10f));
         m.TargetAltitudeM = 400f;
+        m.Mechanism = "startle without danger";
         m.Profile = new WorkloadProfile {
             MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 1,
             AttentionSwitching = 3, SituationAwareness = 2, Perception = 2, ManualControl = 3,
@@ -443,6 +531,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Decide(212f, "CONTINUE THE DEPARTURE OR RETURN? — decide", 8f, 12f));
         m.Events.Add(MissionDefinition.Probe(258f, "REPORT LEVEL — respond", 5f, 10f));
         m.TargetAltitudeM = 400f;
+        m.Mechanism = "forward reasoning about a depleting resource";
         m.Profile = new WorkloadProfile {
             MentalDemand = 4, TemporalDemand = 3, DecisionComplexity = 4, WorkingMemory = 3,
             AttentionSwitching = 3, SituationAwareness = 3, Perception = 2, ManualControl = 2,
@@ -493,6 +582,7 @@ public static class MissionLibrary
         m.Brief = "Cruise, calm air, no traffic, no radio. Fly it accurately — altitude within 70 m " +
                   "and heading within 12° — and nothing else will be asked of you.";
         m.Events.Add(MissionDefinition.Msg(1f, "CRUISE — maintain 700 m, heading 000°. Calm air."));
+        m.Mechanism = "reference - steady-state tracking";
         m.Profile = new WorkloadProfile {
             MentalDemand = 1, TemporalDemand = 0, DecisionComplexity = 0, WorkingMemory = 1,
             AttentionSwitching = 0, SituationAwareness = 1, Perception = 1, ManualControl = 2,
@@ -537,6 +627,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Atc(232f, ScenarioEventType.HeadingChange, 20f, "heading 020°"));
         m.Events.Add(MissionDefinition.Atc(236f, ScenarioEventType.AltitudeChange, 780f, "climb and maintain 780 m"));
         m.Events.Add(MissionDefinition.Probe(262f, "REPORT LEVEL — respond", 5f, 6f));
+        m.Mechanism = "working memory (clearance turnover)";
         m.Profile = new WorkloadProfile {
             MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 1, WorkingMemory = 3,
             AttentionSwitching = 3, SituationAwareness = 2, Perception = 2, ManualControl = 2,
@@ -587,6 +678,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Atc(202f, ScenarioEventType.AltitudeChange, 500f, "descend and maintain 500 m"));
         m.Events.Add(MissionDefinition.Atc(206f, ScenarioEventType.HeadingChange, 60f, "right heading 060°"));
         m.Events.Add(MissionDefinition.Decide(240f, "CONTINUE OR DIVERT? — decide", 8f, 10f));
+        m.Mechanism = "self-consistent wrong information";
         m.Profile = new WorkloadProfile {
             MentalDemand = 4, TemporalDemand = 3, DecisionComplexity = 3, WorkingMemory = 3,
             AttentionSwitching = 4, SituationAwareness = 4, Perception = 4, ManualControl = 3,
@@ -637,6 +729,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Msg(1f, "INBOUND — maintain 500 m, heading 000°. Expect a visual approach."));
         m.Events.Add(MissionDefinition.Msg(BaselineEndT, "CLEARED TO LAND RUNWAY 01 — descend at your discretion, wind calm."));
         m.Events.Add(MissionDefinition.Cfg(150f, "APPROACH FLAPS — as required   [F]"));
+        m.Mechanism = "reference - rehearsed approach";
         m.Profile = new WorkloadProfile {
             MentalDemand = 1, TemporalDemand = 1, DecisionComplexity = 1, WorkingMemory = 1,
             AttentionSwitching = 1, SituationAwareness = 2, Perception = 2, ManualControl = 3,
@@ -681,6 +774,7 @@ public static class MissionLibrary
                      "wind now 070° gusting — ACKNOWLEDGE", 6f, 12f));
         m.Events.Add(MissionDefinition.Wx(176f, 90f, 0.55f, "GUSTY CROSSWIND ON FINAL", 0f));
         m.Events.Add(MissionDefinition.Probe(226f, "OPS CHECK — respond", 5f, 10f));
+        m.Mechanism = "degraded perception + re-planning";
         m.Profile = new WorkloadProfile {
             MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 3,
             AttentionSwitching = 2, SituationAwareness = 3, Perception = 3, ManualControl = 3,
@@ -733,6 +827,7 @@ public static class MissionLibrary
         m.Events.Add(MissionDefinition.Fail(96f, FailureKind.EngineFailure, 1f, "ENGINE FAILURE", 14f));
         m.Events.Add(MissionDefinition.List(106f, ChecklistLibrary.EngineFailure, "ENGINE FAILURE DRILL"));
         m.Events.Add(MissionDefinition.Decide(128f, "RUNWAY OR FIELD AHEAD? — decide", 6f, 6f));
+        m.Mechanism = "irreversible commitment under a clock";
         m.Profile = new WorkloadProfile {
             MentalDemand = 3, TemporalDemand = 4, DecisionComplexity = 3, WorkingMemory = 2,
             AttentionSwitching = 3, SituationAwareness = 4, Perception = 3, ManualControl = 4,

@@ -1,0 +1,37 @@
+cell,phase,class,variant,id,mechanism,pli,manual_control,mental,temporal,decision,working_memory,attention_switching,situation_awareness,perception,procedural,uncertainty,communication,error_consequence,expected_rtlx,duration_s,baseline_s,events,visibility_01,ambient_turbulence,crosswind_ms,headwind_ms
+Takeoff/LOW,Takeoff,Low,1,L1,"reference - single-threaded procedure",28.00,2,1,1,1,1,1,1,2,2,0,1,1,24.2,300,60,2,0.00,0.00,0.00,0.00
+Takeoff/LOW,Takeoff,Low,2,L1V2,"reference - single-threaded procedure with one acknowledgement",28.00,2,1,1,1,1,1,1,2,2,0,1,1,25.3,300,60,3,0.00,0.00,0.00,0.00
+Takeoff/LOW,Takeoff,Low,3,L1V3,"reference - single-threaded procedure to a higher level-off",28.00,2,1,1,1,1,1,1,2,2,0,1,1,24.7,300,60,2,0.00,0.00,0.00,0.00
+Takeoff/MEDIUM,Takeoff,Medium,1,M1,"visual search + procedure",52.75,2,2,2,2,2,3,2,3,2,1,2,2,45.0,300,60,8,0.35,0.00,0.00,0.00
+Takeoff/MEDIUM,Takeoff,Medium,2,M1V2,"working memory - replacing a briefed plan",58.75,2,3,2,2,4,2,2,2,2,1,3,2,46.0,300,60,6,0.00,0.00,0.00,0.00
+Takeoff/MEDIUM,Takeoff,Medium,3,M1V3,"prospective memory - holding an instruction until its condition occurs",66.00,2,3,2,2,3,3,3,3,3,2,3,3,47.3,300,60,6,0.00,0.00,0.00,0.00
+Takeoff/HIGH,Takeoff,High,1,H1,"concurrency under time pressure",87.00,2,4,4,3,4,4,3,3,3,3,3,4,72.0,300,60,11,0.55,0.00,0.00,0.00
+Takeoff/HIGH,Takeoff,High,2,H1V2,"forward reasoning about a physical margin under a clock",86.50,2,4,4,4,3,3,4,3,3,3,3,4,66.5,300,60,8,0.00,0.00,0.00,0.00
+Takeoff/HIGH,Takeoff,High,3,H1V3,"sustained monitoring under degraded perception + prospective memory",88.75,2,4,3,3,4,4,4,4,3,4,3,4,68.0,300,60,9,0.62,0.00,0.00,0.00
+Climb/LOW,Climb,Low,1,L2,"reference - steady-state tracking",18.00,2,1,0,0,1,1,1,1,1,0,1,0,22.0,300,60,2,0.00,0.00,0.00,0.00
+Climb/LOW,Climb,Low,2,L2V2,"reference - steady-state tracking with one target change",24.75,2,1,1,1,1,1,1,1,1,0,1,1,23.7,300,60,3,0.00,0.00,0.00,0.00
+Climb/LOW,Climb,Low,3,L2V3,"reference - steady-state tracking with a turn and a level-off",24.75,2,1,1,1,1,1,1,1,1,0,1,1,24.3,300,60,3,0.00,0.00,0.00,0.00
+Climb/MEDIUM,Climb,Medium,1,M2,"startle without danger",49.75,3,2,2,2,1,3,2,2,1,3,1,1,46.7,300,60,6,0.00,0.00,0.00,0.00
+Climb/MEDIUM,Climb,Medium,2,M2V2,"diagnosis of a gradual, ambiguous cue",67.25,2,3,2,3,2,3,3,3,3,4,1,2,49.3,300,60,5,0.25,0.05,0.00,0.00
+Climb/MEDIUM,Climb,Medium,3,M2V3,"working memory turnover across mixed verbal and numeric items",65.50,2,3,3,2,4,3,2,2,2,1,4,2,51.3,300,60,10,0.00,0.00,0.00,0.00
+Climb/HIGH,Climb,High,1,H2,"forward reasoning about a depleting resource",78.75,2,4,3,4,3,3,3,2,4,2,2,3,62.2,300,60,7,0.00,0.00,0.00,0.00
+Climb/HIGH,Climb,High,2,H2V2,"irreversible commitment against a shrinking margin",84.25,3,4,4,4,2,3,4,3,3,3,2,4,71.2,300,60,7,0.00,0.00,0.00,0.00
+Climb/HIGH,Climb,High,3,H2V3,"prioritisation among simultaneous conflicting demands",84.50,2,4,4,3,3,4,4,3,2,3,3,4,68.0,300,60,8,0.28,0.06,0.00,0.00
+Cruise/LOW,Cruise,Low,1,L3,"reference - steady-state tracking",12.75,2,1,0,0,1,0,1,1,0,0,0,0,18.3,300,60,1,0.00,0.00,0.00,0.00
+Cruise/LOW,Cruise,Low,2,L3V2,"reference - steady-state tracking with one turn",24.75,2,1,1,1,1,1,1,1,1,0,1,1,22.2,300,60,2,0.00,0.00,0.00,0.00
+Cruise/LOW,Cruise,Low,3,L3V3,"reference - steady-state tracking to a displayed target",26.75,2,1,1,1,1,1,2,1,1,0,1,1,24.3,300,60,1,0.00,0.00,0.00,0.00
+Cruise/MEDIUM,Cruise,Medium,1,M3,"working memory (clearance turnover)",49.50,2,2,2,1,3,3,2,2,1,1,3,1,44.2,300,60,11,0.00,0.00,0.00,0.00
+Cruise/MEDIUM,Cruise,Medium,2,M3V2,"re-planning against competing constraints",64.00,2,3,2,4,3,2,3,1,2,2,3,2,49.3,300,60,7,0.00,0.00,0.00,0.00
+Cruise/MEDIUM,Cruise,Medium,3,M3V3,"visual search and sustained monitoring under degraded input",64.75,2,3,2,2,2,4,3,4,1,3,2,3,49.3,300,60,6,0.40,0.08,0.00,0.00
+Cruise/HIGH,Cruise,High,1,H3,"self-consistent wrong information",86.00,3,4,3,3,3,4,4,4,3,4,2,3,70.5,300,60,8,0.00,0.00,0.00,0.00
+Cruise/HIGH,Cruise,High,2,H3V2,"resource management with a self-inflicted cure",84.00,2,4,3,4,4,4,3,2,3,3,2,3,64.0,300,60,7,0.00,0.00,0.00,0.00
+Cruise/HIGH,Cruise,High,3,H3V3,"concurrency - competing demands with no gaps between them",89.50,2,4,4,3,4,4,4,3,4,2,4,3,71.7,300,60,11,0.30,0.10,0.00,0.00
+Approach/LOW,Approach,Low,1,L4,"reference - rehearsed approach",29.25,3,1,1,1,1,1,2,2,1,0,0,2,28.7,300,60,3,0.00,0.00,0.00,0.00
+Approach/LOW,Approach,Low,2,L4V2,"reference - rehearsed approach with a routine configuration change",31.75,3,1,1,1,1,1,2,2,2,0,1,2,32.3,300,60,3,0.00,0.00,0.00,0.00
+Approach/LOW,Approach,Low,3,L4V3,"reference - rehearsed approach from a shorter final",35.00,3,1,2,1,1,1,2,2,2,0,1,2,34.3,300,60,2,0.00,0.00,0.00,0.00
+Approach/MEDIUM,Approach,Medium,1,M4,"degraded perception + re-planning",57.50,3,2,2,2,3,2,3,3,2,2,2,2,54.3,300,60,7,0.45,0.00,0.00,0.00
+Approach/MEDIUM,Approach,Medium,2,M4V2,"re-planning under time pressure late in a committed approach",70.75,3,3,4,2,3,3,3,2,3,1,3,3,60.3,300,60,6,0.00,0.00,0.00,0.00
+Approach/MEDIUM,Approach,Medium,3,M4V3,"abandoning a committed procedure and executing a rehearsed alternative",68.75,3,3,3,2,2,3,3,3,4,2,2,3,58.7,300,60,7,0.00,0.00,0.00,0.00
+Approach/HIGH,Approach,High,1,H4,"irreversible commitment under a clock",76.25,4,3,4,3,2,3,4,3,3,2,1,4,74.7,300,60,5,0.00,0.00,0.00,0.00
+Approach/HIGH,Approach,High,2,H4V2,"re-computing a procedure whose parameters have changed",78.75,4,4,3,3,3,3,3,2,4,2,2,4,69.7,300,60,7,0.00,0.00,0.00,0.00
+Approach/HIGH,Approach,High,3,H4V3,"startle followed immediately by re-planning at high stakes",92.00,3,4,4,3,4,4,4,3,4,3,3,4,76.0,300,60,10,0.00,0.00,0.00,0.00

@@ -107,6 +107,9 @@ public class ScenarioEngine : MonoBehaviour
 
     // control smoothness (input "jerk" per second)
     float prevPitch, prevRoll, prevYaw, jerkSum, jerkTime, jerkInstant;
+    /// <summary>Control-activity covariates — the measurement that lets an EEG effect be
+    /// separated from hand movement. See ControlActivity.cs.</summary>
+    readonly ControlActivity ctrlActivity = new ControlActivity();
 
     // failure / cue tracking
     FailureKind armedKind = FailureKind.None;
@@ -124,7 +127,11 @@ public class ScenarioEngine : MonoBehaviour
     // navigation / landing / mission
     int wpIdx, wpReached;
     bool wasGrounded;
-    float touchdownSink, touchdownX;
+    float touchdownSink, touchdownX, touchdownDrift;
+    /// <summary>Worst lateral excursion from the runway centreline while below 60 m, and
+    /// the time-integral of |drift angle| over the same window. Both are meaningless
+    /// without a wind model and both are primary metrics for the crosswind axis.</summary>
+    float maxCenterlineDev, driftAbsInt, driftTime;
     bool landed;
     bool climbDone;
     int missionPhase;
@@ -175,7 +182,10 @@ public class ScenarioEngine : MonoBehaviour
         altTol = s.AltTolerance; hdgTol = s.HdgTolerance;
         sampleT = inTolT = altErrInt = hdgErrInt = altErrSq = hdgErrSq = 0f;
         respPending = false; alarmsTotal = alarmsHit = alarmsMissed = falseAlarms = rtCount = 0; rtSum = 0f;
+        touchdownSink = touchdownX = touchdownDrift = 0f;
+        maxCenterlineDev = driftAbsInt = driftTime = 0f;
         prevPitch = prevRoll = prevYaw = jerkSum = jerkTime = jerkInstant = 0f;
+        ctrlActivity.Reset();
         wpIdx = wpReached = 0; wasGrounded = false; landed = false; climbDone = false;
         missionPhase = 0; landDeadline = 0f;
         goAroundCommanded = goAroundInitiated = false; goAroundAt = -1f; lowAltAtGoAround = 0f;
@@ -385,6 +395,18 @@ public class ScenarioEngine : MonoBehaviour
             altErrSq += AltError * AltError * dt; hdgErrSq += HdgError * HdgError * dt;
             sampleT += dt;
             if (AltError <= altTol && HdgError <= hdgTol) inTolT += dt;
+        }
+
+        // Runway-relative tracking, accumulated only in the last 60 m of height and
+        // within the runway's own length, i.e. over the take-off roll, the flare and
+        // the rollout. Outside that window a "centreline deviation" is just the
+        // aircraft being somewhere else in the circuit and means nothing.
+        float h = ac.AltitudeM - Aerodrome.RunwayElevationM;
+        if (h < 60f && Mathf.Abs(ac.transform.position.z) < Aerodrome.RunwayHalfLength + 60f)
+        {
+            maxCenterlineDev = Mathf.Max(maxCenterlineDev, Mathf.Abs(ac.transform.position.x));
+            driftAbsInt += Mathf.Abs(ac.DriftAngleDeg) * dt;
+            driftTime += dt;
         }
     }
 
@@ -779,6 +801,10 @@ public class ScenarioEngine : MonoBehaviour
         {
             touchdownSink = -ac.VerticalSpeedMs;
             touchdownX = ac.transform.position.x;
+            // Drift at the moment of touchdown: a correctly de-crabbed landing touches
+            // down with the aeroplane pointing where it is going, i.e. drift near zero.
+            // Landing crabbed side-loads the gear and shows up here and nowhere else.
+            touchdownDrift = ac.DriftAngleDeg;
             bool onRunway = Mathf.Abs(touchdownX) < 16f && Mathf.Abs(ac.transform.position.z) < 305f;
             if (onRunway && !ac.Crashed) { landed = true; }
             Mark(EventMarkers.Touchdown,
@@ -1032,6 +1058,12 @@ public class ScenarioEngine : MonoBehaviour
         // replays identically from the seed. (See defect note in FINAL_TEST_REPORT.)
         WindModel.Clock = Time01;
 
+        // Control activity is accumulated on EVERY physics step, not on the telemetry
+        // tick: it is an integral of control MOVEMENT, and sampling it at the telemetry
+        // rate would alias fast stick reversals into a smaller number. The telemetry rate
+        // happens to equal the physics rate today, but this must not silently depend on that.
+        ctrlActivity.Sample(ac, fdt, CockpitControlRig.Instance != null && CockpitControlRig.AnyGrabbed);
+
         telemetryAccum += fdt;
         float interval = IsExperiment ? 1f / ExperimentLogger.TelemetryHz : 0.1f;
         if (telemetryAccum >= interval - 1e-6f)
@@ -1159,6 +1191,10 @@ public class ScenarioEngine : MonoBehaviour
         }
         r.Metrics["control_jerk_per_s"] = jerkPerSec;
         r.Metrics["trial_duration_s"] = Time01;
+        // The motor covariates. On the cognitive axis these are a MANIPULATION CHECK
+        // (they should NOT differ much between classes inside a phase row); on the
+        // crosswind axis they are the covariate an EEG effect must survive adjustment for.
+        ctrlActivity.WriteInto(r.Metrics);
         if (hasEvents)
         {
             r.Metrics["probes_total"] = alarmsTotal; r.Metrics["probes_hit"] = alarmsHit;
@@ -1185,6 +1221,13 @@ public class ScenarioEngine : MonoBehaviour
             r.Metrics["landed"] = landed ? 1 : 0;
             r.Metrics["touchdown_sink_ms"] = touchdownSink;
             r.Metrics["centerline_offset_m"] = Mathf.Abs(touchdownX);
+            // Crosswind-specific landing quality. Only meaningful now that there is a
+            // wind to be blown off the centreline BY: before the wind model, centreline
+            // deviation was a nearly free metric and drift at touchdown was always zero.
+            r.Metrics["touchdown_drift_deg"] = touchdownDrift;
+            r.Metrics["touchdown_bank_deg"] = ac.TouchdownBank;
+            r.Metrics["max_centerline_dev_m"] = maxCenterlineDev;
+            r.Metrics["mean_abs_drift_deg"] = driftTime > 0.5f ? driftAbsInt / driftTime : 0f;
         }
         Metrics = r.Metrics;
 

@@ -85,6 +85,169 @@ public class MissionTestHarness : MonoBehaviour
     readonly List<string> outcomes = new List<string>();
     int restartTested;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DESIGN CHECKS — properties of the mission TABLE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Assert the structural claims the experimental design rests on. Each of
+    /// these is a claim MISSION_BANK_DESIGN.md makes in prose; here it is enforced, so
+    /// the prose cannot drift away from the table.</summary>
+    void CheckBankDesign()
+    {
+        report.AppendLine("BANK DESIGN CHECKS");
+        report.AppendLine("------------------");
+        var all = MissionLibrary.All();
+        var cognitive = MissionLibrary.CognitiveAxis();
+        var psychomotor = MissionLibrary.PsychomotorAxis();
+        report.AppendLine($"bank: {all.Count} missions  ({cognitive.Count} cognitive axis, {psychomotor.Count} psychomotor axis)");
+
+        // (a) The grid is complete: every (phase, class) cell has every variant.
+        foreach (var phase in MissionLibrary.Rows)
+            foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+                for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+                    if (MissionLibrary.Cell(phase, c, v) == null)
+                        Problem("design", $"grid hole: {phase}/{c} has no variant {v}");
+
+        // (b) Ids are unique. A duplicate id silently overwrites a trial folder.
+        var seen = new HashSet<string>();
+        foreach (var m in all) if (!seen.Add(m.Id)) Problem("design", "duplicate mission id: " + m.Id);
+
+        // (c) THE MECHANISM RULE. The three variants of a cell must reach their class by
+        // DIFFERENT cognitive mechanisms. If they repeat, the bank is three copies of the
+        // same trial wearing different names and buys nothing but apparent breadth.
+        foreach (var phase in MissionLibrary.Rows)
+            foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+            {
+                var mech = new List<string>();
+                for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+                {
+                    var m = MissionLibrary.Cell(phase, c, v);
+                    if (m == null) continue;
+                    if (string.IsNullOrWhiteSpace(m.Mechanism)) { Problem("design", m.Id + " declares no Mechanism"); continue; }
+                    if (mech.Contains(m.Mechanism))
+                        Problem("design", $"{phase}/{c}: variant {v} repeats mechanism \"{m.Mechanism}\"");
+                    mech.Add(m.Mechanism);
+                }
+            }
+
+        // (d) MOTOR MATCHING WITHIN EACH PHASE ROW, per variant index. This is the
+        // property that licenses reading a class difference as cognitive rather than
+        // muscular, and it is the single most important structural claim in the design.
+        // Spread of <= 1 on the 0-4 ManualControl scale is the declared tolerance.
+        for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+            foreach (var phase in MissionLibrary.Rows)
+            {
+                int lo = 99, hi = -1; string detail = "";
+                foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+                {
+                    var m = MissionLibrary.Cell(phase, c, v);
+                    if (m == null) continue;
+                    int mc = m.Profile.ManualControl;
+                    lo = Mathf.Min(lo, mc); hi = Mathf.Max(hi, mc);
+                    detail += $"{m.Id}={mc} ";
+                }
+                if (hi - lo > 1) Problem("design", $"manual demand not matched in {phase} v{v}: spread {hi - lo}  [{detail.Trim()}]");
+            }
+
+        // (e) The classes must actually ORDER on the predicted load index inside every
+        // cell column. A HIGH that scores below its own row's MEDIUM is a mislabelled
+        // mission, and no amount of data would rescue the contrast.
+        for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+            foreach (var phase in MissionLibrary.Rows)
+            {
+                var l = MissionLibrary.Cell(phase, WorkloadClass.Low, v);
+                var md = MissionLibrary.Cell(phase, WorkloadClass.Medium, v);
+                var h = MissionLibrary.Cell(phase, WorkloadClass.High, v);
+                if (l == null || md == null || h == null) continue;
+                if (!(l.Profile.PLI < md.Profile.PLI && md.Profile.PLI < h.Profile.PLI))
+                    Problem("design", $"PLI not ordered in {phase} v{v}: " +
+                            $"{l.Id}={l.Profile.PLI:F1} {md.Id}={md.Profile.PLI:F1} {h.Id}={h.Profile.PLI:F1}");
+            }
+
+        // (f) Every mission must carry the metadata a reader needs to reproduce it. An
+        // empty rationale is how a mission that cannot be defended gets into a bank.
+        foreach (var m in all)
+        {
+            if (string.IsNullOrWhiteSpace(m.LoadRationale)) Problem("design", m.Id + ": no LoadRationale");
+            if (string.IsNullOrWhiteSpace(m.Approximations)) Problem("design", m.Id + ": no Approximations");
+            if (string.IsNullOrWhiteSpace(m.AviationBasis)) Problem("design", m.Id + ": no AviationBasis");
+            if (m.RequiredMarkers == null || m.RequiredMarkers.Length == 0) Problem("design", m.Id + ": no RequiredMarkers");
+            if (Mathf.Abs(m.DurationS - MissionLibrary.StandardDurationS) > 0.01f)
+                Problem("design", m.Id + $": duration {m.DurationS} != the standard {MissionLibrary.StandardDurationS}");
+            if (Mathf.Abs(m.InTaskBaselineS - MissionLibrary.StandardBaselineS) > 0.01f)
+                Problem("design", m.Id + $": in-task baseline {m.InTaskBaselineS} != the standard {MissionLibrary.StandardBaselineS}");
+        }
+
+        // (g) The crosswind axis must be a dose-response series, not a set of scenarios:
+        // crosswind must increase strictly with the level, and no crosswind mission may
+        // be on the cognitive axis.
+        foreach (var m in cognitive)
+            if (Mathf.Abs(m.CrosswindMs) > 1.0f)
+                Problem("design", m.Id + $": cognitive-axis mission carries {m.CrosswindMs:F1} m/s of crosswind — " +
+                        "manual demand is supposed to be matched on this axis");
+        for (int i = 1; i < MissionLibraryCrosswind.Levels.Length; i++)
+            if (MissionLibraryCrosswind.Levels[i] <= MissionLibraryCrosswind.Levels[i - 1])
+                Problem("design", "crosswind levels are not strictly increasing");
+
+        // (h) Every session a participant could be given must be a complete crossed grid.
+        for (int p = 0; p < 12; p++)
+        {
+            var sess = MissionLibrary.SessionMissions(p);
+            if (sess.Count != 12) { Problem("design", $"participant {p}: session has {sess.Count} missions, expected 12"); continue; }
+            foreach (var phase in MissionLibrary.Rows)
+            {
+                int n = 0, variants = 0, firstV = -1;
+                foreach (var m in sess) if (m.Phase == phase)
+                { n++; if (firstV < 0) firstV = m.Variant; if (m.Variant != firstV) variants++; }
+                if (n != 3) Problem("design", $"participant {p}: {phase} row has {n} missions, expected 3");
+                if (variants != 0) Problem("design", $"participant {p}: {phase} row mixes variants — the class contrast would not be variant-matched");
+            }
+        }
+
+        WriteVariantEquivalenceTable();
+        report.AppendLine(problems.Count == 0 ? "design checks: OK" : "design checks: " + problems.Count + " PROBLEM(S)");
+        report.AppendLine();
+    }
+
+    /// <summary>Write the a-priori half of the variant-exchangeability evidence: for
+    /// every cell, the declared demand parameters of each variant side by side.
+    ///
+    /// This is what a reader needs in order to judge whether the three variants of a
+    /// cell are interchangeable representations of it, and it is deliberately written
+    /// BEFORE any participant data exists — the empirical half (achieved flight
+    /// performance and control activity per variant, with effect sizes and confidence
+    /// intervals) is computed from the collected trials by the analysis, against this
+    /// table as its pre-registered reference.</summary>
+    void WriteVariantEquivalenceTable()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("cell,phase,class,variant,id,mechanism,pli,manual_control,mental,temporal,decision," +
+                      "working_memory,attention_switching,situation_awareness,perception,procedural," +
+                      "uncertainty,communication,error_consequence,expected_rtlx,duration_s,baseline_s," +
+                      "events,visibility_01,ambient_turbulence,crosswind_ms,headwind_ms");
+        foreach (var phase in MissionLibrary.Rows)
+            foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+                for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+                {
+                    var m = MissionLibrary.Cell(phase, c, v);
+                    if (m == null) continue;
+                    var p = m.Profile;
+                    sb.AppendLine($"{m.CellKey},{phase},{c},{v},{m.Id},\"{m.Mechanism}\",{p.PLI:F2},{p.ManualControl}," +
+                                  $"{p.MentalDemand},{p.TemporalDemand},{p.DecisionComplexity},{p.WorkingMemory}," +
+                                  $"{p.AttentionSwitching},{p.SituationAwareness},{p.Perception},{p.ProceduralLoad}," +
+                                  $"{p.Uncertainty},{p.Communication},{p.ErrorConsequence},{m.Expected.RTLX:F1}," +
+                                  $"{m.DurationS:F0},{m.InTaskBaselineS:F0},{m.Events.Count},{m.Visibility01:F2}," +
+                                  $"{m.AmbientTurbulence:F2},{m.CrosswindMs:F2},{m.HeadwindMs:F2}");
+                }
+        try
+        {
+            string path = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "variant_equivalence.csv");
+            File.WriteAllText(path, sb.ToString());
+            report.AppendLine("wrote variant_equivalence.csv");
+        }
+        catch (System.Exception e) { report.AppendLine("could not write variant_equivalence.csv: " + e.Message); }
+    }
+
     void Start()
     {
         Application.targetFrameRate = -1;
@@ -123,7 +286,26 @@ public class MissionTestHarness : MonoBehaviour
             foreach (var ft in FindObjectsByType<FlightTest>(FindObjectsSortMode.None))
             { Log("destroying rival control driver: FlightTest"); Destroy(ft.gameObject); }
             ParticipantManagerSetIfNeeded();
-            foreach (var m in MissionLibrary.All()) queue.Add(m.Id);
+            // DESIGN CHECKS FIRST. These are properties of the mission TABLE, not of a
+            // flight, so they can be checked before anything is flown — and if the grid
+            // is malformed there is no point flying 42 missions to find out.
+            CheckBankDesign();
+
+            // -bankquick flies one variant index only (the twelve a single participant
+            // would actually fly) instead of the whole bank. The full bank is ~42 x 300 s
+            // even at 8x, so the quick form exists for iteration; the full form is what
+            // must pass before data collection.
+            bool quick = false;
+            foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-bankquick") quick = true;
+            if (quick)
+            {
+                foreach (var m in MissionLibrary.SessionMissions(0)) queue.Add(m.Id);
+                report.AppendLine("QUICK MODE: one variant index only (" + queue.Count + " missions).");
+            }
+            else
+            {
+                foreach (var m in MissionLibrary.All()) queue.Add(m.Id);
+            }
             report.AppendLine("missions queued: " + queue.Count);
             Log("harness up, " + queue.Count + " missions queued");
             NextMission();
@@ -618,6 +800,15 @@ public class MissionTestHarness : MonoBehaviour
         report.AppendLine("NOTE: this battery runs as participant TEST01. Its folders contain SYNTHETIC");
         report.AppendLine("NASA-TLX values submitted by the harness and must never be analysed as data.");
 
+        // Write to BOTH persistentDataPath and the project root. The project root is
+        // where the control and wind batteries write and where the documentation tells a
+        // reader to look — and a STALE copy sitting there while the live one is buried in
+        // ~/Library is an excellent way to read yesterday's result and believe it is
+        // today's. (That happened during this work: a report dated the previous day, with
+        // the old 12 missions and the old 77-column telemetry, was sitting in the project
+        // root looking entirely plausible.)
+        string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+        try { File.WriteAllText(Path.Combine(projectRoot, "mission_test_report.txt"), report.ToString()); } catch { }
         string path = Path.Combine(Application.persistentDataPath, "mission_test_report.txt");
         File.WriteAllText(path, report.ToString(), new System.Text.UTF8Encoding(false));
         Log("done. problems=" + problems.Count + " report=" + path);

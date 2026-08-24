@@ -80,19 +80,51 @@ public static class ExperimentSession
     /// <summary>Build the counterbalanced order for a participant and open the
     /// session data folder. `participantNumber` is derived from the participant ID
     /// so the same code always gets the same row of the square (reproducible).</summary>
+    /// <summary>The variant index this participant flies in each phase row, in the order
+    /// of MissionLibrary.Rows. Recorded in session.json so the realised assignment is
+    /// reconstructible from the participant code alone.</summary>
+    public static int[] RowVariants { get; private set; } = new int[0];
+
     public static void Begin(string participantId, int sessionNumber)
     {
         int pnum = StableNumber(participantId);
         SquareIndex = (pnum + sessionNumber - 1) % 12;
         Seed = unchecked(pnum * 2654435761u).GetHashCode() ^ (sessionNumber * 104729);
 
+        // WHICH TWELVE. The bank holds 36 cognitive-axis missions (4 phases x 3 classes
+        // x 3 interchangeable variants). A session is still TWELVE — one variant index
+        // per phase row — because 36 x 300 s is three hours of flying inside one EEG
+        // session and fatigue would dominate every contrast the study exists to measure.
+        //
+        // The variant index rotates per row, so that WITHIN a row all three classes share
+        // one variant (the Low-Medium-High contrast is therefore always variant-matched,
+        // and variant can never masquerade as class) while ACROSS rows the participant
+        // meets different variants (so variant is not perfectly nested in participant).
+        // See MISSION_BANK_DESIGN.md.
+        int variantSource = pnum + (sessionNumber - 1);
+        var session = MissionLibrary.SessionMissions(variantSource);
+        RowVariants = new int[MissionLibrary.Rows.Length];
+        for (int r = 0; r < MissionLibrary.Rows.Length; r++)
+            RowVariants[r] = MissionLibrary.VariantForRow(variantSource, MissionLibrary.Rows[r]);
+
         var ids = new List<string>();
-        foreach (var m in MissionLibrary.All()) ids.Add(m.Id);
+        foreach (var m in session) ids.Add(m.Id);
 
         Order = BalancedLatinSquareRow(ids, SquareIndex);
         Order = DeClumpClasses(Order);
 
         ExperimentLogger.BeginSession(Order, Seed);
+    }
+
+    /// <summary>Human-readable variant assignment, for session.json and the operator's
+    /// screen: "Takeoff=v2 Climb=v3 Cruise=v1 Approach=v2".</summary>
+    public static string VariantSummary()
+    {
+        if (RowVariants == null || RowVariants.Length == 0) return "(not assigned)";
+        var sb = new System.Text.StringBuilder();
+        for (int r = 0; r < RowVariants.Length && r < MissionLibrary.Rows.Length; r++)
+            sb.Append(MissionLibrary.Rows[r]).Append("=v").Append(RowVariants[r]).Append(' ');
+        return sb.ToString().TrimEnd();
     }
 
     /// <summary>Row `k` of a balanced (Williams) Latin square on n items. For even n

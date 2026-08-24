@@ -18,13 +18,49 @@ using UnityEngine;
 
 public enum FlightPhase { Preflight, Takeoff, Climb, Cruise, Descent, Approach, Landing, Circuit }
 
+/// <summary>WHICH EXPERIMENTAL AXIS a mission belongs to.
+///
+/// The study has two, and conflating them would destroy the first one.
+///
+/// COGNITIVE is the main experiment: a Low/Medium/High scale on which manual and
+/// psychomotor demand are deliberately MATCHED WITHIN EACH PHASE ROW, which is the
+/// property that licenses reading an EEG difference between classes as cognitive
+/// rather than muscular.
+///
+/// PSYCHOMOTOR_INTEGRATED is the crosswind set. Crosswind raises manual demand by
+/// construction — that is what a crosswind IS — so placing it on the cognitive scale
+/// would break the matching that makes the scale interpretable, and any EEG increase
+/// it produced could be hand movement rather than thought. It is therefore a separate
+/// construct with its own analysis: the continuous crosswind segment is read as
+/// integrated psychomotor/cognitive demand alongside the logged control-activity
+/// covariates, while the ISOLATED cognitive component is the discrete
+/// continue-or-go-around decision against a stated crosswind limit, which has an
+/// onset, a response and a reaction time and can be epoched on its own.
+///
+/// A finding from this axis is stated as "increased integrated psychomotor/cognitive
+/// demand", never as "crosswind increased cognitive workload".</summary>
+public enum LoadAxis { Cognitive, PsychomotorIntegrated }
+
 public class MissionDefinition
 {
     // ---------------- identity ----------------
-    public string Id = "";                 // L1..L4, M1..M4, H1..H4
+    public string Id = "";                 // L1..H4 (variant 1), L1V2.., XT1..XL3
     public string Name = "";
     public WorkloadClass Class = WorkloadClass.Low;
     public FlightPhase Phase = FlightPhase.Cruise;
+    /// <summary>Which experimental axis this mission belongs to. See LoadAxis.</summary>
+    public LoadAxis Axis = LoadAxis.Cognitive;
+    /// <summary>Which interchangeable realisation of this (phase, class) cell this is,
+    /// 1..3. A participant flies ONE variant index per phase row, so within a row the
+    /// Low/Medium/High contrast is always variant-matched and variant can never
+    /// masquerade as class. See MISSION_BANK_DESIGN.md.</summary>
+    public int Variant = 1;
+    /// <summary>The cognitive mechanism this mission uses, in three or four words —
+    /// "working memory", "forward reasoning about a depleting resource", "concurrency
+    /// under time pressure". The three variants of a cell must use DIFFERENT mechanisms;
+    /// this is the field that makes that claim checkable rather than asserted, and the
+    /// mission battery reports any cell whose variants repeat a mechanism.</summary>
+    public string Mechanism = "";
 
     // ---------------- initial conditions ----------------
     public ScenarioStart Start = ScenarioStart.Airborne;
@@ -128,6 +164,8 @@ public class MissionDefinition
 
     // ---------------- helpers ----------------
     public string ClassTag => Class.ToString().ToUpper();
+    /// <summary>The (phase, class) cell this mission is one realisation of.</summary>
+    public string CellKey => Phase + "/" + ClassTag;
 
     /// <summary>Crosswind on the study's runway, m/s, positive = from the right.
     /// Derived, never stored, so it can never disagree with the wind that is flown.</summary>

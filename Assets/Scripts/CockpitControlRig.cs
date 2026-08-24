@@ -36,6 +36,20 @@ public class CockpitControlRig : MonoBehaviour
     /// <summary>Every control built, in a stable order.</summary>
     public PhysicalControl[] Controls { get; private set; } = new PhysicalControl[0];
 
+    /// <summary>True when any physical cockpit control is currently in the pilot's hand.
+    /// Used by the control-activity covariate so "hands on" time is measured rather than
+    /// inferred from whether the inputs happen to be changing.</summary>
+    public static bool AnyGrabbed
+    {
+        get
+        {
+            var r = Instance;
+            if (r == null) return false;
+            foreach (var c in r.Controls) if (c != null && c.Grabbed) return true;
+            return false;
+        }
+    }
+
     // Panel-relative anchors (holder-local metres). Chosen so nothing overlaps:
     // the nearest two controls are 9 cm apart and the largest capture radius is 4.5 cm.
     // Layout, revised in the visual pass. Every control is now MOUNTED — on the lower

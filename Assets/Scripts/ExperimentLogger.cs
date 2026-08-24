@@ -123,6 +123,21 @@ public class ExperimentLogger
         sb.Append("  \"mission_order\": [");
         for (int i = 0; i < order.Count; i++) sb.Append((i > 0 ? ", " : "") + J(order[i]));
         sb.AppendLine("],");
+        // WHICH REALISATION OF EACH CELL THIS PARTICIPANT FLEW. The bank holds three
+        // interchangeable variants of every (phase, class) cell; a session uses one per
+        // phase row. Recording the assignment is what makes variant analysable as the
+        // between-subject nuisance factor it is, instead of an unrecorded difference
+        // between participants that no later analysis could recover.
+        sb.Append("  \"row_variants\": {");
+        for (int r = 0; r < MissionLibrary.Rows.Length; r++)
+        {
+            int v = (ExperimentSession.RowVariants != null && r < ExperimentSession.RowVariants.Length)
+                    ? ExperimentSession.RowVariants[r] : 0;
+            sb.Append((r > 0 ? ", " : "") + J(MissionLibrary.Rows[r].ToString()) + ": " + v);
+        }
+        sb.AppendLine("},");
+        sb.AppendLine($"  \"bank_size\": {MissionLibrary.All().Count},");
+        sb.AppendLine($"  \"variants_per_cell\": {MissionLibrary.VariantCount},");
         sb.AppendLine("  \"note\": \"No personally identifying information is stored. participant_id is a study code assigned by the experimenter.\"");
         sb.AppendLine("}");
         File.WriteAllText(Path.Combine(sessionDir, "session.json"), sb.ToString(), Utf8NoBom);
@@ -411,6 +426,10 @@ public class ExperimentLogger
         sb.AppendLine($"    \"hdg_tolerance_deg\": {m.HdgToleranceDeg.ToString("F0", CI)},");
         sb.AppendLine($"    \"flaps\": {m.StartFlaps01.ToString("F2", CI)},");
         sb.AppendLine($"    \"fuel_l\": {m.StartFuelL.ToString("F0", CI)},");
+        sb.AppendLine($"    \"load_axis\": {J(m.Axis.ToString())},");
+        sb.AppendLine($"    \"variant\": {m.Variant},");
+        sb.AppendLine($"    \"mechanism\": {J(m.Mechanism)},");
+        sb.AppendLine($"    \"cell\": {J(m.CellKey)},");
         sb.AppendLine($"    \"ambient_turbulence\": {m.AmbientTurbulence.ToString("F2", CI)},");
         sb.AppendLine($"    \"wind_from_deg\": {m.WindFromDeg.ToString("F1", CI)},");
         sb.AppendLine($"    \"wind_speed_ms\": {m.WindSpeedMs.ToString("F2", CI)},");
