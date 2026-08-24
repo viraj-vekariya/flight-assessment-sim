@@ -79,6 +79,8 @@ point: the existing batteries were good and passed throughout.
 | 14 | The MFD was a **game minimap**, and its range was fixed at 180 m | looking at a cockpit render | No route, no waypoints, no numbers, and a range so close that a waypoint 4 km ahead was twenty-two screens away — so the route the display exists to show could never have appeared on it. |
 | 15 | **The project had never been built into a player, on any platform** | first build attempt | `Cannot build untitled scene.` The world is built from code and there are no scenes, which works in the editor and cannot work in a player. An editor-only workflow had hidden a build-breaking assumption indefinitely. |
 | 16 | `PlayCapture.RunDesignShots` did not exist | running the command in `CockpitDesignShots`' own header | The documented way to render the cockpit review shots failed; they had only ever been produced by a generic timed run that exits on a stopwatch rather than when the renders finish. |
+| 16b | The PFD showed nothing about the aeroplane's **configuration** | looking at a cockpit render against the mission set | A real 172 has a flap position indicator, and the gap between the flap SELECTOR and the flap POSITION is the entire content of the flap-failure mission. Without one, the only cue was the aeroplane not slowing down. |
+| 16c | `ManualControl = 5` on a **0–4 scale** | reading the generated documentation | The near-limit crosswind landing was scored off the end of the scale the whole workload model is defined on, inflating its PLI by a dimension the weighting never anticipated. |
 | 17 | The control battery wrote its report **only** to `persistentDataPath` | comparing a report against the live log | A stale copy in the project root — where the docs tell a reader to look — served yesterday's result as if it were today's. This happened **twice** during this work, once with each harness. |
 
 ## 6. Mission structure
@@ -235,9 +237,40 @@ Nothing below has been faked or asserted:
 * Landing scoring judges sink, bank and alignment but does not model gear side-load, so
   landing crabbed is penalised through alignment and excursion rather than through a
   modelled undercarriage failure.
+* **The world is sparse.** Terrain, a coastline, an aerodrome with taxiways, hold-short
+  markings and signage, scattered settlements and vegetation all exist — but from cruise
+  altitude over the aerodrome plain there is not much to look at. That is partly
+  deliberate (the plain exists so departures do not fly into hills) and partly just
+  unfinished. It matters less than it looks: the missions are flown on instruments and
+  on ATC instructions, and none of them depends on ground features. It would matter for
+  a study of visual navigation, which this is not.
 * Every mission's own `Approximations` field lists what that mission in particular cannot
   model faithfully, and it is copied into `metadata.json` so no analysis can quietly
   forget it.
+
+---
+
+## 14. A note on how the defects were found
+
+Fifteen of the seventeen were found by **automated checks that did not exist before this
+work**, or by **looking at a rendered picture**. Almost none were found by reading code.
+
+That is worth recording, because the code was not bad — it was careful, well commented,
+and it passed every test it had. What it lacked were tests that could disagree with it:
+
+* a battery that asserts *numbers against closed-form predictions* rather than behaviour
+  (the wind battery — it caught four defects in its first run, three of which had nothing
+  to do with wind);
+* checks on the *design table* rather than on the flying (variant drift, terrain
+  clearance, a crosswind smuggled onto the motor-matched axis) — the cheapest tests in
+  the project, and the ones that caught the most;
+* **rendering the cockpit and looking at it**, which is the only way a spoiler lever in a
+  Cessna 172, a minimap where a navigation display should be, and a missing flap
+  indicator were ever going to surface.
+
+The general lesson for whoever works on this next: when something here is wrong, the
+fastest way to find out is usually to make the simulator *state a number* and then check
+that number against arithmetic done somewhere else — not to read the method again.
 
 ## 13. Recommended next steps, in order
 
