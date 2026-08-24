@@ -153,7 +153,7 @@ public static class PlayCapture
         if (!EditorApplication.isPlaying) return;
         if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
         bool done = CockpitDesignShots.Finished;
-        bool timedOut = EditorApplication.timeSinceStartup - t0 > 300.0;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
         if (!done && !timedOut) return;
         if (timedOut && !done) Debug.LogError("[DESIGNSHOTS] HARD TIMEOUT");
         EditorApplication.update -= TickDesignShots;

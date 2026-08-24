@@ -20,8 +20,12 @@ using UnityEngine;
 public class PedalBrakeVisual : MonoBehaviour
 {
     public CessnaPhysics phys;
-    public float maxTiltDeg = 20f;
+    public float maxTiltDeg = 14f;
     public float tau = 0.05f;
+    /// <summary>Half the pedal's height, metres. Recorded by the rig purely so this
+    /// component can refuse a rotation that would throw the pedal further than its own
+    /// size — the failure that put the pedals through the cockpit floor.</summary>
+    public float pedalHalfHeight = 0.08f;
 
     Quaternion rest;
     float shown;
@@ -34,6 +38,13 @@ public class PedalBrakeVisual : MonoBehaviour
         // Frame-rate independent, like every other smoothed thing in this cockpit.
         float k = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.0001f, tau));
         shown = Mathf.Lerp(shown, Mathf.Clamp01(phys.brakeInput01), k);
-        transform.localRotation = rest * Quaternion.Euler(shown * maxTiltDeg, 0f, 0f);
+        // Hard ceiling expressed as ARC LENGTH rather than angle: the top of the pedal may
+        // not travel further than the pedal's own half-height. With the hinge on the pedal's
+        // bottom edge the top is `2 * pedalHalfHeight` from it, so that bound is
+        // theta <= 0.5 rad (about 28 deg) — comfortably above the 14 deg a toe brake wants,
+        // and a hard stop if the hinge is ever mis-placed again. A visual is not allowed to
+        // relocate part of the airframe.
+        const float MaxArcDeg = 0.5f * Mathf.Rad2Deg;
+        transform.localRotation = rest * Quaternion.Euler(shown * Mathf.Min(maxTiltDeg, MaxArcDeg), 0f, 0f);
     }
 }

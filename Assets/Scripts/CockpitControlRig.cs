@@ -50,125 +50,124 @@ public class CockpitControlRig : MonoBehaviour
         }
     }
 
-    // Panel-relative anchors (holder-local metres). Chosen so nothing overlaps:
-    // the nearest two controls are 9 cm apart and the largest capture radius is 4.5 cm.
-    // Layout, revised in the visual pass. Every control is now MOUNTED — on the lower
-    // panel face, on the centre pedestal, or on a sub-panel — instead of hanging in space.
-    // Spacing is checked against capture radii below: the closest pair is 5.5 cm apart and
-    // the radii that meet there sum to less than that, so no reach can grab two controls.
-    const float PanelZ    = 0.750f;   // lower panel face, just proud of the GLB panel
+    // ═══════════════════════════════════════════════════════════════════════════
+    // LAYOUT
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // MEASURED, NOT ESTIMATED. Every anchor below was read out of the GLB by the design
+    // probe (CockpitDesignShots.WriteGeometryReport), in the cockpit's own axes:
+    //
+    //     panel face                z = 0.755      (Object_50 / Object_81 / Object_83)
+    //     panel width               x = +-0.176    (Object_50)
+    //     display band              y = 0.474 .. 0.547
+    //     centre pedestal           x = +-0.047,  y = 0.237 .. 0.445,  front z = 0.667  (Object_58)
+    //     rudder pedals             x = +-0.127,  y = 0.270 .. 0.306,  z = 0.755 .. 0.801  (Object_52)
+    //     pilot eye                 (0, 0.580, 0.520)
+    //
+    // The model is about 0.352x life size (CockpitHardware.ModelScale, measured four
+    // independent ways), so all HARDWARE dimensions are written in real millimetres and
+    // scaled by MM. Positions stay in model units because that is what the anchors are in.
+    //
+    // THE ARRANGEMENT IS A 172'S, not a set of sliders in a row:
+    //
+    //     lower panel, left to right:   PARK BRAKE | switches | CARB HEAT  THROTTLE  MIXTURE | FLAPS
+    //     centre pedestal, top to bottom:                       TRIM WHEEL / FUEL VALVE
+    //     rudder pedals:                                        TOE BRAKES
+    //     panel outboard columns:                               engine + electrical gauges
+    //
+    // Why the engine controls sit close together in the centre rather than spread across
+    // the panel: on the aeroplane they are one cluster under the radio stack, reached with
+    // one hand without looking, and the FLAP lever is deliberately outboard of them so it
+    // cannot be grabbed by mistake in place of the throttle. Separating controls by
+    // FUNCTION and by SHAPE is what makes a cockpit learnable; spacing them evenly does not.
 
-    // ── LAYOUT ─────────────────────────────────────────────────────────────────────
-    // Two tiers, because the cockpit has two kinds of control and they should not look
-    // alike or sit together:
+    // MEASURED SURFACES (design probe, drawn-triangle bounds + depth map):
     //
-    //   PRIMARY — touched continuously, must be found without looking:
-    //       yoke (GLB) · throttle quadrant · flap lever · brake handle
-    //   SYSTEMS — memory items, touched a handful of times in three missions, grouped
-    //   into ONE tidy block on the left so they read as a switch panel rather than as
-    //   controls scattered round the cabin:
-    //       carb heat · fuel selector · load shed · alternate static
+    //     upper panel  Object_50   z = 0.755   y 0.470 .. 0.560, full width
+    //     LOWER PANEL  Object_81   z = 0.760   y 0.270 .. 0.470, x +-0.176
+    //     PEDESTAL     Object_58   z = 0.667   y 0.250 .. 0.450, x +-0.047   (stands 93 mm proud)
+    //     yoke wheel   Object_90   z = 0.710   y 0.417 .. 0.474, x +-0.047   (94 mm across, centred)
+    //     pedals       Object_52   z = 0.755   y 0.270 .. 0.310, x +-0.110
+    //     PFD glass    centre (-0.0709, 0.4921, 0.7535), 85 x 56
+    //     MFD glass    centre ( 0.0461, 0.4921, 0.7535), 85 x 56
     //
-    // The systems four are NOT decoration and cannot be dropped: ChecklistLibrary gates
-    // real DO items on them — Electrical/H2 on LoadShed, StaticBlock/H3 on
-    // AlternateStaticOpen, EngineFailure/H4 on CarbHeatOn and Selector != Both. Remove
-    // any of them and a HIGH mission's drill can never be completed.
+    // The pedestal is the fact that drives the whole arrangement: it occupies the centre
+    // strip x +-0.047 and stands 93 mm CLOSER to the pilot than the panel, so anything
+    // mounted on the lower panel behind it is simply invisible. The first version of this
+    // layout put the engine controls at x = -0.012 .. +0.052 — directly behind the pedestal —
+    // which is why they rendered as knobs floating in the footwell with a gap above them.
     //
-    // Spacing is checked against capture radii: the closest pair is 55 mm apart and the
-    // radii that meet there sum to 54 mm, so one reach can never take two controls.
+    // So the panel is used as the aeroplane uses it:
+    //
+    //     LEFT of the pedestal    engine and electrical gauges, park brake, switch bank
+    //     ON the pedestal         trim wheel, and the fuel valve below it
+    //     RIGHT of the pedestal   carb heat / throttle / mixture in a row, flap lever outboard
+    //
+    // That also happens to put the throttle 100 mm right of the pilot's centreline, which is
+    // 284 mm at full scale — where a 172's throttle actually is.
 
-    // Layout follows the reference: levers in a quadrant to the RIGHT of the yoke, the
-    // engine/systems group to the LEFT, trim and alternate static on the pedestal, and the
-    // brakes on the model's OWN rudder pedals (Object_52, no longer hidden).
-    //
-    // The furniture is kept clear of the pedal volume (x +-0.127, y 0.270..0.306,
-    // z 0.755..0.801): the sub-panel now starts at y 0.315 and the pedestal is pulled aft
-    // to z 0.630..0.730, so nothing intersects them.
-    //
-    // Capture radii may overlap freely: CockpitInteractor*.Nearest() takes the CLOSEST
-    // control inside its own radius, so a tight quadrant resolves to whichever lever the
-    // hand is actually nearest rather than becoming ambiguous.
+    const float PanelZ = 0.7585f;  // lower panel face (0.760), hardware mounts just proud of it
+    const float PedZ   = 0.6655f;  // pedestal front face (0.667), same treatment
 
-    // ── THE CONTROL AREA ───────────────────────────────────────────────────────────
-    // Three SLIDE controls in one compact block on the lower panel, in the order a hand
-    // meets them moving outboard:
-    //
-    //        SPOILER      THROTTLE      FLAPS
-    //
-    // They slide VERTICALLY on the panel face. That is not a stylistic choice — it is what
-    // lets them be compact and mounted flat on the panel below the displays, instead of
-    // three tall poles standing up off a pedestal, and it agrees with 14 CFR 23.779, which
-    // accepts up/forward for "increase" and down/rearward for flaps and speed brakes to
-    // extend.
-    //
-    // X = 0.115 is set by what the YOKE occludes: at 0.072 and again at 0.092 the inboard
-    // (spoiler) control rendered behind the right yoke horn and could not be seen or
-    // reached. SPACING 48 mm centre-to-centre sits in the band compact GA quadrants use
-    // (40-50 mm); MIL-STD-1472F Fig.18 wants 50 mm for one-hand RANDOM access, but
-    // 5.4.3.2.1.2 requires handle CODING when controls are grouped, and all three grips are
-    // shape-coded (ball / flat paddle / ribbed bar), which is what buys the separation back.
-    //
-    // Y and Z: the block sits on the panel face at z = 0.7485 (6 mm proud), spanning
-    // y 0.322..0.452 — under the displays, whose lower edge is y 0.462, and above the
-    // sub-panel lip. It is BELOW the seated forward view (everything under y = 0.461 is, in
-    // this cockpit, at 55 deg field of view) and is a glance-down control, as the throttle
-    // is in a real 172.
-    // POSITION, measured against the REAL pilot view (the cockpit camera is 78 deg
-    // vertical — CockpitBuilder — not the 55 deg the verification tool used to force).
-    // Every bound below was read off that view, not estimated:
-    //
-    //   yoke horns span      x -0.052 .. +0.048   -> the group must start outboard of 0.048
-    //   panel's right edge   x  0.159             -> and end inboard of it
-    //   MFD's lower edge     y  0.4856            -> travel must top out below that
-    //
-    // That gives a 111 mm window, which comfortably takes three controls at 45 mm centres.
-    // 45 mm is in the band compact GA quadrants use (40-50 mm); MIL-STD-1472F Fig.18 asks
-    // 50 mm for one-hand RANDOM access, but 5.4.3.2.1.2 requires handle CODING when
-    // controls are grouped, and all three grips are shape-coded per 14 CFR 23.781 (ball /
-    // flat paddle / ribbed bar), which is what buys the separation back.
-    const float SlideX = 0.105f, SlideSpacing = 0.045f;
-    // y = 0.432 with 44 mm of travel puts the whole group at viewport y ~0.02..0.19 —
-    // fully inside the pilot's view, and with the top of the ESCUTCHEON below the MFD's
-    // lower edge (viewport 0.24) so no display is occluded.
-    //
-    // Both bounds were measured, and both were wrong at first. Sizing against the TRAVEL
-    // rather than the escutcheon put the plate through the bottom of the MFD; and the
-    // spoiler sits directly under the MFD in x, so it is the control that has to clear it.
-    // Dropping the group instead pushed the placards off the bottom of the frame, which is
-    // why they now sit ABOVE their controls.
-    const float SlideY = 0.432f, SlideZ = 0.7485f;
-    /// <summary>Vertical travel of a slide handle, metres. The handle's position IS the
-    /// value: 0 % of travel = 0.0, 50 % = 0.5, 100 % = 1.0.</summary>
-    const float SlideTravel = 0.044f;
-    static readonly Vector3 SpoilerLeverPos = new Vector3(SlideX - SlideSpacing, SlideY, SlideZ);
-    static readonly Vector3 ThrottlePos     = new Vector3(SlideX,                SlideY, SlideZ);
-    static readonly Vector3 FlapLeverPos    = new Vector3(SlideX + SlideSpacing, SlideY, SlideZ);
-    // left-hand engine / systems group
-    static readonly Vector3 CarbHeatPos     = new Vector3(-0.068f, 0.385f, PanelZ);
-    static readonly Vector3 FuelSelPos      = new Vector3(-0.068f, 0.335f, PanelZ);
-    // LoadShedPos / AltStaticPos retired 23 Aug 2026 with the switches themselves.
-    // pedestal
-    static readonly Vector3 TrimWheelPos    = new Vector3(-0.152f, 0.318f, 0.7425f);
-    // BRAKE HANDLE. Under the LEFT edge of the panel — which is where a 172's brake
-    // handle actually is ("under the left side of the instrument panel", POH Fig. 7-2) and,
-    // more to the point, somewhere a seated hand can reach without groping into the
-    // footwell.
-    //
-    // The pedals were the brake control until now, and they were unusable: measured at 45
-    // deg below the eye line, tucked under the panel, and reachable only by putting a hand
-    // into the footwell mid-taxi. Worse, Object_52 was REPARENTED under the control, so
-    // the control and an unrelated piece of aircraft geometry moved and hid together —
-    // exactly the coupling that must not exist. The pedals are now driven by a separate
-    // follower that only READS brake pressure (see PedalBrakeVisual), and the brake
-    // control is its own object with its own geometry.
-    // BRAKE HANDLE, lower-LEFT panel — where a 172's brake handle actually is ("under the
-    // left side of the instrument panel", POH Fig. 7-2), and reachable from the seat.
-    //
-    // y = 0.435 was set against the REAL pilot view (78 deg): at 0.345 the handle sat below
-    // the bottom edge of the frame and the participant never saw it. 0.435 puts it at
-    // viewport y ~0.11, inboard of the panel's left edge and clear of the PFD, whose lower
-    // edge is y = 0.462.
-    static readonly Vector3 BrakePos        = new Vector3(-0.130f, 0.435f, 0.7485f);
+    /// <summary>THE SEATED VIEW CUTS OFF AT y = 0.358 ON THE PANEL.
+    ///
+    /// Worked from the camera rather than guessed: the eye is at (0, 0.580, 0.520), the
+    /// cockpit camera is 78 deg vertical with a 4 deg down-tilt (CockpitBuilder,
+    /// CockpitCamera.basePitch), and the panel face is 0.2385 in front of the eye. The
+    /// bottom of the frame is therefore 43 deg below the eye, which on the panel is
+    ///     y = 0.580 - 0.2385 * tan(43 deg) = 0.358.
+    ///
+    /// Anything below that is invisible to a seated desktop participant unless they hold
+    /// right-mouse and look down. In a headset it is simply a glance. So:
+    ///
+    ///   ABOVE 0.358  everything used continuously — throttle, flaps, brake, the gauges.
+    ///   BELOW 0.358  the memory items — switch bank, fuel valve — which are touched a
+    ///                handful of times per session, have keyboard equivalents on the
+    ///                desktop, and are exactly where a 172 keeps them.
+    ///
+    /// The pedestal is closer to the eye (z = 0.6655), so the same angle cuts it off much
+    /// higher, at y = 0.444. Its top is 0.450, so the pedestal is essentially never in the
+    /// seated forward view — which is also true of the real aeroplane's.</summary>
+    const float SeatedViewFloorY = 0.358f;
+
+    /// <summary>The engine-control row. One height, because on the aeroplane they are one
+    /// row and a hand sweeping along it should meet them all.</summary>
+    const float EngineRowY = 0.430f;
+
+    // 34 mm centres = 97 mm at full scale, which is a 172's spacing and, more to the point,
+    // more than the two capture radii sum to. At 30 mm the two overlapped by a millimetre
+    // and a hand between them could have taken either.
+    static readonly Vector3 CarbHeatPos = new Vector3(0.072f, EngineRowY, PanelZ);
+    static readonly Vector3 ThrottlePos = new Vector3(0.106f, EngineRowY, PanelZ);
+    static readonly Vector3 MixturePos  = new Vector3(0.140f, EngineRowY, PanelZ);
+    /// <summary>Flaps: outboard of the engine cluster and well below it, so it is neither in
+    /// the row a hand sweeps for power nor at the same height as it. Mistaking the flap
+    /// lever for the throttle on short final is a real accident category; separating them by
+    /// position AND by shape is the standard defence.</summary>
+    static readonly Vector3 FlapLeverPos = new Vector3(0.154f, 0.394f, PanelZ);
+    /// <summary>Park/wheel brake: the small black T-pull under the LEFT panel edge, which is
+    /// where a 172's parking brake is.</summary>
+    static readonly Vector3 BrakePos = new Vector3(-0.072f, 0.394f, PanelZ);
+
+    /// <summary>Trim and fuel go on the PEDESTAL, which is real GLB geometry rather than a
+    /// plate invented to hold them. Both sit about 50 deg below the eye — a glance down,
+    /// exactly as in the aeroplane, well inside the 64 deg the cockpit camera pitches to
+    /// (CockpitCamera.maxPitch) and trivially inside a headset's.</summary>
+    static readonly Vector3 TrimWheelPos = new Vector3(0f, 0.393f, PedZ);
+    static readonly Vector3 FuelSelPos   = new Vector3(0f, 0.310f, PedZ);
+
+    /// <summary>Two interactive toggles in the left switch bank. They exist because
+    /// ChecklistLibrary gates HIGH missions on them (Electrical/H2 on LoadShed,
+    /// StaticBlock/H3 on AlternateStaticOpen) and a headset has no keyboard, so without a
+    /// cockpit object those drills are unperformable in the modality the study runs in.</summary>
+    static readonly Vector3 LoadShedPos  = new Vector3(-0.150f, 0.332f, PanelZ);
+    static readonly Vector3 AltStaticPos = new Vector3(-0.128f, 0.332f, PanelZ);
+
+    /// <summary>The engine and electrical gauges, on the left panel where the yoke and the
+    /// pedestal cannot cover them. Two columns of three.</summary>
+    const float GaugeLeftX  = -0.152f;
+    const float GaugeRightX = -0.112f;
+    static readonly float[] GaugeRowY = { 0.452f, 0.414f, 0.376f };
 
     // ── LABEL SCALE ────────────────────────────────────────────────────────────────
     // Cockpit placards, not captions. The previous pass drew ~5 cm letters: measured from
@@ -217,42 +216,44 @@ public class CockpitControlRig : MonoBehaviour
         ctl = phys.GetComponent<AircraftController>();
         sys = phys.GetComponent<AircraftSystems>();
 
-        BuildStructure();          // furniture first, so every control lands ON something
+        CabinTrim.Build(model);    // the space first, so the furniture sits IN somewhere
+        BuildStructure();          // furniture next, so every control lands ON something
 
         var list = new System.Collections.Generic.List<PhysicalControl>();
+
+        // PRIMARY FLIGHT CONTROLS — touched continuously, found without looking.
         list.Add(BuildYoke());
+        list.Add(BuildBrakePedals());   // also builds the toe pads on the rudder pedals
+
+        // ENGINE CONTROL CLUSTER — one row on the lower centre panel, as on the aeroplane.
+        list.Add(BuildCarbHeat());
         list.Add(BuildThrottle());
+        BuildMixtureVisual();           // geometry only, deliberately not interactive
         list.Add(BuildFlapLever());
+
+        // PEDESTAL — trim above, fuel valve below, on the GLB's own centre console.
+        list.Add(BuildTrimWheel());
+        list.Add(BuildFuelSelector());
+
+        // SYSTEMS SWITCHES. LOAD SHED and ALTERNATE STATIC are RESTORED as cockpit objects.
+        // They were dropped on 23 Aug as panel clutter, but the criterion is whether the
+        // experiment needs them and it does: ChecklistLibrary gates real DO items on their
+        // state — Electrical/H2 on LoadShed and StaticBlock/H3 on AlternateStaticOpen.
+        // Keyboard K and L cover the desktop modality, but a headset has no keyboard, so
+        // without these two objects those drills are unperformable in the modality the
+        // study is actually run in. They are small toggles inside the left switch bank.
+        list.Add(BuildToggle("load_shed", "LOAD SHED", LoadShedPos, ControlTarget.LoadShed, Red));
+        list.Add(BuildToggle("alt_static", "ALT STATIC", AltStaticPos, ControlTarget.AlternateStatic, White));
+
         // NO SPOILER LEVER. A Cessna 172 has no spoilers, and this one served no
         // experimental purpose: no mission and no checklist referenced it, and
-        // AircraftController held it retracted for the whole of every recorded trial.
-        // So it was an unrealistic control, in the most-looked-at part of the panel,
-        // that a participant could see and reach and that did nothing — which is
-        // precisely the "generic game control" the cockpit is supposed not to have.
-        //
-        // The simulation capability is untouched: the spoiler still exists in the flight
-        // model and is still on the X key for development, still locked out during a
-        // recorded trial, and its telemetry column still proves it stayed at zero rather
-        // than being assumed to have.
-        //
-        // The quadrant is now throttle + flaps, which is what the aeroplane has.
-        // BuildSpoilerLever() is retained below, unreferenced, because the geometry is
-        // good and a future aircraft type may want it.
-        list.Add(BuildBrakePedals());
-        list.Add(BuildTrimWheel());
-        // The four systems memory items are RESTORED as physical controls. They were taken
-        // out on 22 Aug as panel clutter, but the criterion is whether the experiment needs
-        // them, and it does: ChecklistLibrary gates real DO items on their state —
-        // Electrical/H2 on LoadShed, StaticBlock/H3 on AlternateStaticOpen, EngineFailure/H4
-        // on CarbHeatOn and Selector != Both. Keyboard H/J/K/L covers desktop, but a headset
-        // has no keyboard, so without these objects those three HIGH missions would be
-        // unperformable in VR. They are kept deliberately small and grouped into one bay.
-        list.Add(BuildCarbHeat());
-        list.Add(BuildFuelSelector());
-        // LOAD SHED and ALTERNATE STATIC removed from the cockpit (23 Aug 2026) — the two
-        // black switches on the left bay. The SYSTEMS behind them are untouched and still
-        // reachable on K and L; they simply no longer have a cockpit object, which makes
-        // H2 and H3 desktop-only. See COCKPIT_CONTROLS.md for the consequence.
+        // AircraftController held it retracted for the whole of every recorded trial — an
+        // unrealistic control, in the most-looked-at part of the panel, that a participant
+        // could see and reach and that did nothing. The simulation capability is untouched:
+        // the spoiler still exists in the flight model, is still on the X key for
+        // development, is still locked out during a recorded trial, and its telemetry column
+        // still proves it stayed at zero rather than being assumed to have.
+
         list.RemoveAll(c => c == null);
         Controls = list.ToArray();
 
@@ -265,6 +266,55 @@ public class CockpitControlRig : MonoBehaviour
             phys.gameObject.AddComponent<CockpitInteractorVR>();
 
         Debug.Log("[CockpitRig] built " + Controls.Length + " physical controls on the GLB cockpit.");
+        CheckSeatedVisibility();
+    }
+
+
+    /// <summary>Report which controls a SEATED participant can actually see without moving
+    /// their head, and complain if a continuously-used one cannot.
+    ///
+    /// This check exists because its absence cost a whole build. The flap lever, the brake
+    /// and the switch bank were all placed on perfectly good panel, mounted on real
+    /// geometry, correctly wired and verified by the control battery — and all three were
+    /// below the bottom edge of the frame. Every test passed and a participant would have
+    /// seen none of them. "Is it wired correctly" and "can the person see it" are different
+    /// questions and only one of them was being asked.
+    ///
+    /// The angles come from the camera as built (CockpitBuilder: 78 deg vertical, 4 deg
+    /// down-tilt) rather than from a constant repeated here, so if the camera changes this
+    /// check changes with it.</summary>
+    void CheckSeatedVisibility()
+    {
+        var cam = System.Array.Find(FindObjectsByType<Camera>(FindObjectsSortMode.None),
+                                    c2 => c2.name == "CockpitCamera");
+        if (cam == null) { Debug.LogWarning("[CockpitRig] no CockpitCamera — cannot check visibility."); return; }
+
+        float halfV = cam.fieldOfView * 0.5f;
+        float halfH = Mathf.Atan(Mathf.Tan(halfV * Mathf.Deg2Rad) * Mathf.Max(1f, cam.aspect)) * Mathf.Rad2Deg;
+        var cc = cam.GetComponent<CockpitCamera>();
+        float tilt = cc != null ? cc.basePitch : 0f;
+
+        // The controls a pilot uses continuously. A memory item below the frame is a design
+        // choice; a primary flight control below the frame is a defect.
+        var primary = new System.Collections.Generic.HashSet<string> { "yoke", "throttle", "flaps", "brake" };
+
+        foreach (var c in Controls)
+        {
+            if (c == null) continue;
+            Vector3 local = cam.transform.InverseTransformPoint(c.transform.position);
+            if (local.z <= 0.001f) continue;
+            float elev = Mathf.Atan2(local.y, local.z) * Mathf.Rad2Deg;
+            float azim = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
+            bool inFrame = Mathf.Abs(elev) <= halfV && Mathf.Abs(azim) <= halfH;
+            string line = string.Format("[CockpitRig] view: {0,-14} elev {1,6:0.0}  azim {2,6:0.0}  {3}",
+                                        c.spec.id, elev, azim, inFrame ? "in frame" : "OUT OF FRAME");
+            if (!inFrame && primary.Contains(c.spec.id))
+                Debug.LogError(line + "  <-- PRIMARY CONTROL NOT VISIBLE FROM THE SEAT "
+                             + "(frame is +-" + halfV.ToString("0.0") + " deg vertical about a "
+                             + tilt.ToString("0.0") + " deg down-tilt)");
+            else
+                Debug.Log(line);
+        }
     }
 
     /// <summary>Reset every control to the state a fresh trial specifies. Called from
@@ -294,175 +344,56 @@ public class CockpitControlRig : MonoBehaviour
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // THE CONTROL QUADRANT
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// <summary>The quadrant the three levers are mounted in.
-    ///
-    /// This exists so the levers are visibly ATTACHED to the aeroplane. The previous
-    /// build drew each lever as a bare primitive standing on a flat deck with a painted
-    /// black rectangle for a slot, which is why they read as debug objects: there was no
-    /// casing, no cheeks, no faceplate, and nothing for a lever to pivot IN.
-    ///
-    /// The casing is one shared piece of furniture; the levers are separate objects
-    /// parented to it, so each keeps its own collider, animation and telemetry.</summary>
-    Transform quadrant;
-
-    void BuildQuadrantHousing()
-    {
-        // A NAMING ROOT ONLY — no geometry.
-        //
-        // The first version of this put a 168 x 130 mm backing plate behind the three
-        // controls to "group" them. From the seat that read as a large blank panel bolted
-        // to the aeroplane, which is precisely the extra panel this cockpit is not supposed
-        // to grow. The three controls are grouped by being 48 mm apart in a row with
-        // matching hardware; they do not need a slab behind them to say so.
-        //
-        // Nothing is parented to this that owns geometry, so it cannot move, hide or
-        // otherwise affect a control.
-        var g = new GameObject("ControlArea");
-        g.transform.SetParent(model, false);
-        g.transform.localPosition = new Vector3(SlideX, SlideY, SlideZ);
-        g.transform.localRotation = Quaternion.identity;
-        quadrant = g.transform;
-    }
-
-
-
-    /// <summary>The FIXED half of a quadrant lever: the slot it runs in and the pivot
-    /// boss it turns on. Built per lever, so every lever owns its own mounting.</summary>
-    /// <summary>The FIXED half of a slide control: the recessed channel the handle runs
-    /// in, plus its end stops. Built per control, so every control owns its own mounting
-    /// and nothing is shared between neighbours.</summary>
-    /// <summary>The FIXED half of a slide control: a small escutcheon, the channel the
-    /// handle runs in, and its end stops. Built per control, so every control owns its own
-    /// mounting and nothing is shared with a neighbour.
-    ///
-    /// NOTE ON SIGN: the pilot's eye is at z = 0.52 and the panel face at z = 0.755, so
-    /// +Z points INTO the panel, away from the pilot. Everything that should stand proud
-    /// of the panel is therefore at NEGATIVE local z. Building this with +Z buried the
-    /// whole control inside the panel — visible in the control tests as a perfectly
-    /// working slider that could not be seen.</summary>
-    void SlideMount(Transform t)
-    {
-        float half = SlideTravel * 0.5f;
-        // Escutcheon: the plate the control is let into, so it is mounted rather than
-        // stuck on. Small — it hugs this control only.
-        // Height is travel + 18 mm, not + 28 mm: the taller plate reached y = 0.492 and
-        // overlapped the MFD's lower edge at 0.4856. The ESCUTCHEON, not the travel, is the
-        // tallest part of the control and is what has to clear the display.
-        Gloss(Box(t, new Vector3(0f, 0f, -0.002f),
-                  new Vector3(0.030f, SlideTravel + 0.018f, 0.005f), QuadBody), 0.16f);
-        // The channel itself, recessed into that plate.
-        Gloss(Box(t, new Vector3(0f, 0f, -0.005f),
-                  new Vector3(0.015f, SlideTravel + 0.016f, 0.004f), SlotDark), 0.05f);
-        // Machined side rails: what makes it read as a channel and not a painted stripe.
-        foreach (float sx in new[] { -0.0105f, 0.0105f })
-            Gloss(Box(t, new Vector3(sx, 0f, -0.007f),
-                      new Vector3(0.005f, SlideTravel + 0.016f, 0.007f), QuadEdge), 0.34f);
-        // End stops, top and bottom.
-        foreach (float sy in new[] { -(half + 0.009f), half + 0.009f })
-            Gloss(Box(t, new Vector3(0f, sy, -0.007f),
-                      new Vector3(0.026f, 0.004f, 0.007f), QuadEdge), 0.34f);
-    }
-
-
-
-    /// <summary>The MOVING half: pivot -> arm -> blade. Returns the ARM, which handles
-    /// hang off; the pivot (arm.parent) is what the spec animates.
-    ///
-    /// The blade is thin across the cockpit and deep fore-and-aft — the proportions of a
-    /// real quadrant lever, which is a flat blade rather than a round rod, so its travel
-    /// direction is legible edge-on from the seat.</summary>
-    /// <param name="biasDeg">Static rake of the arm at rest. It must be the OPPOSITE SIGN
-    /// of the direction the spec animates, so the lever ends up swinging symmetrically
-    /// +-22 deg about vertical.
-    ///
-    /// Getting this wrong is not cosmetic and it happened here: the flap and spoiler specs
-    /// animate about Vector3.left while the throttle animates about Vector3.right, so a
-    /// shared -22 deg bias sent those two from -22 deg to -66 deg — a 66 deg sweep that
-    /// laid the handles flat across the front of the quadrant and over their own placards,
-    /// while the throttle swung a correct +-22 deg. The travel DIRECTIONS were right all
-    /// along (14 CFR 23.779: power forward to increase, flaps and speed brakes aft to
-    /// extend); it was the rest position that was wrong.</param>
-    /// <summary>The MOVING half of a slide control: a carriage that rides the channel and
-    /// carries a shaped grip. Returns the carriage, which the spec translates.
-    ///
-    /// The carriage TRANSLATES; it never rotates. That is the behaviour asked for — grab,
-    /// slide, release, and the handle stays where it was put — and it also means the
-    /// handle's position along its slot IS the control's value, with no second animation
-    /// path that could disagree with the aircraft.
-    ///
-    /// <paramref name="startAtTop"/> places the carriage at the t = 0 end of the channel.
-    /// Throttle starts at the BOTTOM (0 = idle, slide up for power); flaps and spoiler
-    /// start at the TOP (0 = retracted, slide down to extend, per 14 CFR 23.779).</summary>
-    /// <summary>The MOVING half: a carriage that rides the channel and carries a shaped
-    /// grip. Returns the carriage, which the spec translates.
-    ///
-    /// The carriage TRANSLATES and never rotates — grab, slide, release, and the handle
-    /// stays where it was put. Its position along the channel IS the control's value, so
-    /// there is no second animation path that could disagree with the aeroplane.
-    ///
-    /// <paramref name="startAtTop"/> puts the carriage at the t = 0 end. Throttle starts at
-    /// the BOTTOM (0 = idle, slide up for power); flaps and spoiler start at the TOP
-    /// (0 = retracted, slide down to extend, per 14 CFR 23.779).</summary>
-    Transform SlideHandle(Transform t, bool startAtTop)
-    {
-        var carriage = new GameObject("Handle").transform;
-        carriage.SetParent(t, false);
-        carriage.localPosition = new Vector3(0f, startAtTop ? SlideTravel * 0.5f : -SlideTravel * 0.5f, 0f);
-        // Carriage body: spans the rails and sits in the channel, so the grip above it
-        // never reads as floating in front of the panel.
-        Metal(Gloss(Box(carriage, new Vector3(0f, 0f, -0.009f),
-                        new Vector3(0.024f, 0.016f, 0.010f), LeverSteel), 0.55f), 0.6f);
-        return carriage;
-    }
-
-
-
-    static Transform Metal(Transform t, float m)
-    {
-        var r = t.GetComponent<Renderer>();
-        if (r != null) r.material.SetFloat("_Metallic", m);
-        return t;
-    }
-
-    static Transform Gloss(Transform t, float g)
-    {
-        var r = t.GetComponent<Renderer>();
-        if (r != null) r.material.SetFloat("_Glossiness", g);
-        return t;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // THE CONTROLS
     // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // Each control is built out of CockpitHardware, which knows the SHAPES a 172 uses.
+    // The rule this file now follows, and did not before: a control's shape is part of its
+    // identity, so no two controls with different jobs may share one. A pilot finds the
+    // throttle in the dark because it is the only knurled black plunger; if the flaps were
+    // also a plunger, they could not.
+
+    /// <summary>A physical placard: a dark plate with engraved-looking legend, sitting ON
+    /// the panel beside its control. Replaces the floating white text that read as debug
+    /// annotation, and at a size a placard actually is rather than three times it.</summary>
+    void PlacardPlate(Transform parent, Vector3 lp, string text, float widthMm, float capMm = 9f)
+    {
+        CockpitHardware.Box(parent, lp + new Vector3(0f, 0f, 0.0004f),
+                            new Vector3(widthMm * CockpitHardware.MM,
+                                        (capMm + 4f) * CockpitHardware.MM,
+                                        1.2f * CockpitHardware.MM),
+                            CockpitHardware.Bezel, 0.10f);
+        Label(parent, lp + new Vector3(0f, 0f, -0.0009f), text,
+              capMm * CockpitHardware.MM, CockpitHardware.Placard);
+    }
 
     PhysicalControl BuildYoke()
     {
-        // The yoke geometry is already rigged by RealCockpit (YokeRoot/YokeVisual) and
-        // already follows pitchInput/rollInput, so grabbing it and writing input makes
-        // the visual agree automatically — the "visual 50% = aircraft 50%" requirement
-        // is satisfied by construction rather than by a second animation path.
+        // The yoke MESH is the GLB's own (RealCockpit cuts the twin-yoke mesh down to one
+        // and rigs it to pitch/roll), so this control only supplies the grab volume and the
+        // input mapping. Its visual is null on purpose: adding a second animation path here
+        // would let the collider and the wheel disagree about where the yoke is.
         var yokeVisual = FindDeep(model, "YokeVisual");
         Vector3 pos = yokeVisual != null ? yokeVisual.position
-                                         : model.TransformPoint(new Vector3(0f, 0.46f, 0.66f));
+                                         : model.TransformPoint(new Vector3(0f, 0.44f, 0.72f));
 
         var c = Make("yoke", pos);
         c.spec = new ControlSpec
         {
             id = "yoke", label = "YOKE", kind = ControlKind.Yoke, target = ControlTarget.PitchRoll,
-            // Fore/aft = pitch, left/right = roll, in the cockpit's own frame.
             axis = Vector3.forward, secondaryAxis = Vector3.right,
-            // 16 cm of fore/aft travel and 18 cm across. A 172's yoke moves roughly this
-            // far, and it is large enough that a participant's hand tremor is a few
-            // percent of full deflection rather than a few tens of percent.
+            // Model units: 0.16 and 0.18 are 455 and 511 real mm, which is about a 172's
+            // fore/aft column travel and wheel throw. Large travel is deliberate — it makes
+            // hand tremor a few percent of full deflection instead of a few tens.
             travel = 0.16f, secondaryTravel = 0.18f,
             centred = true,
-            captureRadius = 0.13f,      // the biggest control, and the one you reach for blind
+            // 55 mm = 156 mm at full scale, which still comfortably contains both grips of
+            // a 300 mm wheel. It was 130 mm, chosen when the engine controls were somewhere
+            // else entirely; at that size the yoke's capture volume swallowed the carb-heat
+            // knob 64 mm away, so a hand reaching for carb heat would have taken the yoke.
+            // Found by the pairwise reach check, not by anyone noticing.
+            captureRadius = 0.055f,
             smoothingTau = 0.045f,
-            // Slight softening around neutral so small hand jitter is not full-scale
-            // aileron, without making large deflections feel dead.
             responseExponent = 1.25f,
             deadZone = 0.02f,
         };
@@ -470,249 +401,245 @@ public class CockpitControlRig : MonoBehaviour
         return c;
     }
 
+    /// <summary>THROTTLE — a push-pull plunger with a knurled black knob, which is what a
+    /// 172 has. IN is full power and OUT is idle, so the knob's protrusion IS the power
+    /// setting and can be read from the corner of the eye.
+    ///
+    /// The previous build made this a black ball on a vertical slider. Both halves of that
+    /// were wrong: the aeroplane has no vertical throttle, and a sphere is the one shape
+    /// 14 CFR 23.781 reserves for a control this is not.</summary>
     PhysicalControl BuildThrottle()
     {
-        // THROTTLE — the control that must be identifiable without looking. Shape does that
-        // work, not colour: a round ball grip, the 14 CFR 23.781(b) powerplant shape, and
-        // the only spherical grip in the cockpit. It is also the largest of the three.
-        //
-        // Slides UP for power (23.779: "forward to increase forward thrust"; up is the
-        // accepted equivalent on a panel-mounted control). Handle position IS the value —
-        // bottom of travel = idle, halfway = ~0.5, top = full.
         var c = Make("throttle", model.TransformPoint(ThrottlePos));
-        c.transform.SetParent(quadrant, true);
+        // 32 mm knob, 55 mm of shaft: a 172's throttle, to the millimetre.
+        var plunger = CockpitHardware.Plunger(c.transform, 32f, 46f, CockpitHardware.KnobBlack);
+        PlacardPlate(c.transform, new Vector3(0f, -0.0165f, -0.0006f), "THROTTLE", 40f);
 
-        SlideMount(c.transform);
-        var h = SlideHandle(c.transform, startAtTop: false);
-
-        // Ball grip on a short neck. The neck keeps the ball off the carriage so a hand
-        // (or a VR controller) has something to close around.
-        Gloss(Cylinder(h, new Vector3(0f, 0f, -0.017f), 0.0060f, 0.005f, LeverSteel), 0.5f);
-        var knob = Sphere(h, new Vector3(0f, 0f, -0.029f), 0.024f, KnobBlack);
-        knob.localScale = new Vector3(0.024f, 0.024f, 0.019f);   // slightly flattened, not a gearstick
-        Gloss(knob, 0.30f);
-
-        Label(c.transform, new Vector3(0f, SlideTravel * 0.5f + 0.003f, -0.006f),
-              "THROTTLE", PlacardText, Placard);
-
+        const float Travel = 55f * CockpitHardware.MM;
         c.spec = new ControlSpec
         {
             id = "throttle", label = "THROTTLE", kind = ControlKind.Lever, target = ControlTarget.Throttle,
-            axis = Vector3.up,          // slide up = more power
-            travel = SlideTravel,
+            axis = Vector3.forward,     // push IN for power
+            travel = Travel,
             centred = false,
-            captureRadius = 0.020f,   // < half the 45 mm spacing     // well under half the 48 mm gap to the next control
-            smoothingTau = 0.035f,
-            visual = h, visualIsRotation = false,
-            visualAxis = Vector3.up, visualTravel = SlideTravel,
+            captureRadius = 0.016f,     // half the 34 mm gap to carb heat and mixture
+            smoothingTau = 0.05f,
+            visual = plunger, visualIsRotation = false,
+            visualAxis = Vector3.forward, visualTravel = Travel,
         };
         Configure(c);
-        c.SetSilently(phys != null ? phys.Throttle01 : 0f);
+        c.SetSilently(0f);
         return c;
     }
 
-
-    PhysicalControl BuildTrimWheel()
+    /// <summary>MIXTURE — geometry only, deliberately NOT interactive.
+    ///
+    /// A 172 has three engine controls and a cockpit with two of them looks wrong at a
+    /// glance. But the flight model has no mixture, so an interactive mixture would either
+    /// do nothing (a control that lies) or would have to be invented — and inventing one
+    /// adds a variable to a workload experiment that nothing in the design controls for.
+    /// So it is built, in the right place, in the right shape and the right colour, and it
+    /// does not move and cannot be grabbed. That is the honest version.</summary>
+    void BuildMixtureVisual()
     {
-        // A 172's trim wheel is a vertical wheel on the pedestal, wound fore/aft.
-        var c = Make("trim", model.TransformPoint(TrimWheelPos));
-        var wheel = Cylinder(c.transform, Vector3.zero, 0.026f, 0.007f, new Color(0.22f, 0.22f, 0.24f));
-        wheel.localRotation = Quaternion.Euler(0f, 0f, 90f);          // axis across the cockpit
-        for (int i = 0; i < 8; i++)                                    // rim ribs, so rotation reads
-        {
-            float a = i * Mathf.PI * 2f / 8f;
-            Box(wheel, new Vector3(0f, Mathf.Sin(a) * 0.025f, Mathf.Cos(a) * 0.025f),
-                new Vector3(0.010f, 0.005f, 0.005f), Steel);
-        }
-        // Housing so the wheel is recessed in the pedestal with only its rim exposed,
-        // which is how a 172 trim wheel actually presents.
-        // Housing sits BEHIND the wheel only, so the rim stands proud and can be read and
-        // reached. The first pass boxed the wheel in and hid it completely.
-        // Backing boss into the pedestal side; the wheel itself stands proud of it.
-        // Flat escutcheon on the panel, not a pedestal cheek: the wheel now lives on the
-        // left panel and an 88 mm backing box there read as a slab.
-        Box(c.transform, new Vector3(0f, 0f, 0.008f), new Vector3(0.062f, 0.062f, 0.010f), PanelEdge);
-        Label(c.transform, new Vector3(0f, 0.026f, -0.004f), "TRIM", DetentText, White);
-        // No legend. The ribbed wheel on the pedestal side is self-evident, and a
-        // participant who needs to know is told by the drill text, not by the cockpit.
+        var g = new GameObject("MixtureVisual").transform;
+        g.SetParent(model, false);
+        g.localPosition = MixturePos;
+        g.localRotation = Quaternion.identity;
+        var p = CockpitHardware.Plunger(g, 28f, 46f, CockpitHardware.KnobRed);
+        // Full rich: pushed all the way in, which is where it sits for every phase of
+        // flight this experiment simulates.
+        p.localPosition = new Vector3(0f, 0f, 46f * CockpitHardware.MM * 0.55f);
+        PlacardPlate(g, new Vector3(0f, -0.0165f, -0.0006f), "MIXTURE", 36f);
+        SetLayer(g, CockpitBuilder.CockpitLayer);
+    }
 
+    /// <summary>CARB HEAT — a smaller plunger, LEFT of the throttle, pulled OUT for heat
+    /// ON. Same family as the throttle because on the aeroplane it is the same family; told
+    /// apart by size, position and placard rather than by being a different kind of
+    /// object.</summary>
+    PhysicalControl BuildCarbHeat()
+    {
+        var c = Make("carb_heat", model.TransformPoint(CarbHeatPos));
+        var plunger = CockpitHardware.Plunger(c.transform, 24f, 34f, CockpitHardware.KnobBlack, knurled: false);
+        PlacardPlate(c.transform, new Vector3(0f, -0.0165f, -0.0006f), "CARB HEAT", 42f);
+
+        const float Travel = 30f * CockpitHardware.MM;
         c.spec = new ControlSpec
         {
-            id = "trim", label = "TRIM", kind = ControlKind.TrimWheel, target = ControlTarget.Trim,
-            axis = Vector3.forward,     // wind forward = nose down, back = nose up
-            // 12 cm end-to-end for the FULL trim range. Deliberately long: trim is a fine
-            // adjustment, and a short travel would make it a precision task, which is
-            // exactly the unnecessary motor difficulty this build is meant to avoid.
-            travel = 0.12f,
-            centred = true,
-            captureRadius = 0.030f,
-            smoothingTau = 0.06f,
-            visual = wheel, visualIsRotation = true,
-            visualAxis = Vector3.forward, visualTravel = 160f,        // degrees at full trim
+            id = "carb_heat", label = "CARB HEAT", kind = ControlKind.Toggle, target = ControlTarget.CarbHeat,
+            axis = Vector3.back,        // pull OUT for heat ON
+            travel = Travel,
+            centred = false,
+            captureRadius = 0.015f,
+            smoothingTau = 0.05f,
+            visual = plunger, visualIsRotation = false,
+            visualAxis = Vector3.back, visualTravel = Travel,
         };
-        // Wind FORWARD for nose DOWN: displacement +Z must give trim −1.
-        c.spec.axis = Vector3.back;
         Configure(c);
         return c;
     }
 
+    /// <summary>FLAPS — the 172's small gated lever on the lower right panel. Three gates,
+    /// because the aeroplane has three flap settings; a continuous slider would let the
+    /// cockpit show a setting the aeroplane cannot hold.</summary>
     PhysicalControl BuildFlapLever()
     {
-        // FLAPS — shape-coded as a flat PADDLE, the CS-23/14 CFR 23.781(a) flap shape (the
-        // handle is shaped like the surface it drives, exactly as a landing-gear handle is
-        // shaped like a wheel). Flat where the throttle is round, so the two are told apart
-        // by touch alone, in a headset, without looking.
-        //
-        // Slides DOWN to extend (23.779: "flaps — rearward/down to extend"), and stops at
-        // three gates. THREE, because the simulation has exactly three flap states; giving
-        // the handle continuous travel would let the cockpit disagree with the aeroplane.
         var c = Make("flaps", model.TransformPoint(FlapLeverPos));
-        c.transform.SetParent(quadrant, true);
+        Transform[] gates;
+        const float TravelMm = 52f;
+        const float Travel = TravelMm * CockpitHardware.MM;
+        var lever = CockpitHardware.FlapSelector(c.transform, TravelMm, 3, out gates);
+        // UP is the top gate; the lever starts there and slides DOWN to extend, per
+        // 14 CFR 23.779.
+        lever.localPosition = new Vector3(0f, Travel * 0.5f, 0f);
 
-        SlideMount(c.transform);
-        var h = SlideHandle(c.transform, startAtTop: true);
-
-        // Flat paddle: thick leading edge tapering to a thin trailing edge — an aerofoil
-        // section in miniature, which is what 23.781(a) depicts.
-        Gloss(Box(h, new Vector3(0f, 0f, -0.018f), new Vector3(0.030f, 0.013f, 0.011f), FlapWhite), 0.18f);
-        Gloss(Box(h, new Vector3(0f, 0f, -0.027f), new Vector3(0.030f, 0.009f, 0.008f), FlapWhite), 0.18f);
-
-        // Gate teeth beside the channel: the three positions are visible BEFORE the handle
-        // is touched, which is what a gate is for. No legends — the teeth say "three
-        // positions" and the handle resting against one says which is selected.
-        for (int i2 = 0; i2 < 3; i2++)
-            Gloss(Box(c.transform, new Vector3(0.018f, SlideTravel * (0.5f - i2 * 0.5f), -0.007f),
-                      new Vector3(0.008f, 0.0035f, 0.007f), QuadEdge), 0.40f);
-
-        Label(c.transform, new Vector3(0f, SlideTravel * 0.5f + 0.003f, -0.006f),
-              "FLAPS", PlacardText, Placard);
+        PlacardPlate(c.transform, new Vector3(0f, Travel * 0.5f + 0.010f, -0.0006f), "FLAPS", 30f);
+        // Gate legends, beside the teeth they belong to.
+        string[] marks = { "UP", "10", "FULL" };
+        for (int i = 0; i < 3; i++)
+            Label(c.transform,
+                  new Vector3(0.0235f, Travel * (0.5f - i * 0.5f), -0.0014f),
+                  marks[i], 7f * CockpitHardware.MM, CockpitHardware.Placard);
 
         c.spec = new ControlSpec
         {
             id = "flaps", label = "FLAPS", kind = ControlKind.DetentLever, target = ControlTarget.Flaps,
             axis = Vector3.down,        // slide down through the gates for more flap
-            travel = SlideTravel,
+            travel = Travel,
             centred = false,
-            captureRadius = 0.020f,   // < half the 45 mm spacing
+            captureRadius = 0.018f,
             smoothingTau = 0.05f,
             detents = AircraftController.FlapDetents,
             detentLabels = AircraftController.FlapLabels,
-            visual = h, visualIsRotation = false,
-            visualAxis = Vector3.down, visualTravel = SlideTravel,
+            visual = lever, visualIsRotation = false,
+            visualAxis = Vector3.down, visualTravel = Travel,
         };
         Configure(c);
         c.SetSilently(0f, 0);
         return c;
     }
 
-
-    PhysicalControl BuildSpoilerLever()
+    /// <summary>ELEVATOR TRIM — a large wheel edge-on in the centre pedestal, with a
+    /// separate position pointer beside it. The wheel spins; the pointer says where the
+    /// trim actually is, which the wheel cannot because it turns many times.</summary>
+    PhysicalControl BuildTrimWheel()
     {
-        // SPOILER — inboard control, shape-coded as a RIBBED BAR: neither round like the
-        // throttle nor flat like the flap paddle, so all three are distinct by touch. Dark
-        // navy, the glider convention for an airbrake, deliberately desaturated so it does
-        // not become the brightest thing in a dark cockpit.
-        //
-        // Slides DOWN to extend (23.779: "speed brakes — aft to extend").
-        //
-        // HONEST LIMITATION: a 172 has no spoilers — this is a simulator control, and no
-        // mission or checklist references it. AircraftController holds the spoiler
-        // retracted for the whole of a recorded trial, so a participant cannot alter drag
-        // and lift mid-mission. It works in FREE FLIGHT and CONTROL CHECK and parks itself
-        // at UP during the twelve missions, reading the actual spoiler back each frame so
-        // it shows the truth rather than a stale selection.
-        var c = Make("spoiler", model.TransformPoint(SpoilerLeverPos));
-        c.transform.SetParent(quadrant, true);
-
-        SlideMount(c.transform);
-        var h = SlideHandle(c.transform, startAtTop: true);
-
-        Gloss(Box(h, new Vector3(0f, 0f, -0.020f), new Vector3(0.017f, 0.012f, 0.016f), SpoilBlue), 0.20f);
-        for (int i2 = 0; i2 < 2; i2++)
-            Gloss(Box(h, new Vector3(0f, -0.003f + i2 * 0.006f, -0.027f),
-                      new Vector3(0.019f, 0.0025f, 0.006f), QuadBody), 0.15f);
-
-        for (int i2 = 0; i2 < 3; i2++)
-            Gloss(Box(c.transform, new Vector3(-0.018f, SlideTravel * (0.5f - i2 * 0.5f), -0.007f),
-                      new Vector3(0.008f, 0.0035f, 0.007f), QuadEdge), 0.40f);
-
-        Label(c.transform, new Vector3(0f, SlideTravel * 0.5f + 0.003f, -0.006f),
-              "SPOILER", PlacardText, Placard);
+        var c = Make("trim", model.TransformPoint(TrimWheelPos));
+        Transform pointer;
+        var wheel = CockpitHardware.TrimWheel(c.transform, 128f, out pointer);
+        // The pointer beside the wheel shows ABSOLUTE trim. The wheel itself cannot: it
+        // turns through 220 degrees per unit and would be ambiguous, which is exactly why
+        // the real aeroplane has a separate indicator with a TAKEOFF band on it.
+        var ti = c.gameObject.AddComponent<TrimIndicator>();
+        ti.pointer = pointer;
+        ti.phys = phys;
+        ti.span = 56f * CockpitHardware.MM;
+        PlacardPlate(c.transform, new Vector3(0f, 0.0245f, -0.0006f), "TRIM", 26f, 6f);
+        Label(c.transform, new Vector3(-0.0046f, 0.0205f, -0.0016f), "NOSE UP",
+              6f * CockpitHardware.MM, CockpitHardware.Placard);
+        Label(c.transform, new Vector3(-0.0046f, -0.0205f, -0.0016f), "DN",
+              6f * CockpitHardware.MM, CockpitHardware.Placard);
 
         c.spec = new ControlSpec
         {
-            id = "spoiler", label = "SPOILER", kind = ControlKind.DetentLever, target = ControlTarget.Spoiler,
+            id = "trim", label = "TRIM", kind = ControlKind.TrimWheel, target = ControlTarget.Trim,
+            // THE RIM FACES THE PILOT, so the hand moves UP and DOWN across it — not fore
+            // and aft as it would on a wheel exposed at the side of a pedestal. Rolling the
+            // exposed rim UP carries the top of the wheel AWAY from the pilot, which is the
+            // 172's "wind forward for nose down"; rolling it DOWN brings the top back, for
+            // nose up. So a downward hand gives positive trim.
             axis = Vector3.down,
-            travel = SlideTravel,
-            centred = false,
-            captureRadius = 0.020f,   // < half the 45 mm spacing
-            smoothingTau = 0.05f,
-            detents = new[] { 0f, 0.5f, 1f },
-            detentLabels = new[] { "UP", "HALF", "FULL" },
-            visual = h, visualIsRotation = false,
-            visualAxis = Vector3.down, visualTravel = SlideTravel,
+            travel = 0.12f,             // long: trim is a fine adjustment, not a precision task
+            centred = true,
+            captureRadius = 0.028f,
+            smoothingTau = 0.06f,
+            visual = wheel, visualIsRotation = true,
+            // ABOUT -X, not +X. A rotation about +X lifts the near rim, so with the hand
+            // moving down the wheel would have visibly rolled the opposite way to the
+            // fingers on it — the one thing a direct-manipulation control must never do.
+            visualAxis = Vector3.left, visualTravel = 220f,   // degrees across the full range
         };
         Configure(c);
-        c.SetSilently(0f, 0);
         return c;
     }
 
+    /// <summary>FUEL SELECTOR — a red rotary valve on the pedestal below the trim wheel,
+    /// which is where a 172's is. The handle is a BAR, so its direction is the reading.</summary>
+    PhysicalControl BuildFuelSelector()
+    {
+        var c = Make("fuel_selector", model.TransformPoint(FuelSelPos));
+        var handle = CockpitHardware.FuelValve(c.transform, 62f, 58f);
 
+        Label(c.transform, new Vector3(-0.0092f, -0.0055f, -0.0012f), "L",
+              8f * CockpitHardware.MM, CockpitHardware.Placard);
+        Label(c.transform, new Vector3(0f, 0.0118f, -0.0012f), "BOTH",
+              7f * CockpitHardware.MM, CockpitHardware.Placard);
+        Label(c.transform, new Vector3(0.0092f, -0.0055f, -0.0012f), "R",
+              8f * CockpitHardware.MM, CockpitHardware.Placard);
+        PlacardPlate(c.transform, new Vector3(0f, -0.0148f, -0.0006f), "FUEL", 26f, 6f);
+
+        c.spec = new ControlSpec
+        {
+            id = "fuel_selector", label = "FUEL SELECTOR", kind = ControlKind.Rotary,
+            target = ControlTarget.FuelSelector,
+            axis = Vector3.right, travel = 0.07f, centred = false,
+            captureRadius = 0.024f, smoothingTau = 0.06f,
+            detents = new[] { 0f, 0.5f, 1f },
+            detentLabels = new[] { "LEFT", "BOTH", "RIGHT" },
+            visual = handle, visualIsRotation = true,
+            // -55 L .. 0 BOTH .. +55 R, about the valve's own axis. Negative because a
+            // handle pointing LEFT selects the left tank.
+            visualAxis = Vector3.back, visualTravel = 110f,
+        };
+        Configure(c);
+        c.SetSilently(0.5f, 1);
+        return c;
+    }
+
+    /// <summary>THE BRAKE.
+    ///
+    /// A 172 brakes with TOE PADS on the rudder pedals, and this build now has them: they
+    /// are on the pedals, they carry the tread, and they tilt with applied pressure.
+    ///
+    /// It ALSO keeps a hand control, and that is a deliberate accessibility decision rather
+    /// than an oversight. No headset in this lab has rudder pedals, and a participant in VR
+    /// has no keyboard either — so with toe brakes alone there would be no way to stop the
+    /// aeroplane in the modality the experiment is actually run in. The hand control is
+    /// therefore shaped and placed as the thing a 172 really does have within reach of the
+    /// left hand: the small black parking-brake T-pull under the left panel edge. It is
+    /// small, it is where that handle lives, and it is no longer a black bar the size of a
+    /// forearm sitting in the middle of the panel.</summary>
     PhysicalControl BuildBrakePedals()
     {
-        // A pull handle: escutcheon on the panel underside, a shaft, and a T-grip that
-        // comes AFT toward the pilot as pressure goes on. Spring-loaded, so releasing it
-        // releases the brakes — a brake that stayed on would be both wrong and dangerous.
-        //
-        // Deliberately NOT a floating button, and deliberately not sharing geometry with
-        // anything: every part below is created here, parented here, and nothing else in
-        // the cockpit is reparented under it.
         var c = Make("brake", model.TransformPoint(BrakePos));
+        var pull = CockpitHardware.BrakePull(c.transform);
+        PlacardPlate(c.transform, new Vector3(0f, -0.0135f, -0.0006f), "BRAKE", 30f, 6f);
 
-        // Fixed: mounting escutcheon and the barrel the shaft runs in.
-        Gloss(Box(c.transform, new Vector3(0f, 0f, -0.002f), new Vector3(0.042f, 0.034f, 0.005f), QuadBody), 0.18f);
-        var barrel = Cylinder(c.transform, new Vector3(0f, 0f, -0.010f), 0.0090f, 0.010f, QuadEdge);
-        barrel.localRotation = Quaternion.Euler(90f, 0f, 0f);
-        Gloss(barrel, 0.20f);
-
-        // Moving: shaft + T-grip. Travels AFT (toward the pilot, -Z) as the brake comes on.
-        var pull = new GameObject("Pull").transform;
-        pull.SetParent(c.transform, false);
-        Metal(Gloss(Cylinder(pull, new Vector3(0f, 0f, -0.022f), 0.0055f, 0.014f, LeverSteel), 0.6f), 0.7f);
-        var shaft = pull.GetChild(0);
-        shaft.localRotation = Quaternion.Euler(90f, 0f, 0f);
-        Gloss(Box(pull, new Vector3(0f, 0f, -0.038f), new Vector3(0.038f, 0.014f, 0.012f), KnobBlack), 0.28f);
-
-        Label(c.transform, new Vector3(0f, -0.026f, -0.004f), "BRAKE", PlacardText, Placard);
-
+        const float Travel = 26f * CockpitHardware.MM;
         c.spec = new ControlSpec
         {
             id = "brake", label = "BRAKE", kind = ControlKind.SpringLever, target = ControlTarget.WheelBrake,
             axis = Vector3.back,        // pull it toward you to brake
-            travel = 0.045f,
+            travel = Travel,
             centred = false,
-            // 30 mm. The nearest neighbour is the carb-heat knob 62 mm away with a 26 mm
-            // radius; 45 mm here would have summed to 71 mm and overlapped it, so a reach
-            // for carb heat could have taken the brake.
-            captureRadius = 0.030f,
+            captureRadius = 0.020f,
             smoothingTau = 0.03f,       // brakes must feel immediate
             visual = pull, visualIsRotation = false,
-            visualAxis = Vector3.back, visualTravel = 0.030f,
+            visualAxis = Vector3.back, visualTravel = Travel,
         };
         Configure(c);
 
-        // The PEDALS still show the brake, but as an INDEPENDENT follower.
         AttachPedalFollower();
         return c;
     }
 
-    /// <summary>Tilt the aeroplane's own rudder/brake pedals with applied brake pressure.
+    /// <summary>Tilt the aeroplane's own rudder/brake pedals with applied brake pressure,
+    /// and give them the toe pads that make them read as brakes.
     ///
     /// This is a one-way READ of `phys.brakeInput01`. The pedals are not parented to the
     /// brake control and the brake control does not own them, so hiding, moving or
-    /// rebuilding either one cannot affect the other. That independence is the whole point:
-    /// the previous build reparented Object_52 under the control, which coupled an
-    /// interactable to an unrelated piece of the airframe.</summary>
+    /// rebuilding either one cannot affect the other.</summary>
     void AttachPedalFollower()
     {
         var pedals = FindDeep(model, "Object_52");
@@ -721,95 +648,76 @@ public class CockpitControlRig : MonoBehaviour
             Debug.LogWarning("[CockpitRig] Object_52 (pedals) not found — brake handle still works, pedals just will not animate.");
             return;
         }
+
+        // THE HINGE MUST BE ON THE PEDAL, NOT ON THE NODE ORIGIN.
+        //
+        // This previously put the pivot at `pedals.localPosition`. In a glTF the mesh's
+        // transform is usually identity with the geometry baked into the vertices, so that
+        // "pivot" sat at the model datum — roughly a metre away from the pedals and well
+        // below them. Tilting about a point a metre from the part throws it through a huge
+        // arc, which is what put the pedals under the floor whenever the brake was applied.
+        // That is a pivot-placement error, not a fault in the brake logic.
+        var rends = pedals.GetComponentsInChildren<Renderer>(true);
+        if (rends.Length == 0)
+        {
+            Debug.LogWarning("[CockpitRig] pedals have no renderer — not animating them.");
+            return;
+        }
+        Bounds b = rends[0].bounds;
+        foreach (var r in rends) b.Encapsulate(r.bounds);
+        Vector3 hingeWorld = new Vector3(b.center.x, b.min.y, b.center.z);
+
         var pivot = new GameObject("PedalPivot").transform;
         pivot.SetParent(pedals.parent, false);
-        pivot.localPosition = pedals.localPosition;
-        pivot.localRotation = pedals.localRotation;
+        pivot.position = hingeWorld;
+        // Axis alignment, not node alignment: the pivot's X must be the aeroplane's LATERAL
+        // axis, or a "14 degree" tilt would be 14 degrees about whatever the glTF node
+        // happened to be rotated to.
+        pivot.rotation = model.rotation;
         pedals.SetParent(pivot, true);          // keeps the mesh exactly where it is
+
+        // TOE PADS on the pilot's two pedals. Purely visual, parented to the pedal so they
+        // move with it, and with no collider — they are what the pedal IS, not a control.
+        Vector3 padLocal = pivot.InverseTransformPoint(new Vector3(b.center.x, b.max.y, b.center.z));
+        foreach (float sx in new[] { -0.048f, 0.048f })
+            CockpitHardware.ToeBrakePad(pivot,
+                padLocal + new Vector3(sx, -0.004f, -0.008f), 62f, 34f);
+        SetLayer(pivot, CockpitBuilder.CockpitLayer);
 
         var f = pivot.gameObject.AddComponent<PedalBrakeVisual>();
         f.phys = phys;
-        f.maxTiltDeg = 20f;                     // top of the 15-20 deg band for a GA toe brake
+        f.maxTiltDeg = 14f;
+        f.pedalHalfHeight = Mathf.Max(0.001f, b.extents.y);
+
+        // A pedal that moves further than its own size is not hinged, it is thrown. The
+        // check is cheap and it is exactly what was missing when this shipped broken.
+        float worst = Vector3.Distance(hingeWorld, b.max) * f.maxTiltDeg * Mathf.Deg2Rad;
+        if (worst > 0.12f)
+            Debug.LogError(string.Format(
+                "[CockpitRig] PEDAL HINGE BAD: full brake would move the pedal {0:0.000} m " +
+                "(pedal is only {1:0.000} m tall). Hinge at {2}, bounds {3}.",
+                worst, b.size.y, hingeWorld, b));
+        else
+            Debug.Log(string.Format("[CockpitRig] pedal hinge ok: {0:0.000} m sweep at full brake (pedal {1:0.000} m tall).",
+                                    worst, b.size.y));
     }
 
-    PhysicalControl BuildCarbHeat()
-    {
-        // Small pull knob on the left systems bay, as the reference shows. Orange is the
-        // conventional carb-heat colour. Pulled out = ON.
-        var c = Make("carb_heat", model.TransformPoint(CarbHeatPos));
-
-        var boss = Cylinder(c.transform, new Vector3(0f, 0f, 0.004f), 0.010f, 0.006f, PanelEdge);
-        boss.localRotation = Quaternion.Euler(90f, 0f, 0f);
-
-        var plunger = new GameObject("Plunger").transform;
-        plunger.SetParent(c.transform, false);
-        plunger.localPosition = Vector3.zero;
-        var shaft = Cylinder(plunger, new Vector3(0f, 0f, -0.012f), 0.003f, 0.014f, Steel);
-        shaft.localRotation = Quaternion.Euler(90f, 0f, 0f);
-        var knob = Cylinder(plunger, new Vector3(0f, 0f, -0.026f), 0.0075f, 0.007f, Orange);
-        knob.localRotation = Quaternion.Euler(90f, 0f, 0f);
-
-        Label(c.transform, new Vector3(0f, 0.019f, -0.004f), "CARB HEAT", DetentText, Orange);
-
-        c.spec = new ControlSpec
-        {
-            id = "carb_heat", label = "CARB HEAT", kind = ControlKind.Toggle, target = ControlTarget.CarbHeat,
-            axis = Vector3.back, travel = 0.03f, centred = false,
-            captureRadius = 0.026f, smoothingTau = 0.05f,
-            visual = plunger, visualAxis = Vector3.back, visualTravel = 0.024f,
-        };
-        Configure(c);
-        return c;
-    }
-
-    PhysicalControl BuildFuelSelector()
-    {
-        // Three-position rotary: LEFT — BOTH — RIGHT, exactly the states
-        // AircraftSystems.Selector supports. Red, as the reference shows.
-        var c = Make("fuel_selector", model.TransformPoint(FuelSelPos));
-        Box(c.transform, new Vector3(0f, 0f, 0.008f), new Vector3(0.048f, 0.048f, 0.010f), PanelEdge);
-        var body = new GameObject("Dial").transform;      // spun by the control
-        body.SetParent(c.transform, false);
-        var disc = Cylinder(body, Vector3.zero, 0.017f, 0.005f, Red);
-        disc.localRotation = Quaternion.Euler(90f, 0f, 0f);
-        Box(body, new Vector3(0f, 0.011f, -0.007f), new Vector3(0.005f, 0.016f, 0.005f), White);
-
-        Label(c.transform, new Vector3(-0.021f, 0.006f, -0.004f), "L",    DetentText, White);
-        Label(c.transform, new Vector3(0f,      0.021f, -0.004f), "BOTH", DetentText, White);
-        Label(c.transform, new Vector3( 0.021f, 0.006f, -0.004f), "R",    DetentText, White);
-
-        c.spec = new ControlSpec
-        {
-            id = "fuel_selector", label = "FUEL SELECTOR", kind = ControlKind.Rotary,
-            target = ControlTarget.FuelSelector,
-            axis = Vector3.right, travel = 0.09f, centred = false,
-            captureRadius = 0.026f, smoothingTau = 0.06f,
-            detents = new[] { 0f, 0.5f, 1f },
-            detentLabels = new[] { "LEFT", "BOTH", "RIGHT" },
-            visual = body, visualIsRotation = true,
-            visualAxis = Vector3.forward, visualTravel = 90f,   // -45 L .. 0 BOTH .. +45 R
-        };
-        Configure(c);
-        c.SetSilently(0.5f, 1);
-        return c;
-    }
-
+    /// <summary>A panel toggle switch that actually does something. Used for the two
+    /// systems items a HIGH mission's drill requires.</summary>
     PhysicalControl BuildToggle(string id, string label, Vector3 localPos, ControlTarget target, Color col)
     {
         var c = Make(id, model.TransformPoint(localPos));
-        Box(c.transform, new Vector3(0f, 0f, 0.006f), new Vector3(0.034f, 0.026f, 0.010f), PanelEdge);
-        var body = Box(c.transform, new Vector3(0f, 0f, -0.002f), new Vector3(0.020f, 0.015f, 0.012f), Black);
-        var lever = Box(body, new Vector3(0f, 0.010f, -0.006f), new Vector3(0.007f, 0.020f, 0.007f), col);
-        Label(c.transform, new Vector3(0f, 0.020f, -0.004f), label, DetentText, White);
+        var lever = CockpitHardware.Toggle(c.transform, Vector3.zero, col);
+        PlacardPlate(c.transform, new Vector3(0f, -0.0115f, -0.0006f), label, 22f, 5f);
 
         c.spec = new ControlSpec
         {
             id = id, label = label, kind = ControlKind.Toggle, target = target,
-            axis = Vector3.up, travel = 0.03f, centred = false,
-            captureRadius = 0.024f,
+            axis = Vector3.up, travel = 0.02f, centred = false,
+            captureRadius = 0.009f,
             smoothingTau = 0.04f,
             visual = lever, visualIsRotation = true,
-            visualAxis = Vector3.right, visualTravel = -46f,   // flicks up when ON
+            visualAxis = Vector3.right, visualTravel = 44f,   // flicks up when ON
         };
         Configure(c);
         return c;
@@ -834,6 +742,10 @@ public class CockpitControlRig : MonoBehaviour
         var col = c.GetComponent<SphereCollider>();
         if (col != null) col.radius = c.spec.captureRadius;
         SetLayer(c.transform, CockpitBuilder.CockpitLayer);
+        // The visual's REST transform, recorded now that the spec exists and the geometry
+        // has been built. Every builder assigns `spec` and then calls Configure, so this is
+        // the one place that is guaranteed to run after both.
+        c.CaptureVisualRest();
     }
 
     /// <summary>Centre of a named GLB node in model-local space, or a fallback if the
@@ -1001,30 +913,107 @@ public class CockpitControlRig : MonoBehaviour
     /// <summary>The cockpit furniture the controls are mounted on: a sub-panel across the
     /// lower instrument panel, and a centre pedestal running down and aft from it. Built
     /// once, before the controls, so every control lands ON something.</summary>
+    /// <summary>The cockpit FURNITURE: the panel hardware a control is mounted on or sits
+    /// beside, none of it interactive.
+    ///
+    /// This is not decoration. The strongest single cue that the old cockpit was generated
+    /// rather than real was the acre of empty dark panel around two glass displays — an
+    /// aeroplane's panel is dense, and a bare one reads as a menu screen. It also matters
+    /// experimentally: a participant told they are flying an aeroplane and shown an empty
+    /// slab has been given a reason to disbelieve the whole scene, and disbelief is not a
+    /// controlled variable.</summary>
     void BuildStructure()
     {
-        // Lower sub-panel: the strip of panel the plungers and switches live on. Sits a
-        // few millimetres proud of the GLB panel face so it reads as a separate bay.
-        Structure("SubPanel", new Vector3(0f, 0.360f, PanelZ + 0.004f),
-                  new Vector3(0.400f, 0.090f, 0.012f), PanelDark, Vector3.zero);
-        // A lighter bezel line under it, so the bay has an edge instead of dissolving.
-        Structure("SubPanelLip", new Vector3(0f, 0.316f, PanelZ + 0.002f),
-                  new Vector3(0.400f, 0.008f, 0.016f), PanelEdge, Vector3.zero);
+        var furn = new GameObject("PanelFurniture").transform;
+        furn.SetParent(model, false);
+        furn.localPosition = Vector3.zero;
+        furn.localRotation = Quaternion.identity;
 
-        // Centre pedestal: from under the sub-panel, down and aft toward the pilot.
-        // Tapered by stacking two boxes rather than a wedge mesh — cheap and reads right.
-        // The centre pedestal was REMOVED (23 Aug 2026). It carried only the trim wheel and
-        // filled the footwell directly ahead of the seat, breaking the pilot's visual path
-        // from seat to pedals. The trim wheel now mounts on the left panel.
+        // NO DISPLAY BEZELS. The GLB already models them (Object_83 is a bezel plate that
+        // hugs both screens, with the radio stack in the 32 mm between them), and the pair
+        // this file built earlier were 160 mm slabs that cut across the windscreen and
+        // covered the bottom of the PFD. Adding furniture to a model without first measuring
+        // what it already has is how that happens.
 
-        BuildQuadrantHousing();
-        // left-hand engine/systems bay, so that group reads as its own panel
-        // Systems bay: sized to the two controls that remain (carb heat, fuel selector)
-        // rather than the four it used to hold, so removing the switches does not leave a
-        // bare plate behind. It is a BACKING PLATE ONLY — no control is parented to it,
-        // which is what guarantees that changing it cannot move or hide a control.
-        Structure("SystemsBay", new Vector3(-0.068f, 0.360f, PanelZ - 0.001f),
-                  new Vector3(0.062f, 0.086f, 0.008f), PanelEdge, Vector3.zero);
+        // ── ENGINE-CONTROL SUB-PANEL, right of the pedestal ───────────────────────
+        CockpitHardware.Box(furn, new Vector3(0.106f, EngineRowY, PanelZ + 0.0018f),
+                            new Vector3(0.084f, 0.038f, 0.0035f), CockpitHardware.PanelSub, 0.20f);
+        CockpitHardware.Box(furn, new Vector3(0.106f, EngineRowY - 0.0205f, PanelZ + 0.0010f),
+                            new Vector3(0.084f, 0.004f, 0.006f), CockpitHardware.PanelLight, 0.35f);
+
+        // ── LEFT SWITCH BANK ──────────────────────────────────────────────────────
+        // Six toggles. Two are real controls built elsewhere (LOAD SHED, ALT STATIC); the
+        // other four are the aeroplane's electrical switches, built as hardware and honestly
+        // inert. A 172 has them and their absence is conspicuous, but inventing behaviour for
+        // them would add uncontrolled variables to a workload study.
+        CockpitHardware.Box(furn, new Vector3(-0.128f, 0.332f, PanelZ + 0.0018f),
+                            new Vector3(0.092f, 0.026f, 0.0035f), CockpitHardware.PanelSub, 0.20f);
+        string[] swNames = { "MSTR", "ALT", "AVN", "BCN" };
+        for (int i = 0; i < swNames.Length; i++)
+        {
+            var g = new GameObject("Sw_" + swNames[i]).transform;
+            g.SetParent(furn, false);
+            g.localPosition = new Vector3(-0.106f + i * 0.0140f, 0.332f, PanelZ);
+            CockpitHardware.Toggle(g, Vector3.zero, CockpitHardware.KnobWhite);
+        }
+
+        // ── CIRCUIT BREAKER FIELD, right lower panel below the flap lever ─────────
+        CockpitHardware.Box(furn, new Vector3(0.090f, 0.332f, PanelZ + 0.0018f),
+                            new Vector3(0.062f, 0.036f, 0.0035f), CockpitHardware.PanelSub, 0.20f);
+        for (int r = 0; r < 3; r++)
+            for (int col = 0; col < 5; col++)
+                CockpitHardware.Breaker(furn, new Vector3(0.066f + col * 0.0120f,
+                                                          0.320f + r * 0.0110f, PanelZ));
+
+        BuildEngineGauges(furn);
+
+        SetLayer(furn, CockpitBuilder.CockpitLayer);
+    }
+
+    /// <summary>Six live round gauges on the left panel: the engine and electrical
+    /// instruments a 172 has, driven by AircraftSystems.
+    ///
+    /// These are NOT decoration, and adding them is not a neutral change. Three HIGH
+    /// missions turn on diagnosing a systems failure — a rough engine, a failing alternator,
+    /// a blocked static port — and until now the cockpit displayed none of the evidence a
+    /// pilot would use to diagnose them. A participant could only guess, or follow the
+    /// checklist text blindly. With the gauges present the diagnosis becomes a real
+    /// perceptual task, which is what the mission was designed to be.
+    ///
+    /// It does change the information available in those missions, so it changes what they
+    /// measure. That is recorded in the change report rather than slipped in quietly: the
+    /// three affected missions should be re-piloted before their workload predictions are
+    /// treated as calibrated.</summary>
+    void BuildEngineGauges(Transform parent)
+    {
+        var specs = new[]
+        {
+            new PanelGauge.Spec { label = "RPM",   kind = PanelGauge.Kind.RPM,        min = 0f,    max = 3000f },
+            new PanelGauge.Spec { label = "FUEL",  kind = PanelGauge.Kind.FuelTotal,  min = 0f,    max = 180f  },
+            new PanelGauge.Spec { label = "OIL P", kind = PanelGauge.Kind.OilPress,   min = 0f,    max = 115f  },
+            new PanelGauge.Spec { label = "OIL T", kind = PanelGauge.Kind.OilTemp,    min = 20f,   max = 120f  },
+            new PanelGauge.Spec { label = "VOLTS", kind = PanelGauge.Kind.BusVolts,   min = 0f,    max = 32f   },
+            new PanelGauge.Spec { label = "AMPS",  kind = PanelGauge.Kind.LoadAmps,   min = -20f,  max = 60f   },
+        };
+
+        for (int i = 0; i < specs.Length; i++)
+        {
+            float x = (i % 2 == 0) ? GaugeLeftX : GaugeRightX;
+            float y = GaugeRowY[i / 2];
+            var g = new GameObject("Gauge_" + specs[i].label.Replace(" ", "")).transform;
+            g.SetParent(parent, false);
+            g.localPosition = new Vector3(x, y, PanelZ);
+            g.localRotation = Quaternion.identity;
+
+            var face = CockpitHardware.GaugeCan(g, Vector3.zero, 46f);
+            var pg = g.gameObject.AddComponent<PanelGauge>();
+            pg.spec = specs[i];
+            pg.systems = sys;
+            pg.phys = phys;
+            pg.Build(face, 46f);
+            Label(g, new Vector3(0f, -0.0110f, -0.0053f), specs[i].label,
+                  6.5f * CockpitHardware.MM, CockpitHardware.Placard);
+        }
     }
 
     static void Paint(GameObject g, Color c)
