@@ -15,6 +15,9 @@ for what the classes mean.
 | Design | within-subject, **4 flight phases × 3 workload classes**, one trial per cell |
 | Independent variable | cognitive workload class (LOW / MEDIUM / HIGH) |
 | Controlled factor | flight phase (take-off, climb, cruise, approach) — **fully crossed** with class |
+| Mission bank | **42** on disk: 36 cognitive-axis (4 × 3 × **3 variants**) + 6 psychomotor-axis (crosswind) |
+| Flown per session | **12** — one variant index per phase row, rotated by Latin square |
+| Variant | a between-subject **nuisance factor**, recorded in `session.json` as `row_variants` |
 | Dependent variables | EEG band-power features; NASA-TLX (raw) + Bedford; task performance |
 | Trial length | **300 s, identical for every mission** |
 | In-task baseline | **first 60 s of every mission**, un-manipulated |
@@ -27,6 +30,27 @@ once in every phase, a LOW-vs-HIGH difference cannot be a cruise-vs-landing diff
 The previous version of this mission set did not have that property — HIGH was mostly
 approaches and LOW was mostly cruise — and no analysis could have separated phase from
 workload afterwards.
+
+**The bank does not change the session.** A participant still flies the same twelve-trial
+crossed grid that was verified; the bank changes only *which realisation* of each cell
+they meet. 42 × 300 s would be over three hours of flying inside one EEG session, and
+fatigue would dominate every contrast the study exists to measure. What the bank buys is
+(a) a participant who repeats the study does not repeat the same trials, (b) a variant
+that turns out not to work can be retired without collapsing the design, and (c) a class
+effect that survives across variants is a class effect rather than a property of one
+particular scenario — a stronger claim than the twelve-mission design could make at all.
+
+Within a phase row all three classes share one variant, so the class contrast is always
+variant-matched and **variant can never masquerade as class**. Across rows a participant
+meets different variants, so variant is not perfectly nested in participant. See
+`MISSION_BANK_DESIGN.md`.
+
+**The crosswind missions are a SEPARATE AXIS and are not part of this design.** They are
+an optional extra block (see §4.7). Crosswind raises manual demand by construction, and
+this design's interpretability depends on manual demand being matched within a phase row —
+so folding them in would break the property the whole thing rests on. A finding from that
+block is reported as *integrated psychomotor/cognitive demand*, never as *crosswind
+increased cognitive workload*.
 
 ---
 
@@ -113,6 +137,15 @@ mission it is *straight-and-level*. That is deliberate:
 - [ ] Confirm ethics/consent approval covers what is actually recorded: EEG, flight
       telemetry, questionnaire responses.
 - [ ] Disk: a full 12-trial session writes roughly 60–80 MB before EEG.
+- [ ] **Record the variant assignment.** The operator screen shows it as
+      `Takeoff v2 · Climb v3 · Cruise v1 · Approach v2`, and it is written into
+      `session.json` as `row_variants`. It follows deterministically from the study code,
+      so it is reconstructible — but write it on the run sheet anyway, because a
+      mistyped code is the one way it can silently differ from what you intended.
+- [ ] **Bind and check the flight controls.** Open CONTROL CHECK and confirm every axis
+      moves in the right direction through its full travel — see `HARDWARE_CONTROLS.md`
+      §5. Forty seconds here is the cheapest insurance in the protocol; a dead axis
+      discovered an hour into an EEG session is an hour of EEG wasted.
 - [ ] If using LSL: install LSL4Unity, add the `LSL4UNITY` scripting define, and
       confirm the `FlightSimMarkers` stream appears in LabRecorder **before** the
       participant is capped.
@@ -200,6 +233,28 @@ markers, so a short block is never silent.
 - [ ] Note anything unusual: comments, interruptions, an aborted mission, sim sickness.
 
 ---
+
+### 4.7 OPTIONAL — the crosswind block (~35 min, separate axis)
+
+Run this **after** the main block and the closing resting baseline, never interleaved
+with it, and analyse it separately.
+
+- Six missions: crosswind take-off and landing at light / moderate / near-limit
+  crosswind (about 25%, 60% and 95% of the C172's 15 kt demonstrated component).
+- **Counterbalance the order within the block.** For a non-pilot, crosswind handling is
+  substantially skill acquisition, and skill improves across a session in a way workload
+  does not. An order that runs light → moderate → near-limit would confound learning with
+  crosswind level and the dose-response would be uninterpretable.
+- The primary EEG contrast in this block is **not** the continuous crosswind segment. It
+  is the discrete `DECISION_PROMPT → DECISION_MADE` epoch, where the pilot judges the
+  crosswind against the stated limit. On the take-off missions that decision happens with
+  the aeroplane **stationary at the holding point** — no control activity, no movement
+  artifact — which makes it the one contrast on this axis that is not motor-contaminated.
+  The landing missions ask the same judgement while flying, which is a within-axis control
+  for exactly that contamination.
+- Report the `ctrl_*` covariates alongside any EEG result from this block. If EEG activity
+  and control activity both rise, the finding is *increased integrated psychomotor/
+  cognitive demand*.
 
 ## 5. Data out
 
