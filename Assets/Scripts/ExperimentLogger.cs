@@ -193,6 +193,14 @@ public class ExperimentLogger
         "pos_x,pos_y,pos_z,altitude_m,airspeed_kmh,vspeed_ms,heading_deg,pitch_deg,roll_deg,yaw_rate_dps,aoa_deg," +
         // aircraft (INDICATED state, what the pilot's instruments show — can differ)
         "ind_airspeed_kmh,ind_altitude_m,ind_vspeed_ms," +
+        // WIND. groundspeed and airspeed differ by exactly the wind, and drift_deg
+        // (track minus heading) is how much of the crosswind the pilot has NOT taken
+        // out. On a crosswind approach, |drift| near zero with a non-zero crab is a
+        // correctly flown one; |drift| growing is the error the mission is about.
+        // wind_n / wind_e are the LOCAL air-mass vector, which varies with height
+        // through the shear profile — so an analysis can reconstruct the exact
+        // conditions at any instant rather than assuming the briefed surface value.
+        "groundspeed_kmh,drift_deg,sideslip_deg,wind_n_ms,wind_e_ms," +
         // controls
         "in_pitch,in_roll,in_yaw,throttle,flaps_actual,flaps_selected,spoiler,brake," +
         // trim + who is flying. `elevator_cmd` is stick+trim combined: it separates
@@ -232,6 +240,9 @@ public class ExperimentLogger
 
         if (sys != null) { A(sb, sys.IndicatedAirspeedKmh, 2); A(sb, sys.IndicatedAltitudeM, 2); A(sb, sys.IndicatedVSpeedMs, 3); }
         else { A(sb, ac.AirspeedKmh, 2); A(sb, ac.AltitudeM, 2); A(sb, ac.VerticalSpeedMs, 3); }
+
+        A(sb, ac.GroundSpeedMs * 3.6f, 2); A(sb, ac.DriftAngleDeg, 2); A(sb, ac.SideslipDeg, 2);
+        A(sb, ac.WindVel.z, 3); A(sb, ac.WindVel.x, 3);
 
         A(sb, ac.pitchInput, 4); A(sb, ac.rollInput, 4); A(sb, ac.yawInput, 4);
         A(sb, ac.Throttle01, 4); A(sb, ac.Flaps01, 3);
@@ -401,6 +412,15 @@ public class ExperimentLogger
         sb.AppendLine($"    \"flaps\": {m.StartFlaps01.ToString("F2", CI)},");
         sb.AppendLine($"    \"fuel_l\": {m.StartFuelL.ToString("F0", CI)},");
         sb.AppendLine($"    \"ambient_turbulence\": {m.AmbientTurbulence.ToString("F2", CI)},");
+        sb.AppendLine($"    \"wind_from_deg\": {m.WindFromDeg.ToString("F1", CI)},");
+        sb.AppendLine($"    \"wind_speed_ms\": {m.WindSpeedMs.ToString("F2", CI)},");
+        sb.AppendLine($"    \"wind_gust_ms\": {m.WindGustMs.ToString("F2", CI)},");
+        sb.AppendLine($"    \"wind_shear_alt_m\": {m.WindShearAltM.ToString("F1", CI)},");
+        sb.AppendLine($"    \"wind_shear_delta_ms\": {m.WindShearDeltaMs.ToString("F2", CI)},");
+        sb.AppendLine($"    \"wind_shear_delta_deg\": {m.WindShearDeltaDeg.ToString("F1", CI)},");
+        sb.AppendLine($"    \"crosswind_ms\": {m.CrosswindMs.ToString("F2", CI)},");
+        sb.AppendLine($"    \"headwind_ms\": {m.HeadwindMs.ToString("F2", CI)},");
+        sb.AppendLine($"    \"wind_report\": \"{m.WindReport}\",");
         sb.AppendLine($"    \"visibility_01\": {m.Visibility01.ToString("F2", CI)}");
         sb.AppendLine("  },");
         sb.AppendLine($"  \"duration_s\": {m.DurationS.ToString("F0", CI)},");

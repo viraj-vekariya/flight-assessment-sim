@@ -58,7 +58,12 @@ public class MissionShots : MonoBehaviour
     static void Boot()
     {
         foreach (var a in System.Environment.GetCommandLineArgs())
-            if (a == "-shots") { new GameObject("MissionShots").AddComponent<MissionShots>(); return; }
+            if (a == "-shots") { {
+                    // One driver at a time — see SimDriver. A second driver does not
+                    // crash, it quietly changes every number the battery reports.
+                    if (!SimDriver.Claim("MissionShots")) return;
+                    new GameObject("MissionShots").AddComponent<MissionShots>();
+                } return; }
     }
 
     GameManager gm;

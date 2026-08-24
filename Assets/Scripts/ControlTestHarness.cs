@@ -43,7 +43,12 @@ public class ControlTestHarness : MonoBehaviour
     static void Boot()
     {
         foreach (var a in System.Environment.GetCommandLineArgs())
-            if (a == "-controltest") { new GameObject("ControlTestHarness").AddComponent<ControlTestHarness>(); return; }
+            if (a == "-controltest") { {
+                    // One driver at a time — see SimDriver. A second driver does not
+                    // crash, it quietly changes every number the battery reports.
+                    if (!SimDriver.Claim("ControlTestHarness")) return;
+                    new GameObject("ControlTestHarness").AddComponent<ControlTestHarness>();
+                } return; }
     }
 
     IEnumerator Start()

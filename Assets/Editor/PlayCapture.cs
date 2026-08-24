@@ -104,6 +104,32 @@ public static class PlayCapture
         EditorApplication.Exit(failures == 0 ? 0 : 1);
     }
 
+    /// <summary>Runs the wind-model tests (WindTestHarness, -windtest).</summary>
+    public static void RunWindTest()
+    {
+        EditorSettings.enterPlayModeOptionsEnabled = true;
+        EditorSettings.enterPlayModeOptions =
+            EnterPlayModeOptions.DisableDomainReload | EnterPlayModeOptions.DisableSceneReload;
+        entered = false;
+        EditorApplication.update += TickWindTest;
+        EditorApplication.EnterPlaymode();
+    }
+
+    static void TickWindTest()
+    {
+        if (!EditorApplication.isPlaying) return;
+        if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
+        bool done = WindTestHarness.Finished;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 300.0;
+        if (!done && !timedOut) return;
+        int failures = WindTestHarness.Failures;
+        if (timedOut && !done) { Debug.LogError("[WTEST] HARD TIMEOUT"); failures = Mathf.Max(1, failures); }
+        Debug.Log("[WTEST] exiting, failures=" + failures);
+        EditorApplication.update -= TickWindTest;
+        EditorApplication.isPlaying = false;
+        EditorApplication.Exit(failures == 0 ? 0 : 1);
+    }
+
     public static void RunMissionTest()
     {
         EditorSettings.enterPlayModeOptionsEnabled = true;

@@ -14,21 +14,17 @@ public class FlightTest : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
     {
-        // Test harness only: runs under -batchmode OR when Unity is launched with -flighttest.
-        // Never spawns in normal play, so it cannot affect the shipped game.
-        // This harness DRIVES THE CONTROLS. It must never run alongside another one.
-        // MissionTestHarness (-missiontest) also drives the controls, and the two
-        // fought every frame: the mission battery's inputs were overwritten, so the
-        // aeroplane flew FlightTest's scripted climb profile instead of the mission,
-        // climbed away from every assigned altitude, and half the missions were
-        // scored INCOMPLETE for reasons that had nothing to do with the missions.
-        // Explicit opt-out wins over the implicit batchmode default.
-        var args = System.Environment.GetCommandLineArgs();
-        foreach (var a in args) if (a == "-missiontest" || a == "-probe" || a == "-screens" || a == "-shots" || a == "-controltest"
-                             || a == "-designshots" || a == "-cockpitaudit") return;
-
-        bool enabled = Application.isBatchMode;
-        if (!enabled) foreach (var a in args) if (a == "-flighttest") { enabled = true; break; }
+        // OPT-IN ONLY. This harness DRIVES THE CONTROLS and disables AircraftController,
+        // so it must never run alongside another driver.
+        //
+        // It used to spawn on ANY -batchmode run unless the command line named one of
+        // seven opt-out flags. That default was backwards and the list decayed exactly
+        // as you would expect: -windtest was added later, was not on the list, and the
+        // entire wind battery therefore ran with FlightTest flying the aeroplane and
+        // every commanded input silently discarded. Requiring -flighttest explicitly
+        // removes the class of bug rather than adding an eighth entry to a list.
+        bool enabled = false;
+        foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-flighttest") { enabled = true; break; }
         if (!enabled) return;
         new GameObject("FlightTest").AddComponent<FlightTest>();
     }
@@ -53,6 +49,7 @@ public class FlightTest : MonoBehaviour
         {
             var gm = GameManager.Instance;
             if (gm == null || gm.Aircraft == null) return;
+            if (!SimDriver.Claim("FlightTest")) { enabled = false; return; }
             phys = gm.Aircraft;
             bootState = gm.State.ToString();
             var ctl = phys.GetComponent<AircraftController>();

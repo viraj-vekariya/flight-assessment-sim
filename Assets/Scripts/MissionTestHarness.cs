@@ -54,7 +54,12 @@ public class MissionTestHarness : MonoBehaviour
         bool on = false;
         foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-missiontest") on = true;
         if (!on) return;
-        new GameObject("MissionTestHarness").AddComponent<MissionTestHarness>();
+        {
+                    // One driver at a time — see SimDriver. A second driver does not
+                    // crash, it quietly changes every number the battery reports.
+                    if (!SimDriver.Claim("MissionTestHarness")) return;
+                    new GameObject("MissionTestHarness").AddComponent<MissionTestHarness>();
+                }
     }
 
     /// <summary>Set true by the harness when the whole battery has finished, so the

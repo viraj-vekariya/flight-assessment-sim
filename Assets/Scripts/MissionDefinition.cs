@@ -40,12 +40,46 @@ public class MissionDefinition
     public float HdgToleranceDeg = 12f;
 
     // ---------------- environment ----------------
-    /// <summary>Baseline turbulence 0..1 present for the WHOLE mission (0 = calm).</summary>
+    /// <summary>Baseline turbulence 0..1 present for the WHOLE mission (0 = calm).
+    /// Turbulence is a ZERO-MEAN disturbance: it makes the aeroplane wobble but does
+    /// not change where it goes. For a manipulation that changes the TASK, use wind.</summary>
     public float AmbientTurbulence = 0f;
-    /// <summary>Crosswind component, m/s, positive = from the right.</summary>
-    public float CrosswindMs = 0f;
     /// <summary>0 = CAVOK, 1 = minimum visibility used in the study.</summary>
     public float Visibility01 = 0f;
+
+    // ---------------- wind (see WindModel.cs) ----------------
+    // Specified meteorologically — direction the wind blows FROM, and the FREE-STREAM
+    // speed at 300 m. The surface wind a pilot would be given follows from the
+    // boundary-layer profile, so briefings and ATIS text are generated, never typed.
+    // Author these with SetWind(crosswindMs, headwindMs) rather than by hand.
+    /// <summary>Direction the wind blows FROM, degrees true. 0 with no wind.</summary>
+    public float WindFromDeg = 0f;
+    /// <summary>Free-stream steady wind speed at WindModel.RefHeightM, m/s. 0 = calm.</summary>
+    public float WindSpeedMs = 0f;
+    /// <summary>Peak gust excursion about the steady vector, m/s. A gusty crosswind is
+    /// a materially harder task than a steady one of the same mean, because the
+    /// correction cannot be set once and left.</summary>
+    public float WindGustMs = 0f;
+    /// <summary>Altitude (m) of a discrete shear layer, 0 = none. Used by the
+    /// windshear-on-final missions.</summary>
+    public float WindShearAltM = 0f;
+    /// <summary>Wind-speed change across the shear layer, m/s (+ = stronger above).</summary>
+    public float WindShearDeltaMs = 0f;
+    /// <summary>Wind-direction change across the shear layer, degrees.</summary>
+    public float WindShearDeltaDeg = 0f;
+
+    /// <summary>Author the wind in the terms the workload argument is actually about:
+    /// how much crosswind (positive = from the right) and how much headwind (negative
+    /// = a tailwind) the pilot has on the runway. `runwayHeadingDeg` defaults to 010,
+    /// the study's single runway.</summary>
+    public MissionDefinition SetWind(float crosswindMs, float headwindMs, float gustMs = 0f,
+                                     float runwayHeadingDeg = 0f)
+    {
+        WindFromDeg = WindModel.DirectionFor(runwayHeadingDeg, crosswindMs, headwindMs, out float spd);
+        WindSpeedMs = spd;
+        WindGustMs = gustMs;
+        return this;
+    }
 
     // ---------------- aircraft configuration & systems ----------------
     public float StartFlaps01 = 0f;
@@ -94,6 +128,16 @@ public class MissionDefinition
 
     // ---------------- helpers ----------------
     public string ClassTag => Class.ToString().ToUpper();
+
+    /// <summary>Crosswind on the study's runway, m/s, positive = from the right.
+    /// Derived, never stored, so it can never disagree with the wind that is flown.</summary>
+    public float CrosswindMs =>
+        WindModel.Crosswind(WindFromDeg, WindSpeedMs, Aerodrome.RunwayHeadingDeg);
+    /// <summary>Headwind on the study's runway, m/s. Negative = a tailwind.</summary>
+    public float HeadwindMs =>
+        WindModel.Headwind(WindFromDeg, WindSpeedMs, Aerodrome.RunwayHeadingDeg);
+    /// <summary>ATIS-style wind for briefings and documentation, e.g. "310/14G20 kt".</summary>
+    public string WindReport => WindModel.Report(WindFromDeg, WindSpeedMs, WindGustMs);
 
     /// <summary>Build the runnable Scenario the existing engine executes. All of the
     /// experiment metadata rides along on Scenario.Mission.</summary>

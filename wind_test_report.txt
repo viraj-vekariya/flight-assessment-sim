@@ -1,0 +1,89 @@
+WIND MODEL TEST
+===============
+generated 2026-08-24 09:34:16
+unity 6000.0.77f1
+
+-- model arithmetic --
+   ok   zero wind is exactly zero (x)  (got 0.0000, want 0.0000 ±0.0000)
+   ok   zero wind is exactly zero (z)  (got 0.0000, want 0.0000 ±0.0000)
+   ok   Enabled false when calm
+   ok   from 090 blows towards -x  (got -10.0000, want -10.0000 ±0.0500)
+   ok   from 090 has no north component  (got 0.0000, want 0.0000 ±0.0500)
+   ok   from 360 blows towards -z  (got -10.0000, want -10.0000 ±0.0500)
+   ok   free-stream speed at reference height  (got 12.0000, want 12.0000 ±0.0500)
+   ok   surface speed follows the power law  (got 7.4539, want 7.4539 ±0.0500)
+   ok   wind is weaker near the ground
+   ok   round trip crosswind (6,4)  (got 6.0000, want 6.0000 ±0.0500)
+   ok   round trip headwind  (6,4)  (got 4.0000, want 4.0000 ±0.0500)
+   ok   round trip crosswind (-6,4)  (got -6.0000, want -6.0000 ±0.0500)
+   ok   round trip headwind  (-6,4)  (got 4.0000, want 4.0000 ±0.0500)
+   ok   round trip crosswind (8,-2)  (got 8.0000, want 8.0000 ±0.0500)
+   ok   round trip headwind  (8,-2)  (got -2.0000, want -2.0000 ±0.0500)
+   ok   round trip crosswind (3,9)  (got 3.0000, want 3.0000 ±0.0500)
+   ok   round trip headwind  (3,9)  (got 9.0000, want 9.0000 ±0.0500)
+   ok   same seed + same clock => same gust (x)  (got 8.8729, want 8.8729 ±0.0000)
+   ok   same seed + same clock => same gust (z)  (got -0.1401, want -0.1401 ±0.0000)
+   ok   a different seed gives a different gust
+   ok   gust varies over a 300 s trial (spread 8.18 m/s)
+
+cockpit rig  : 8 controls
+
+-- harness can command the aircraft --
+   after SetYaw(-1): yawInput=-1.000 ovr=True
+   after SetPitch(0.4): pitchInput=0.400 ovr=True
+   after SetRoll(-0.3): rollInput=-0.300 ovr=True
+   after SetThrottle(0.8): throttle=0.800 ovr=True
+   ok   commanded rudder reaches the flight model  (got -1.0000, want -1.0000 ±0.0200)
+   ok   commanded elevator reaches the flight model  (got 0.4000, want 0.4000 ±0.0200)
+   ok   commanded aileron reaches the flight model  (got -0.3000, want -0.3000 ±0.0200)
+   ok   commanded throttle reaches the flight model  (got 0.8000, want 0.8000 ±0.0200)
+
+-- zero wind: airspeed == groundspeed --
+   ok   groundspeed equals airspeed in calm air  (got 51.9265, want 51.9265 ±0.0100)
+   ok   no drift in calm air  (got 0.0000, want 0.0000 ±0.5000)
+   ok   no wind vector in calm air  (got 0.0000, want 0.0000 ±0.0000)
+
+-- headwind subtracts from groundspeed --
+   ok   groundspeed = airspeed - headwind  (got 49.8412, want 49.8410 ±1.2000)
+   ok   groundspeed is lower than airspeed into a headwind
+   ok   a pure headwind causes no drift  (got 0.0000, want 0.0000 ±1.5000)
+   ok   groundspeed is higher than airspeed with a tailwind
+
+-- crosswind produces the predicted drift --
+   airspeed 59.9 m/s, wind 11.0 m/s, drift 10.57° (predicted 10.39°)
+   ok   crosswind from the left drifts the track right
+   ok   drift angle matches atan(Vw/Vac)  (got 10.5670, want 10.3897 ±3.5000)
+   ok   crosswind from the right drifts the track left
+
+-- shear: the wind the aeroplane is in changes with height --
+   wind at 900 m = 16.32 m/s, at 60 m = 11.09 m/s
+   ok   the wind is weaker low down
+   shear layer at 200 m: below 5.28 m/s, above 14.00 m/s
+   ok   the discrete shear layer changes the wind across it
+
+-- ground: the nose weathervanes into the crosswind --
+      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 2255 grounded 100% peak gs 10.1 m/s crashed=no
+   crosswind from the right, no rudder: heading change +27.37°
+   ok   nose swings right into a right crosswind
+      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 3789 grounded 100% peak gs 10.1 m/s crashed=no
+   crosswind from the left,  no rudder: heading change -27.49°
+   ok   nose swings left into a left crosswind
+      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 5952 grounded 100% peak gs 10.1 m/s crashed=no
+   calm, no rudder:                     heading change +0.00°
+   ok   the roll tracks straight in calm air  (got 0.0000, want 0.0000 ±1.0000)
+
+-- rudder authority against the crosswind --
+   15 kt crosswind, rudder holding heading: max lateral deviation 0.71 m
+   ok   the centreline is holdable at the demonstrated crosswind (< 15 m)
+   39 kt crosswind, rudder holding heading: max lateral deviation 2.80 m
+   ok   a grossly out-of-limits crosswind costs materially more deviation
+
+-- reset --
+   ok   wind is on before the reset
+   ok   wind is off after Disable()
+   ok   Sample() is zero after Disable()  (got 0.0000, want 0.0000 ±0.0000)
+   ok   the aeroplane sees no wind after a reset  (got 0.0000, want 0.0000 ±0.0000)
+
+
+checks   : 46
+problems : 0

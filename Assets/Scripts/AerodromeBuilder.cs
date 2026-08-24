@@ -54,6 +54,17 @@ using UnityEngine;
 public static class Aerodrome
 {
     // --- runway ---
+    /// <summary>The runway's true heading. The aeroplane rolls toward +Z, which is
+    /// north, so the true heading is 000; it is SIGNED "01" on the surface, the normal
+    /// aviation rounding. Published because the wind model needs a runway axis to
+    /// resolve a crosswind against, and that axis must not be a magic 0f scattered
+    /// through the mission table.</summary>
+    public const float RunwayHeadingDeg = 0f;
+    /// <summary>Aerodrome elevation, m AMSL. The terrain pad is flattened to zero, so
+    /// altitude AMSL and height above the runway are the same number here — which is
+    /// only true because of PadFlatten, and is why this is a named constant rather
+    /// than an assumption.</summary>
+    public const float RunwayElevationM = 0f;
     public const float RunwayHalfWidth = 15f;
     public const float RunwayHalfLength = 300f;
     public const float ThresholdZ = -300f;      // take-off threshold (roll toward +Z)

@@ -176,7 +176,8 @@ public static class DocGen
         Row(sb, "Targets", m.TargetAltitudeM.ToString("F0", ci) + " m ±" + m.AltToleranceM.ToString("F0", ci) +
                 ", " + m.TargetHeadingDeg.ToString("F0", ci) + "° ±" + m.HdgToleranceDeg.ToString("F0", ci));
         Row(sb, "Weather / wind / visibility", "turbulence " + m.AmbientTurbulence.ToString("F2", ci) +
-                " ambient, crosswind " + m.CrosswindMs.ToString("F1", ci) + " m/s, visibility index " +
+                " ambient, wind " + m.WindReport + " (crosswind " + m.CrosswindMs.ToString("F1", ci) +
+                " m/s, headwind " + m.HeadwindMs.ToString("F1", ci) + " m/s), visibility index " +
                 m.Visibility01.ToString("F2", ci));
         Row(sb, "Configuration / fuel", "flaps " + m.StartFlaps01.ToString("F2", ci) + ", " +
                 m.StartFuelL.ToString("F0", ci) + " L");

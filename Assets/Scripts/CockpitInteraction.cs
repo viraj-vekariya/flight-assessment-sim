@@ -36,16 +36,34 @@ public class CockpitInteraction : MonoBehaviour
 
     void Update()
     {
-        if (controller != null) controller.ClearOverrides();
-
+        // DO NOT call controller.ClearOverrides() unconditionally here.
+        //
+        // It used to be called every frame, at execution order -50, i.e. AFTER every
+        // other input source has written and BEFORE AircraftController reads. That
+        // wiped the override of anything running at order >= -50 — the scenario
+        // engine, the test harnesses, and any external control-hardware layer — so
+        // those inputs silently never reached the aeroplane. It was invisible in
+        // normal use only because RealCockpit disables this component once the GLB
+        // cockpit finishes loading (~14 s in). In the FALLBACK path, where the GLB
+        // fails to load and this component stays enabled for the whole session, no
+        // programmatic or hardware input could reach the aircraft at all.
+        //
+        // The unconditional clear was also vestigial: it dates from the old model in
+        // which an override LATCHED until explicitly cleared. Ownership now expires on
+        // its own after one frame (AircraftController.GraceFrames), so nothing needs
+        // clearing except this component's own grab, on release.
         var gm = GameManager.Instance;
         bool active = gm != null && gm.State == GameState.Flying
                       && cam != null && cam.enabled && controller != null;
-        if (!active) { grabbed = null; return; }
+        if (!active)
+        {
+            if (grabbed != null) { grabbed = null; controller?.ClearOverrides(); }
+            return;
+        }
 
         if (Input.GetMouseButtonDown(0)) TryGrab();
         if (Input.GetMouseButton(0) && grabbed != null) DriveHeld();
-        if (Input.GetMouseButtonUp(0)) grabbed = null;
+        if (Input.GetMouseButtonUp(0) && grabbed != null) { grabbed = null; controller.ClearOverrides(); }
     }
 
     void TryGrab()

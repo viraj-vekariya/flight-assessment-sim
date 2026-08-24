@@ -216,6 +216,7 @@ public class ScenarioEngine : MonoBehaviour
         // rendered under the same overcast HDRI and the weather manipulation was
         // invisible to the participant regardless of what the fog density said.
         ApplyMissionSky(m);
+        ApplyMissionWind(m);
 
         SetupAircraft(s);
         // Clean configuration for every trial. Without this, flap and spoiler
@@ -495,6 +496,18 @@ public class ScenarioEngine : MonoBehaviour
         if (sev <= 0.01f) WorldBuilder.SetSkyClear();
         else WorldBuilder.SetSkyOvercast(sev);
         baseSkySeverity = sev;
+    }
+
+    /// <summary>Configure the air mass for this trial. Seeded from the trial seed, so
+    /// the gust series replays exactly; disabled outright when the mission is calm, so
+    /// a calm mission is bit-identical to the pre-wind flight model.</summary>
+    void ApplyMissionWind(MissionDefinition m)
+    {
+        if (m == null || (m.WindSpeedMs <= 0.01f && m.WindGustMs <= 0.01f)) { WindModel.Disable(); return; }
+        WindModel.Configure(m.WindFromDeg, m.WindSpeedMs, m.WindGustMs, trialSeed,
+                            m.WindShearAltM, m.WindShearDeltaMs, m.WindShearDeltaDeg,
+                            Aerodrome.RunwayElevationM);
+        WindModel.Clock = 0f;
     }
 
     void ArmFailure(ScenarioEvent e)
@@ -1015,6 +1028,9 @@ public class ScenarioEngine : MonoBehaviour
         float fdt = Time.fixedDeltaTime;
 
         Time01 += fdt;
+        // The gust series is sampled against the MISSION clock, not wall time, so it
+        // replays identically from the seed. (See defect note in FINAL_TEST_REPORT.)
+        WindModel.Clock = Time01;
 
         telemetryAccum += fdt;
         float interval = IsExperiment ? 1f / ExperimentLogger.TelemetryHz : 0.1f;
@@ -1029,7 +1045,12 @@ public class ScenarioEngine : MonoBehaviour
         float k = (WeatherActive ? weatherIntensity : 0f) + ambientTurb;
         if (k <= 0.001f) return;
 
-        float t = UnityEngine.Time.time;
+        // MISSION time, not UnityEngine.Time.time. Time.time is seconds since the
+        // application started, so the turbulence phase depended on HOW LONG UNITY HAD
+        // BEEN OPEN when the trial began — the sequence was seeded but not reproducible,
+        // and two participants with the same seed got different turbulence. Time01 is
+        // the physics-locked mission clock and always starts at 0.
+        float t = Time01;
         float gy = Mathf.PerlinNoise(turbSeed, t * 0.22f) - 0.5f;
         float gx = Mathf.PerlinNoise(turbSeed + 17f, t * 0.30f) - 0.5f;
         float gz = Mathf.PerlinNoise(turbSeed + 41f, t * 0.26f) - 0.5f;
@@ -1229,7 +1250,8 @@ public class ScenarioEngine : MonoBehaviour
     {
         respPending = false; AlarmActive = false; Banner = ""; HasWaypoint = false;
         WeatherActive = false; FaultActive = false; Checklist = null;
-        // Never let one trial's weather leak into the next.
+        // Never let one trial's weather or wind leak into the next.
+        WindModel.Disable();
         WorldBuilder.SetSkyClear();
         baseSkySeverity = 0f;
         if (gauges != null) foreach (var g in gauges) if (g != null) g.enabled = true;

@@ -45,6 +45,31 @@ public class CessnaPhysics : MonoBehaviour
 
     [Header("Stability")]
     [Range(0f, 1f)] public float weathervane = 0.30f;
+    /// <summary>DIRECTIONAL STABILITY (weathercock stability, Cn_beta). Effective fin
+    /// volume in m^3: yaw moment = 0.5 * rho * V * V_lateral * finVolume, which is the
+    /// standard q * S_v * l_v * a_v * beta with beta ~ V_lateral / V.
+    ///
+    /// WHY IT IS A SEPARATE TERM FROM `weathervane`
+    ///   `weathervane` rotates the whole aircraft toward its velocity vector on ALL
+    ///   THREE axes and is tuned for pitch — it is what makes the nose drop in a stall.
+    ///   At 0.30 it delivers about 2 N.m per radian of yaw misalignment, roughly three
+    ///   thousand times too little to model a fin, so the aeroplane would fly through a
+    ///   crosswind almost entirely SIDEWAYS instead of weathercocking into it. Measured:
+    ///   with an 11 m/s crosswind at 55 m/s, the aircraft reached 2 degrees of drift in
+    ///   8 s where the trigonometry says 11.3. Raising `weathervane` instead would have
+    ///   changed the verified stall and pitch behaviour, so directional stability gets
+    ///   its own yaw-only term and `weathervane` is left exactly as it was.
+    ///
+    /// SIZING. S_v ~ 1.6 m^2, l_v ~ 4.2 m, fin lift slope ~ 2.5 /rad gives ~17 m^3.
+    /// With Izz ~ 1800 kg.m^2 that puts the Dutch-roll frequency near 0.67 Hz at
+    /// cruise against a real C172's ~0.4-0.5 Hz, and the damping ratio near 0.24
+    /// against a real ~0.1-0.2 — the right order, slightly over-damped, which is the
+    /// safe direction to err in for an experiment (predictable beats twitchy).
+    ///
+    /// It applies ON THE GROUND TOO, and that is the point: it is what makes a
+    /// crosswind take-off roll require rudder. Before this term existed a 15 kt
+    /// crosswind produced no yawing tendency at all.</summary>
+    public float finVolume = 17f;
 
     [Header("Aerodynamic rate damping")]
     // The tail/wings resist angular RATE, so a held control input settles at a steady rate
@@ -134,6 +159,21 @@ public class CessnaPhysics : MonoBehaviour
     // --- readouts (metric) ---
     public float AirspeedKmh { get; private set; }
     public float AirspeedMs { get; private set; }
+    // ---- WIND-RELATIVE READOUTS -----------------------------------------------
+    // AirspeedMs is the speed through the AIR (what the wing feels and what the ASI
+    // shows). GroundSpeedMs is the speed over the ground (what the GPS/MFD shows and
+    // what determines whether you reach the runway). They are equal only in calm air,
+    // and the difference between them IS the crosswind/headwind task.
+    /// <summary>Speed over the ground, m/s.</summary>
+    public float GroundSpeedMs { get; private set; }
+    /// <summary>The air-mass velocity the aircraft is currently in, m/s world axes.</summary>
+    public Vector3 WindVel { get; private set; }
+    /// <summary>Track minus heading, degrees. Positive = drifting right of the nose.
+    /// A pilot holding a crab into a left crosswind flies with a POSITIVE drift angle.
+    /// Zero in calm air; this is the primary observable of the crosswind task.</summary>
+    public float DriftAngleDeg { get; private set; }
+    /// <summary>Aerodynamic sideslip, degrees. Positive = relative wind from the right.</summary>
+    public float SideslipDeg { get; private set; }
     public float AltitudeM { get; private set; }
     public float HeadingDeg { get; private set; }
     public float VerticalSpeedMs { get; private set; }
@@ -202,16 +242,35 @@ public class CessnaPhysics : MonoBehaviour
 
     void FixedUpdate()
     {
-        Vector3 vel = rb.linearVelocity;
+        // ---- WIND ------------------------------------------------------------
+        // Every aerodynamic term below uses the AIR-RELATIVE velocity; the ground
+        // handling (wheels, brakes, steering) uses the ground-relative one. That one
+        // distinction is the whole wind model as far as the flight dynamics are
+        // concerned. WindModel.Sample() returns exactly zero when no wind is
+        // configured, so a calm mission is bit-identical to this model before the wind
+        // layer existed — the same contract AircraftSystems' five hooks have.
+        Vector3 groundVel = rb.linearVelocity;
+        WindVel = WindModel.Sample(transform.position);
+        Vector3 vel = groundVel - WindVel;          // air-relative: what the wing feels
         float speed = vel.magnitude;
 
+        GroundSpeedMs = groundVel.magnitude;
         AirspeedMs = speed;
         AirspeedKmh = speed * 3.6f;
         AltitudeM = transform.position.y;
-        VerticalSpeedMs = vel.y;
+        VerticalSpeedMs = groundVel.y;              // the VSI is inertial, not air-relative
         HeadingDeg = NormalizeHeading(transform.eulerAngles.y);
         YawRateDps = rb.angularVelocity.y * Mathf.Rad2Deg;
         ComputeAttitude();
+
+        // Drift = where you are GOING minus where you are POINTING. The single number
+        // that says whether the pilot is compensating for the crosswind.
+        Vector3 track = groundVel; track.y = 0f;
+        DriftAngleDeg = track.sqrMagnitude > 1f
+            ? Mathf.DeltaAngle(HeadingDeg, NormalizeHeading(Mathf.Atan2(track.x, track.z) * Mathf.Rad2Deg))
+            : 0f;
+        Vector3 lv = transform.InverseTransformDirection(vel);
+        SideslipDeg = speed > 1.5f ? Mathf.Atan2(lv.x, Mathf.Max(0.5f, Mathf.Abs(lv.z))) * Mathf.Rad2Deg : 0f;
 
         // CRASHED -> wreck & fall: the engine is dead and there is no lift or
         // control, so the aircraft CANNOT keep flying. Gravity + the ground bring
@@ -330,6 +389,13 @@ public class CessnaPhysics : MonoBehaviour
                 float bank = Mathf.Clamp(RollDeg, -75f, 75f) * Mathf.Deg2Rad;
                 rb.AddRelativeTorque(0f, Mathf.Sin(bank) * turnCoordination * dq, 0f, ForceMode.Force);
             }
+
+            // FIN / DIRECTIONAL STABILITY. Always on, airborne and on the ground.
+            // Sign: localVel.x > 0 means the relative wind comes from the RIGHT, and the
+            // nose must swing right (positive yaw) to point into it.
+            if (Mathf.Abs(localVel.x) > 0.01f)
+                rb.AddRelativeTorque(0f, 0.5f * airDensity * speed * localVel.x * finVolume, 0f,
+                                     ForceMode.Force);
 
             // Static stability: align the nose toward the velocity vector. In a
             // stall this pulls the nose DOWN toward the airflow, so the aircraft
