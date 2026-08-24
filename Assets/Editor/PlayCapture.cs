@@ -133,6 +133,34 @@ public static class PlayCapture
         EditorApplication.Exit(failures == 0 ? 0 : 1);
     }
 
+    /// <summary>Renders the cockpit design-review shots (CockpitDesignShots,
+    /// -designshots). CockpitDesignShots' own header documented this entry point, but it
+    /// did not exist — so the documented command failed and the shots were only ever
+    /// produced by the generic timed Run(), which exits on a stopwatch rather than when
+    /// the renders are actually finished.</summary>
+    public static void RunDesignShots()
+    {
+        EditorSettings.enterPlayModeOptionsEnabled = true;
+        EditorSettings.enterPlayModeOptions =
+            EnterPlayModeOptions.DisableDomainReload | EnterPlayModeOptions.DisableSceneReload;
+        entered = false;
+        EditorApplication.update += TickDesignShots;
+        EditorApplication.EnterPlaymode();
+    }
+
+    static void TickDesignShots()
+    {
+        if (!EditorApplication.isPlaying) return;
+        if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
+        bool done = CockpitDesignShots.Finished;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 300.0;
+        if (!done && !timedOut) return;
+        if (timedOut && !done) Debug.LogError("[DESIGNSHOTS] HARD TIMEOUT");
+        EditorApplication.update -= TickDesignShots;
+        EditorApplication.isPlaying = false;
+        EditorApplication.Exit(done ? 0 : 1);
+    }
+
     public static void RunMissionTest()
     {
         EditorSettings.enterPlayModeOptionsEnabled = true;

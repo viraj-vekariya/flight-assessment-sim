@@ -34,7 +34,11 @@ public class StallHorn : MonoBehaviour
     void Update()
     {
         if (phys == null || src == null) return;
-        bool warn = phys.StallWarning && !phys.Grounded && !phys.Crashed;
+        // The stall horn is an ALERT, not ambience: the pilot is meant to act on it and
+        // the latency from horn to response is data. It follows the warning gain, which
+        // stays on in the development profile so a developer can hear that it fired.
+        src.volume = 0.5f * AudioPolicy.WarningGain;
+        bool warn = phys.StallWarning && !phys.Grounded && !phys.Crashed && AudioPolicy.WarningGain > 0f;
         if (warn && !src.isPlaying) src.Play();
         else if (!warn && src.isPlaying) src.Stop();
     }

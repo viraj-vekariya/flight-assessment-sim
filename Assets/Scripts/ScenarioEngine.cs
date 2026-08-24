@@ -128,6 +128,31 @@ public class ScenarioEngine : MonoBehaviour
     int wpIdx, wpReached;
     bool wasGrounded;
     float touchdownSink, touchdownX, touchdownDrift;
+    // ---- TAKE-OFF EVALUATION (see brief section 30: "the participant should not
+    // simply press a button and fly") ----
+    /// <summary>Airspeed and distance down the runway at the moment the wheels leave —
+    /// the two numbers that say whether the rotation was flown or merely arrived at.</summary>
+    float rotateAirspeedKmh, rotateDistanceM, rollStartZ;
+    /// <summary>Worst lateral and directional excursion during the ground roll only.
+    /// Separate from the airborne centreline metric because keeping straight on the
+    /// runway and tracking the extended centreline are different skills, and in a
+    /// crosswind they fail in different ways.</summary>
+    float rollMaxDevM, rollMaxHdgDevDeg;
+    float airborneAtT, targetAltAtT, initialClimbRate;
+    bool rollStarted;
+    // ---- LANDING EVALUATION (brief section 29: more than "did the plane crash") ----
+    /// <summary>Distance from the threshold to the touchdown point, along the runway.
+    /// The single most informative landing number and the one that was not recorded.</summary>
+    float touchdownDistanceM, touchdownSpeedKmh;
+    /// <summary>Height at which the flare began (first sustained arrest of the sink
+    /// rate) and how long it lasted. Late flare and no flare look identical in a
+    /// sink-rate-only score.</summary>
+    float flareStartAltM, flareStartT;
+    float prevSinkMs;
+    /// <summary>RMS deviation from a nominal 3-degree glidepath over the approach,
+    /// sampled between 300 m and 30 m above the runway.</summary>
+    float glideErrSq, glideT;
+    bool excursion;
     /// <summary>Worst lateral excursion from the runway centreline while below 60 m, and
     /// the time-integral of |drift angle| over the same window. Both are meaningless
     /// without a wind model and both are primary metrics for the crosswind axis.</summary>
@@ -184,6 +209,14 @@ public class ScenarioEngine : MonoBehaviour
         respPending = false; alarmsTotal = alarmsHit = alarmsMissed = falseAlarms = rtCount = 0; rtSum = 0f;
         touchdownSink = touchdownX = touchdownDrift = 0f;
         maxCenterlineDev = driftAbsInt = driftTime = 0f;
+        rotateAirspeedKmh = rotateDistanceM = rollStartZ = 0f;
+        rollMaxDevM = rollMaxHdgDevDeg = 0f;
+        airborneAtT = targetAltAtT = initialClimbRate = 0f;
+        rollStarted = false;
+        touchdownDistanceM = touchdownSpeedKmh = 0f;
+        flareStartAltM = flareStartT = prevSinkMs = 0f;
+        glideErrSq = glideT = 0f;
+        excursion = false;
         prevPitch = prevRoll = prevYaw = jerkSum = jerkTime = jerkInstant = 0f;
         ctrlActivity.Reset();
         wpIdx = wpReached = 0; wasGrounded = false; landed = false; climbDone = false;
@@ -414,6 +447,31 @@ public class ScenarioEngine : MonoBehaviour
                 driftAbsInt += Mathf.Abs(ac.DriftAngleDeg) * dt;
                 driftTime += dt;
             }
+        }
+
+        // ---- approach quality, for the landing missions ----
+        if (Current != null && Current.Goal == ScenarioGoal.Land && !ac.Grounded)
+        {
+            Vector3 p = ac.transform.position;
+            float agl = ac.AltitudeM - Aerodrome.RunwayElevationM;
+            float toThr = Aerodrome.ThresholdZ - p.z;          // +ve = still short of it
+            // GLIDEPATH ERROR. The nominal path is 3 degrees to the threshold; the error
+            // is the angular difference between where the aeroplane is and where that
+            // path would put it. Sampled between 30 m and 300 m so it covers the approach
+            // and not the flare or the join.
+            if (agl > 30f && agl < 300f && toThr > 200f)
+            {
+                float actualDeg = Mathf.Atan2(agl, toThr) * Mathf.Rad2Deg;
+                float err = actualDeg - 3f;
+                glideErrSq += err * err * dt; glideT += dt;
+            }
+            // FLARE. The first sustained arrest of the sink rate below 30 m. Recording
+            // WHERE it began separates "flared late" from "did not flare", which a
+            // touchdown sink rate alone cannot: both produce a firm arrival.
+            float sink = -ac.VerticalSpeedMs;
+            if (flareStartAltM <= 0f && agl < 30f && agl > 0.5f && prevSinkMs > 0.6f && sink < prevSinkMs - 0.15f)
+            { flareStartAltM = agl; flareStartT = Time01; }
+            prevSinkMs = Mathf.Lerp(prevSinkMs, sink, 0.15f);
         }
     }
 
@@ -812,6 +870,8 @@ public class ScenarioEngine : MonoBehaviour
             // down with the aeroplane pointing where it is going, i.e. drift near zero.
             // Landing crabbed side-loads the gear and shows up here and nowhere else.
             touchdownDrift = ac.DriftAngleDeg;
+            touchdownSpeedKmh = ac.AirspeedKmh;
+            touchdownDistanceM = ac.transform.position.z - Aerodrome.ThresholdZ;
             bool onRunway = Mathf.Abs(touchdownX) < 16f && Mathf.Abs(ac.transform.position.z) < 305f;
             if (onRunway && !ac.Crashed) { landed = true; }
             Mark(EventMarkers.Touchdown,
@@ -819,6 +879,22 @@ public class ScenarioEngine : MonoBehaviour
                  ";on_runway=" + (onRunway ? 1 : 0));
         }
         wasGrounded = ac.Grounded;
+
+        // RUNWAY EXCURSION: on the ground, past the threshold, and off the paved
+        // surface. Distinct from "crashed" — an aeroplane that rolls off the side into
+        // the grass and stops has not crashed, and the difference matters for a landing
+        // score that is supposed to be more than a survival flag.
+        if (!excursion && ac.Grounded && landed)
+        {
+            Vector3 gp = ac.transform.position;
+            if (Mathf.Abs(gp.x) > Aerodrome.RunwayHalfWidth + 2f ||
+                gp.z > Aerodrome.RunwayHalfLength + 5f)
+            {
+                excursion = true;
+                Mark(EventMarkers.PhaseChange, "runway_excursion|x=" + gp.x.ToString("F1") +
+                     ";z=" + gp.z.ToString("F1"));
+            }
+        }
 
         if (Current.Goal == ScenarioGoal.Navigate) UpdateWaypoints();
         else if (Current.Goal == ScenarioGoal.TaxiTakeoff) UpdateTaxiTakeoff();
@@ -902,20 +978,41 @@ public class ScenarioEngine : MonoBehaviour
                 break;
 
             case 2:   // lining up and rolling
+            {
+                Vector3 rp = ac.transform.position;
+                // The roll proper starts once the aeroplane is on the runway and moving.
+                if (!rollStarted && ac.Grounded && Aerodrome.OnRunway(rp) && ac.GroundSpeedMs > 3f)
+                { rollStarted = true; rollStartZ = rp.z; }
+                if (rollStarted && ac.Grounded)
+                {
+                    rollMaxDevM = Mathf.Max(rollMaxDevM, Mathf.Abs(rp.x));
+                    rollMaxHdgDevDeg = Mathf.Max(rollMaxHdgDevDeg,
+                        Mathf.Abs(Mathf.DeltaAngle(ac.HeadingDeg, Aerodrome.RunwayHeadingDeg)));
+                }
                 if (!ac.Grounded && ac.AltitudeM > 8f)
                 {
                     taxiPhase = 3; rotated = true;
+                    rotateAirspeedKmh = ac.AirspeedKmh;
+                    rotateDistanceM = rollStarted ? Mathf.Abs(ac.transform.position.z - rollStartZ) : 0f;
+                    airborneAtT = Time01;
                     wpReached = Current.Waypoints.Count;   // route completed by getting airborne
                     HasWaypoint = false;
-                    Mark(EventMarkers.PhaseChange, "airborne|taxi_m=" + taxiDistance.ToString("F0"));
+                    Mark(EventMarkers.PhaseChange, "airborne|taxi_m=" + taxiDistance.ToString("F0") +
+                         ";rotate_kmh=" + rotateAirspeedKmh.ToString("F0") +
+                         ";roll_m=" + rotateDistanceM.ToString("F0"));
                 }
                 break;
+            }
 
             case 3:   // airborne, climbing to the assigned level
                 if (!climbDone && ac.AltitudeM >= Current.TargetAltitude - 20f)
                 {
                     climbDone = true;
-                    Mark(EventMarkers.PhaseChange, "target_altitude_reached");
+                    targetAltAtT = Time01;
+                    if (targetAltAtT > airborneAtT + 1f)
+                        initialClimbRate = (ac.AltitudeM - 8f) / (targetAltAtT - airborneAtT);
+                    Mark(EventMarkers.PhaseChange, "target_altitude_reached;t_from_rotate_s=" +
+                         (targetAltAtT - airborneAtT).ToString("F1"));
                 }
                 break;
         }
@@ -1245,6 +1342,13 @@ public class ScenarioEngine : MonoBehaviour
             r.Metrics["runway_incursion"] = holdShortBusted ? 1 : 0;
             r.Metrics["became_airborne"] = rotated ? 1 : 0;
             r.Metrics["taxi_phase_reached"] = taxiPhase;
+            // Take-off quality, not merely take-off occurrence.
+            r.Metrics["rotate_airspeed_kmh"] = rotateAirspeedKmh;
+            r.Metrics["rotate_distance_m"] = rotateDistanceM;
+            r.Metrics["roll_max_centerline_dev_m"] = rollMaxDevM;
+            r.Metrics["roll_max_heading_dev_deg"] = rollMaxHdgDevDeg;
+            r.Metrics["initial_climb_rate_ms"] = initialClimbRate;
+            r.Metrics["time_rotate_to_level_s"] = climbDone ? targetAltAtT - airborneAtT : -1f;
         }
         if (Current.Goal == ScenarioGoal.Land || Current.Goal == ScenarioGoal.Mission)
         {
@@ -1258,6 +1362,13 @@ public class ScenarioEngine : MonoBehaviour
             r.Metrics["touchdown_bank_deg"] = ac.TouchdownBank;
             r.Metrics["max_centerline_dev_m"] = maxCenterlineDev;
             r.Metrics["mean_abs_drift_deg"] = driftTime > 0.5f ? driftAbsInt / driftTime : 0f;
+            // Landing quality, not merely survival.
+            r.Metrics["touchdown_distance_m"] = touchdownDistanceM;
+            r.Metrics["touchdown_speed_kmh"] = touchdownSpeedKmh;
+            r.Metrics["flare_start_alt_m"] = flareStartAltM;
+            r.Metrics["flare_duration_s"] = flareStartT > 0f ? Mathf.Max(0f, Time01 - flareStartT) : -1f;
+            r.Metrics["glidepath_rms_deg"] = glideT > 1f ? Mathf.Sqrt(glideErrSq / glideT) : -1f;
+            r.Metrics["runway_excursion"] = excursion ? 1 : 0;
         }
         Metrics = r.Metrics;
 

@@ -1,6 +1,6 @@
 MISSION TEST REPORT
 ===================
-generated 2026-08-24 14:47:00
+generated 2026-08-24 14:58:17
 unity 6000.0.77f1   timeScale 8
 
 BANK DESIGN CHECKS
@@ -22,7 +22,7 @@ bank: 42 missions  (36 cognitive axis, 6 psychomotor axis)
    H3V2   hdg     0  alt   850  no rising terrain on the nominal track
    H4V2   hdg     0  alt   500  no rising terrain on the nominal track
    L1V3   hdg     0  alt   800  no rising terrain on the nominal track
-   L3V3   route 3 legs, 11840 m  min clearance     623 m at 6778 m
+   L3V3   route 3 legs, 11840 m  min clearance     599 m at 6538 m
    L4V3   hdg     0  alt   400  no rising terrain on the nominal track
    M1V3   hdg     0  alt   600  no rising terrain on the nominal track
    M2V3   hdg   350  alt   850  no rising terrain on the nominal track
@@ -37,34 +37,34 @@ bank: 42 missions  (36 cognitive axis, 6 psychomotor axis)
    XT3    hdg     0  alt   600  no rising terrain on the nominal track
    XL3    hdg     0  alt   500  no rising terrain on the nominal track
 terrain clearance along each mission's nominal track (margin 90 m):
-   M1     hdg    40  alt   700  min clearance     287 m at  3600 m out
-   M2     hdg   330  alt   900  min clearance     522 m at  2640 m out
-   M3     hdg    20  alt   780  min clearance     681 m at  5640 m out
-   H1     hdg   320  alt   800  min clearance     244 m at  3600 m out
-   H3     hdg    60  alt   500  min clearance     216 m at  4560 m out
-   L3V2   hdg    20  alt   700  min clearance     601 m at  5640 m out
-   M1V2   hdg   340  alt   750  min clearance     243 m at  3720 m out
-   M3V2   hdg   315  alt   900  min clearance     739 m at  5160 m out
-   H1V2   hdg    25  alt   600  min clearance     297 m at  3480 m out
-   L2V3   hdg   340  alt   700  min clearance     554 m at  2280 m out
-   H2V3   hdg    50  alt   800  min clearance     595 m at  2760 m out
-   H3V3   hdg    10  alt   600  min clearance     524 m at  5760 m out
+   M1     hdg    40  alt   700  min clearance     169 m at  2880 m out
+   M2     hdg   330  alt   900  min clearance     450 m at  1800 m out
+   M3     hdg    20  alt   780  min clearance     632 m at  5040 m out
+   H1     hdg   320  alt   800  min clearance     147 m at  3000 m out
+   H3     hdg    60  alt   500  min clearance     156 m at  4440 m out
+   L3V2   hdg    20  alt   700  min clearance     552 m at  5040 m out
+   M1V2   hdg   340  alt   750  min clearance     145 m at  2880 m out
+   M3V2   hdg   315  alt   900  min clearance     706 m at  4320 m out
+   H1V2   hdg    25  alt   600  min clearance     184 m at  2760 m out
+   L2V3   hdg   340  alt   700  min clearance     523 m at  1320 m out
+   H2V3   hdg    50  alt   800  min clearance     474 m at  1920 m out
+   H3V3   hdg    10  alt   600  min clearance     482 m at  5400 m out
 wrote variant_equivalence.csv
 design checks: OK
 
-SINGLE MISSION: L3V3
+SINGLE MISSION: L1
 missions queued: 1
 
-── L3V3  Waypoint navigation  [LOW]  PLI 14.8
+── L1  Normal departure from the stand  [LOW]  PLI 28.0
    telemetry: 15000 rows x 82 cols, monotonic  OK
-   events: 11 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TLX_START TLX_SUBMIT WAYPOINT
+   events: 24 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN WAYPOINT
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
    restart: new trial folder allocated  OK
    restart: systems reset clean  OK
    restart: mission clock reset  OK
    telemetry: 15000 rows x 82 cols, monotonic  OK
-   events: 11 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TLX_START TLX_SUBMIT WAYPOINT
+   events: 24 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN WAYPOINT
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
@@ -72,7 +72,7 @@ SUMMARY
 -------
 missions run : 1
 problems     : 0
-scripted-pilot outcomes: L3V3=SUCCESS  L3V3=SUCCESS
+scripted-pilot outcomes: L1=SUCCESS  L1=SUCCESS
   (outcomes are a flyability sanity check, NOT part of the pass/fail.
    The scripted pilot is a crude autopilot, not a model of a participant.)
   (none)

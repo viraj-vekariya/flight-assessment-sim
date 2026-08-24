@@ -16,6 +16,25 @@ public class LiveMFD : MonoBehaviour
     public Transform screenQuad;
 
     Camera mapCam;
+
+    // ── NAVIGATION SYMBOLOGY ────────────────────────────────────────────────
+    // Before this, the map was a top-down camera on the terrain with a triangle in the
+    // middle and eight compass letters. That is a MINIMAP: it tells the pilot where they
+    // are on a picture, and nothing else. An aviation navigation display has to answer
+    // "where am I GOING, how far, and how fast" — the route, the active leg, the range
+    // the picture is drawn at, and the numbers. Those are what is added here.
+    const int MaxLegs = 16;
+    Transform routeRoot;
+    Transform[] wpMarks = new Transform[0];
+    Transform[] wpLabels = new Transform[0];
+    Transform[] legs = new Transform[0];
+    TextMesh gsText, trkText, altText, wptText, rngText;
+    float halfWidth;                 // ortho half-width in map units (aspect * mapSize)
+    /// <summary>Everything drawn ON the map hangs off this. Scaling it by
+    /// (currentRange / mapSize) keeps every symbol the same size ON SCREEN while the
+    /// camera's range changes, which is what a real range-selectable display does.</summary>
+    Transform symRoot;
+    float rangeM;                    // current map range (ortho half-height), metres
     // The eight compass labels and the true bearing each one marks (N = 0, clockwise).
     static readonly string[] CompassNames = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
     Transform[] compassLabels = new Transform[0];   // filled by Build()
@@ -40,12 +59,18 @@ public class LiveMFD : MonoBehaviour
         mapCam.targetTexture = rt;
         mapCam.cullingMask |= (1 << SymbolLayer);
 
+        // One container for all symbology, so the whole overlay can be scaled with the
+        // selected range in a single place.
+        symRoot = new GameObject("Symbology").transform;
+        symRoot.SetParent(camGO.transform, false);
+        rangeM = mapSize;
+
         // ---- own-ship symbol: a plain triangle pointing up the map (the aircraft heading) ----
         // A solid arrowhead reads far better at this size than a little aeroplane outline: the
         // pilot only needs "which way am I pointing". Drawn over a dark outline triangle so it
         // stays legible over pale ground as well as dark.
         var sym = new GameObject("MapSymbol");
-        sym.transform.SetParent(camGO.transform, false);
+        sym.transform.SetParent(symRoot, false);
         sym.transform.localPosition = new Vector3(0f, 0f, 3f);
 
         float halfW = mapSize * 0.085f;    // half the base width
@@ -67,7 +92,7 @@ public class LiveMFD : MonoBehaviour
             float rx = ringR * Mathf.Sin(rad);
             float ry = ringR * Mathf.Cos(rad);
             var piv = new GameObject("RingSeg").transform;
-            piv.SetParent(camGO.transform, false);
+            piv.SetParent(symRoot, false);
             piv.localPosition = new Vector3(rx, ry, 3f);
             // rotate each segment tangentially around the ring
             piv.localRotation = Quaternion.Euler(0f, 0f, -(90f + i * 10f));
@@ -95,7 +120,83 @@ public class LiveMFD : MonoBehaviour
         compassRadius = mapSize * 0.755f;
         compassLabels = new Transform[CompassNames.Length];
         for (int i = 0; i < CompassNames.Length; i++)
-            compassLabels[i] = AddMapLabel(camGO.transform, CompassNames[i], mapSize, SymbolLayer);
+            compassLabels[i] = AddMapLabel(symRoot, CompassNames[i], mapSize, SymbolLayer);
+
+        // ---- DIM OVERLAY ----
+        // The map camera renders the real world, and from directly above at midday the
+        // terrain is a flat sheet of bright green. That is why the display read as a
+        // game minimap: an aviation screen is DARK, and its symbology is the brightest
+        // thing on it. A translucent dark sheet between the terrain and the symbology
+        // gives the instrument its own value range back — the ground is still there,
+        // still moving, still readable as terrain, but it is now a background instead of
+        // the subject.
+        float aspect = 512f / 384f;
+        halfWidth = mapSize * aspect;
+        // Z ORDER MATTERS AND IS COUNTER-INTUITIVE HERE. The camera looks along its own
+        // local +Z, so a LARGER local z is FURTHER AWAY. The symbology sits at z = 3, so
+        // an overlay at z = 2 would be in front of it and would dim the very numbers it
+        // exists to make readable — which is exactly what the first version did: the
+        // GS/TRK/ALT block came out washed out while the near-white compass letters
+        // survived, so the fault looked like a font-colour problem rather than a
+        // depth-ordering one. The overlay belongs BEHIND the symbols and in front of the
+        // world: z = 4.
+        AddTransparentQuad(symRoot, new Vector3(0f, 0f, 4.0f),
+                           new Vector3(halfWidth * 2.4f, mapSize * 2.4f, 1f),
+                           new Color(0.02f, 0.05f, 0.08f, 0.78f), SymbolLayer);
+
+        // ---- ROUTE LAYER ----
+        // Legs and waypoint marks live in MAP-CAMERA-LOCAL space and are repositioned
+        // every LateUpdate from the aircraft's own position and heading. They are NOT
+        // placed in the world: a world-space symbol on this layer would be rendered by
+        // any other camera that happened to include the layer, and the participant would
+        // see magenta diamonds hanging over the countryside.
+        routeRoot = new GameObject("Route").transform;
+        routeRoot.SetParent(symRoot, false);
+        wpMarks = new Transform[MaxLegs];
+        wpLabels = new Transform[MaxLegs];
+        legs = new Transform[MaxLegs];
+        var magenta = new Color(0.95f, 0.35f, 0.95f, 1f);
+        for (int i = 0; i < MaxLegs; i++)
+        {
+            var leg = new GameObject("Leg" + i).transform;
+            leg.SetParent(routeRoot, false);
+            AddQuad(leg, Vector3.zero, Vector3.one, magenta, SymbolLayer);
+            leg.gameObject.SetActive(false);
+            legs[i] = leg;
+
+            var mk = new GameObject("Wpt" + i).transform;
+            mk.SetParent(routeRoot, false);
+            // A diamond — the standard en-route waypoint symbol — as a square turned 45°.
+            var d = new GameObject("Dia").transform;
+            d.SetParent(mk, false);
+            d.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            AddQuad(d, Vector3.zero, new Vector3(mapSize * 0.045f, mapSize * 0.045f, 1f), magenta, SymbolLayer);
+            mk.gameObject.SetActive(false);
+            wpMarks[i] = mk;
+
+            wpLabels[i] = MakeDataLabel(routeRoot, "", mapSize * 0.045f, magenta, SymbolLayer).transform;
+            wpLabels[i].gameObject.SetActive(false);
+        }
+
+        // ---- DATA BLOCK ----
+        // The four numbers a pilot actually reads off a moving map, in the corners where
+        // a G1000 puts them, plus the RANGE — because a map without a stated range is a
+        // picture, not an instrument, and the pilot cannot judge any distance on it.
+        var cyan = new Color(0.45f, 1f, 1f);
+        float cap = mapSize * 0.068f;
+        float mx = halfWidth * 0.97f, my = mapSize * 0.94f;
+        gsText  = MakeDataLabel(symRoot, "GS ---", cap, cyan, SymbolLayer);
+        trkText = MakeDataLabel(symRoot, "TRK ---", cap, cyan, SymbolLayer);
+        altText = MakeDataLabel(symRoot, "ALT ---", cap, cyan, SymbolLayer);
+        wptText = MakeDataLabel(symRoot, "", cap, new Color(0.95f, 0.35f, 0.95f), SymbolLayer);
+        rngText = MakeDataLabel(symRoot, "", mapSize * 0.055f, new Color(0.85f, 0.90f, 0.94f), SymbolLayer);
+        Place(gsText,  new Vector3(-mx, my, 3f), TextAnchor.UpperLeft);
+        Place(trkText, new Vector3( mx, my, 3f), TextAnchor.UpperRight);
+        Place(altText, new Vector3( mx, -my, 3f), TextAnchor.LowerRight);
+        Place(wptText, new Vector3(-mx, -my, 3f), TextAnchor.LowerLeft);
+        // On the ring, down-right — straight up collides with the N compass label.
+        Place(rngText, new Vector3(mapSize * 0.37f, -mapSize * 0.30f, 3f), TextAnchor.MiddleLeft);
+        rngText.text = FormatDistance(mapSize * 0.5f);
 
         // ---- overlay quad over the panel's right screen ----
         var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -131,6 +232,206 @@ public class LiveMFD : MonoBehaviour
             compassLabels[i].localPosition = new Vector3(compassRadius * Mathf.Sin(a),
                                                         compassRadius * Mathf.Cos(a), 3f);
         }
+
+        UpdateRange();
+        UpdateSymbology(p, hdg);
+    }
+
+    /// <summary>Choose the map range.
+    ///
+    /// The range used to be FIXED at 180 m — about two runway widths. That is a
+    /// reasonable taxi range and a useless en-route one: a waypoint 4 km ahead is
+    /// twenty-two screens away, so the route this display exists to show could never
+    /// appear on it. A fixed range is also why the range annotation did not earn its
+    /// place; a number that never changes is decoration.
+    ///
+    /// So the range follows the task: close on the ground where the geometry is the
+    /// aerodrome, wide in the air, and wide enough to hold the ACTIVE WAYPOINT with
+    /// room around it when there is one. Real displays let the pilot select this; a
+    /// participant flying a workload experiment should not be spending attention on a
+    /// range knob, so it is automatic and always annotated.
+    ///
+    /// It steps rather than slides — a continuously-zooming map is unreadable, because
+    /// nothing on it holds still.</summary>
+    void UpdateRange()
+    {
+        var phys = aircraft != null ? aircraft.GetComponent<CessnaPhysics>() : null;
+        var gm = GameManager.Instance;
+        var eng = gm != null ? gm.ScenarioRunner : null;
+        bool onGround = phys != null && phys.Grounded;
+
+        float want = onGround ? 250f : 1500f;
+        if (eng != null && eng.Active && eng.HasWaypoint)
+        {
+            Vector3 w = eng.WaypointPos, a = aircraft.position;
+            float d = Vector2.Distance(new Vector2(a.x, a.z), new Vector2(w.x, w.z));
+            want = Mathf.Max(want, d * 1.25f);
+        }
+        // Standard-ish range steps, so the picture settles instead of breathing.
+        float[] steps = { 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f };
+        float chosen = steps[steps.Length - 1];
+        foreach (float st in steps) if (want <= st) { chosen = st; break; }
+
+        if (Mathf.Abs(chosen - rangeM) < 1f) return;
+        rangeM = chosen;
+        mapCam.orthographicSize = rangeM;
+        // Keep every symbol the same size on screen as the range changes.
+        if (symRoot != null) symRoot.localScale = Vector3.one * (rangeM / mapSize);
+        if (rngText != null) rngText.text = FormatDistance(rangeM * 0.5f);
+        // The far clip has to reach the ground from the camera's height whatever the range.
+        mapCam.farClipPlane = Mathf.Max(3000f, height * 3f);
+    }
+
+    /// <summary>World offset -> map-camera-local position. The camera is heading-up, so
+    /// map +Y is the aircraft's nose: a point due north appears straight up only when the
+    /// aeroplane is heading north.</summary>
+    Vector2 ToMap(Vector3 worldOffset, float hdgDeg)
+    {
+        float r = hdgDeg * Mathf.Deg2Rad;
+        float c = Mathf.Cos(r), sn = Mathf.Sin(r);
+        return new Vector2(worldOffset.x * c - worldOffset.z * sn,
+                           worldOffset.x * sn + worldOffset.z * c);
+    }
+
+    void UpdateSymbology(Vector3 pos, float hdgDeg)
+    {
+        var phys = aircraft != null ? aircraft.GetComponent<CessnaPhysics>() : null;
+        var gm = GameManager.Instance;
+        var eng = gm != null ? gm.ScenarioRunner : null;
+
+        // ---- data block ----
+        if (phys != null)
+        {
+            // GROUND speed, not airspeed: this is the display that answers "when do I get
+            // there", and in a wind those are different numbers. The PFD has the airspeed.
+            if (gsText != null) gsText.text = "GS " + Mathf.RoundToInt(phys.GroundSpeedMs * 3.6f) + " km/h";
+            // TRACK, not heading: on a moving map the useful number is the direction the
+            // aeroplane is actually going over the ground.
+            float trk = Mathf.Repeat(hdgDeg + phys.DriftAngleDeg, 360f);
+            if (trkText != null) trkText.text = "TRK " + Mathf.RoundToInt(trk).ToString("000") + "\u00B0";
+            if (altText != null) altText.text = "ALT " + Mathf.RoundToInt(phys.AltitudeM) + " m";
+        }
+
+        // ---- route ----
+        int shown = 0;
+        var sc = eng != null ? eng.Current : null;
+        if (sc != null && sc.Waypoints != null && eng.Active)
+        {
+            int n = Mathf.Min(sc.Waypoints.Count, MaxLegs);
+            Vector2 prev = Vector2.zero;
+            bool havePrev = false;
+            for (int i = 0; i < n; i++)
+            {
+                // Divide by the symRoot scale so that AFTER scaling the marker lands at
+                // its true offset in metres — the container scaling that keeps symbol
+                // SIZES constant would otherwise also move these off their positions.
+                float inv = mapSize / Mathf.Max(1f, rangeM);
+                Vector2 m = ToMap(sc.Waypoints[i].Pos - pos, hdgDeg) * inv;
+                // Skip anything far outside the picture — a symbol pinned to the edge of
+                // the screen is worse than no symbol, because it implies a position.
+                bool visible = Mathf.Abs(m.x) < halfWidth * 1.02f && Mathf.Abs(m.y) < mapSize * 1.02f;
+                if (wpMarks[i] != null)
+                {
+                    wpMarks[i].gameObject.SetActive(visible);
+                    if (visible) wpMarks[i].localPosition = new Vector3(m.x, m.y, 2.9f);
+                }
+                if (wpLabels[i] != null)
+                {
+                    var tm = wpLabels[i].GetComponent<TextMesh>();
+                    if (tm != null) tm.text = sc.Waypoints[i].Name;
+                    wpLabels[i].gameObject.SetActive(visible);
+                    if (visible)
+                        wpLabels[i].localPosition = new Vector3(m.x, m.y + mapSize * 0.062f, 2.9f);
+                }
+                if (havePrev && legs[i] != null)
+                {
+                    Vector2 a = prev, b = m;
+                    Vector2 mid = (a + b) * 0.5f;
+                    float len = Vector2.Distance(a, b);
+                    float ang = Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg;
+                    legs[i].gameObject.SetActive(len > 0.01f);
+                    legs[i].localPosition = new Vector3(mid.x, mid.y, 2.8f);
+                    legs[i].localRotation = Quaternion.Euler(0f, 0f, ang);
+                    legs[i].localScale = new Vector3(len, mapSize * 0.009f, 1f);
+                }
+                else if (legs[i] != null) legs[i].gameObject.SetActive(false);
+                prev = m; havePrev = true;
+                shown++;
+            }
+            // ---- active leg readout ----
+            if (wptText != null)
+            {
+                if (eng.HasWaypoint)
+                {
+                    Vector3 w = eng.WaypointPos;
+                    float d = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(w.x, w.z));
+                    float brg = Mathf.Repeat(Mathf.Atan2(w.x - pos.x, w.z - pos.z) * Mathf.Rad2Deg, 360f);
+                    string nm = (eng.Current != null && eng.WaypointIndex >= 0 &&
+                                 eng.WaypointIndex < eng.Current.Waypoints.Count)
+                              ? eng.Current.Waypoints[eng.WaypointIndex].Name : "WPT";
+                    wptText.text = nm + "  " + FormatDistance(d) + "  " +
+                                   Mathf.RoundToInt(brg).ToString("000") + "\u00B0";
+                }
+                else wptText.text = "";
+            }
+        }
+        for (int i = shown; i < MaxLegs; i++)
+        {
+            if (wpMarks[i] != null) wpMarks[i].gameObject.SetActive(false);
+            if (wpLabels[i] != null) wpLabels[i].gameObject.SetActive(false);
+            if (legs[i] != null) legs[i].gameObject.SetActive(false);
+        }
+        if (shown == 0 && wptText != null) wptText.text = "";
+    }
+
+    static string FormatDistance(float metres) =>
+        metres >= 1000f ? (metres / 1000f).ToString("F1") + " km" : Mathf.RoundToInt(metres) + " m";
+
+    static void Place(TextMesh tm, Vector3 lp, TextAnchor anchor)
+    {
+        if (tm == null) return;
+        tm.transform.localPosition = lp;
+        tm.anchor = anchor;
+        tm.alignment = anchor == TextAnchor.UpperRight || anchor == TextAnchor.LowerRight
+                     ? TextAlignment.Right : TextAlignment.Left;
+    }
+
+    /// <summary>A data-block glyph on the map: same rendering path as the compass labels
+    /// (TextMesh on the symbol layer, parented to the map camera) so it becomes pixels in
+    /// the render texture rather than text floating in the cockpit.</summary>
+    static TextMesh MakeDataLabel(Transform parent, string text, float cap, Color col, int layer)
+    {
+        const int Pt = 72;
+        var tm = new GameObject("Data").AddComponent<TextMesh>();
+        tm.transform.SetParent(parent, false);
+        tm.text = text;
+        tm.characterSize = cap * 10f / Pt;
+        tm.fontSize = Pt;
+        tm.color = col;
+        tm.anchor = TextAnchor.MiddleCenter;
+        tm.gameObject.layer = layer;
+        var mr = tm.GetComponent<MeshRenderer>();
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows = false;
+        return tm;
+    }
+
+    /// <summary>A translucent quad. AddQuad uses Unlit/Color, which is opaque — the alpha
+    /// in a colour handed to it is silently ignored, which is why the reference ring's
+    /// 0.6 alpha never did anything.</summary>
+    static void AddTransparentQuad(Transform parent, Vector3 localPos, Vector3 localScale,
+                                   Color color, int layer)
+    {
+        var g = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        var c = g.GetComponent<Collider>(); if (c) Object.Destroy(c);
+        g.transform.SetParent(parent, false);
+        g.transform.localPosition = localPos;
+        g.transform.localScale = localScale;
+        g.layer = layer;
+        var sh = Shader.Find("Unlit/Transparent Colored") ?? Shader.Find("Sprites/Default");
+        var mat = new Material(sh) { color = color };
+        mat.renderQueue = 3000;
+        g.GetComponent<MeshRenderer>().material = mat;
     }
 
     /// <summary>One compass label, sized in MAP UNITS so it stays legible whatever the

@@ -223,7 +223,21 @@ public class CockpitControlRig : MonoBehaviour
         list.Add(BuildYoke());
         list.Add(BuildThrottle());
         list.Add(BuildFlapLever());
-        list.Add(BuildSpoilerLever());
+        // NO SPOILER LEVER. A Cessna 172 has no spoilers, and this one served no
+        // experimental purpose: no mission and no checklist referenced it, and
+        // AircraftController held it retracted for the whole of every recorded trial.
+        // So it was an unrealistic control, in the most-looked-at part of the panel,
+        // that a participant could see and reach and that did nothing — which is
+        // precisely the "generic game control" the cockpit is supposed not to have.
+        //
+        // The simulation capability is untouched: the spoiler still exists in the flight
+        // model and is still on the X key for development, still locked out during a
+        // recorded trial, and its telemetry column still proves it stayed at zero rather
+        // than being assumed to have.
+        //
+        // The quadrant is now throttle + flaps, which is what the aeroplane has.
+        // BuildSpoilerLever() is retained below, unreferenced, because the geometry is
+        // good and a future aircraft type may want it.
         list.Add(BuildBrakePedals());
         list.Add(BuildTrimWheel());
         // The four systems memory items are RESTORED as physical controls. They were taken

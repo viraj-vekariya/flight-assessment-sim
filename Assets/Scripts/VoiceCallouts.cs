@@ -97,7 +97,9 @@ public class VoiceCallouts : MonoBehaviour
         var c = pending[best];
         pending.RemoveAt(best);
         currentTier = c.tier;
-        src.PlayOneShot(c.clip);
+        // ATC and GPWS speech is a TASK INSTRUCTION, never decoration — a mission whose
+        // clearance is inaudible is not the mission it claims to be.
+        src.PlayOneShot(c.clip, AudioPolicy.CalloutGain);
     }
 
     void Update()

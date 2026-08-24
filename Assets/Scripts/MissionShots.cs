@@ -106,8 +106,14 @@ public class MissionShots : MonoBehaviour
         BuildCameras();
 
         int n = 0;
+        // -onlymission:ID renders ONE mission. The bank is now 42, and re-rendering all
+        // of them to look at a single display is a very slow way to check one thing.
+        string only = null;
+        foreach (var a in System.Environment.GetCommandLineArgs())
+            if (a.StartsWith("-onlymission:")) only = a.Substring("-onlymission:".Length);
         foreach (var m in MissionLibrary.All())
         {
+            if (!string.IsNullOrEmpty(only) && m.Id != only) continue;
             n++;
             yield return Capture(m, n);
         }

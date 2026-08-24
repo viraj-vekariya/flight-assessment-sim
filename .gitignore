@@ -11,3 +11,5 @@ UserSettings/
 *.log
 mono_crash*.json
 .DS_Store
+Builds/
+CockpitDesignShots/

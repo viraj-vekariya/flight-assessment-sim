@@ -95,7 +95,10 @@ public class ControlTestHarness : MonoBehaviour
         yield return TestTrim();
         yield return TestFlaps();
         yield return TestBrake();
-        yield return TestSpoiler();
+        // The spoiler lever was removed from the cockpit (a 172 has no spoilers and it
+        // served no experimental purpose). The simulation capability remains, so the
+        // test runs only if a spoiler control is actually present.
+        if (HasControl("spoiler")) yield return TestSpoiler();
         // The four systems controls are physical again, so drive them physically — and
         // still assert the keyboard path, because desktop sessions use it and the drill
         // text tells the participant to.
@@ -613,6 +616,16 @@ public class ControlTestHarness : MonoBehaviour
 
     void Section(string s) { report.AppendLine(); report.AppendLine("── " + s); }
 
+    /// <summary>True when the rig actually built a control with this id. Lets a
+    /// test section stand down for a control that has been deliberately removed,
+    /// instead of failing and looking like a regression.</summary>
+    bool HasControl(string id)
+    {
+        if (rig == null) return false;
+        foreach (var c in rig.Controls) if (c != null && c.spec != null && c.spec.id == id) return true;
+        return false;
+    }
+
     void Check(string what, bool ok, string detail)
     {
         report.AppendLine((ok ? "   OK    " : "   FAIL  ") + what + "   [" + detail + "]");
@@ -634,6 +647,11 @@ public class ControlTestHarness : MonoBehaviour
         report.AppendLine("NOTE: this verifies WIRING, DIRECTION, GEARING and RESET. Whether a control is");
         report.AppendLine("comfortable or reachable in VR needs a headset and a person.");
 
+        // Write to BOTH locations. A stale copy in the project root - where the docs
+        // tell a reader to look - is an excellent way to read an old result and
+        // believe it is the current one. That happened twice during this work.
+        try { File.WriteAllText(Path.Combine(Directory.GetParent(Application.dataPath).FullName,
+                                             "control_test_report.txt"), report.ToString()); } catch { }
         string path = Path.Combine(Application.persistentDataPath, "control_test_report.txt");
         File.WriteAllText(path, report.ToString(), new UTF8Encoding(false));
         Debug.Log("[CTEST-REPORT]\n" + report.ToString());

@@ -285,14 +285,17 @@ public static class WorldBuilder
         //
         //   So the aerodrome now sits on a CIRCULAR PLAIN of radius 3.2 km, blended out
         //   over 900 m, which is both what a real aerodrome sits on and what makes a
-        //   departure turn safe: at 3.2 km a climbing C172 is near 350 m, well above the
-        //   terrain as it starts to rise. The long approach corridor on -Z is kept
+        //   departure turn safe: at 2.4 km a climbing C172 is near 260 m and still
+        //   climbing as the ground begins to rise. The radius is deliberately the
+        //   SMALLEST that keeps every mission's verified clearance comfortable — a
+        //   larger plain is safer but flattens the countryside the pilot can see, and
+        //   an empty world is its own kind of unrealism. The long approach corridor on -Z is kept
         //   unchanged, because the 12 km straight-in still needs it.
         //
         //   Flattening only ever LOWERS terrain, so this cannot make any previously
         //   verified mission less safe.
         float rad = Mathf.Sqrt(x * x + z * z);
-        float dPlain = Mathf.Max(0f, rad - 3200f);
+        float dPlain = Mathf.Max(0f, rad - 2400f);
 
         float ax = Mathf.Max(0f, Mathf.Abs(x) - 260f);
         float az = z < 0f ? Mathf.Max(0f, -z - 10000f) : 0f;

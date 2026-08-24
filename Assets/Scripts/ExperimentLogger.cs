@@ -120,6 +120,14 @@ public class ExperimentLogger
         // enforced in analysis rather than remembered.
         sb.AppendLine($"  \"input_modality\": {J(VRRuntime.Modality.ToString().ToLower())},");
         sb.AppendLine($"  \"vr_status\": {J(VRRuntime.StatusLine)},");
+        // AUDIO IS A CONDITION, NOT A SETTING. Whether the engine, the stall horn and
+        // the ATC callouts were audible changes what the participant had to work with,
+        // and a session recorded with them off must never be pooled with one recorded
+        // with them on. `audio_valid_for_experiment` is false for any profile other
+        // than EXPERIMENT, so the check is one field rather than an interpretation.
+        sb.AppendLine($"  \"audio_profile\": {J(AudioPolicy.Profile.ToString().ToLowerInvariant())},");
+        sb.AppendLine($"  \"audio_valid_for_experiment\": {(AudioPolicy.ValidForExperiment ? "true" : "false")},");
+        sb.AppendLine($"  \"hardware_input\": {J(HardwareInput.StatusLine())},");
         sb.Append("  \"mission_order\": [");
         for (int i = 0; i < order.Count; i++) sb.Append((i > 0 ? ", " : "") + J(order[i]));
         sb.AppendLine("],");
@@ -426,6 +434,7 @@ public class ExperimentLogger
         sb.AppendLine($"    \"hdg_tolerance_deg\": {m.HdgToleranceDeg.ToString("F0", CI)},");
         sb.AppendLine($"    \"flaps\": {m.StartFlaps01.ToString("F2", CI)},");
         sb.AppendLine($"    \"fuel_l\": {m.StartFuelL.ToString("F0", CI)},");
+        sb.AppendLine($"    \"audio_profile\": {J(AudioPolicy.Profile.ToString().ToLowerInvariant())},");
         sb.AppendLine($"    \"load_axis\": {J(m.Axis.ToString())},");
         sb.AppendLine($"    \"variant\": {m.Variant},");
         sb.AppendLine($"    \"mechanism\": {J(m.Mechanism)},");

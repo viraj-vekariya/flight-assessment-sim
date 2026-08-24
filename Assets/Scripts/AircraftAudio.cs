@@ -61,19 +61,25 @@ public class AircraftAudio : MonoBehaviour
         if (engine)
         {
             engine.pitch  = Mathf.Lerp(0.75f, 1.5f, thr);
-            engine.volume = 0f;   // engine sound muted (per request)
+            // This line used to read `engine.volume = 0f;  // (per request)`, a
+            // development convenience that would have shipped. Engine sound is a
+            // WORKLOAD-RELEVANT CUE — rough running and partial power loss are heard
+            // before they are seen, and two missions depend on exactly that — so
+            // whether it is audible is now a declared, recorded condition rather than a
+            // hard-coded zero. See AudioPolicy.cs.
+            engine.volume = Mathf.Lerp(0.10f, 0.42f, thr) * duck * AudioPolicy.EngineGain;
         }
 
         // wind — swells with airspeed
         float spd = phys.AirspeedMs;
-        if (wind) wind.volume = flying ? Mathf.Clamp01(spd / 75f) * 0.35f * duck : 0f;
+        if (wind) wind.volume = flying ? Mathf.Clamp01(spd / 75f) * 0.35f * duck * AudioPolicy.WindGain : 0f;
 
         // ground roll — rumble while the wheels are down and moving
         if (ground)
         {
             bool rolling = flying && phys.Grounded && spd > 1.5f;
             float k = Mathf.Clamp01(spd / 40f);
-            ground.volume = rolling ? k * 0.4f * duck : 0f;
+            ground.volume = rolling ? k * 0.4f * duck * AudioPolicy.GroundGain : 0f;
             ground.pitch  = Mathf.Lerp(0.8f, 1.3f, k);
         }
 
@@ -81,19 +87,19 @@ public class AircraftAudio : MonoBehaviour
         if (phys.Grounded && !wasGrounded && inFlight && oneShot && touchdownClip)
         {
             float v = Mathf.Clamp01(phys.TouchdownSink / 4f);
-            oneShot.PlayOneShot(touchdownClip, 0.4f + v * 0.5f);
+            oneShot.PlayOneShot(touchdownClip, (0.4f + v * 0.5f) * AudioPolicy.WarningGain);
         }
         wasGrounded = phys.Grounded;
 
         // crash bang (rising edge)
         if (phys.Crashed && !wasCrashed && oneShot && crashClip)
-            oneShot.PlayOneShot(crashClip, 0.9f);
+            oneShot.PlayOneShot(crashClip, 0.9f * AudioPolicy.WarningGain);
         wasCrashed = phys.Crashed;
 
         // scenario master-caution beep when an alarm appears (rising edge)
         var eng = GameManager.Instance != null ? GameManager.Instance.ScenarioRunner : null;
         bool alarm = eng != null && eng.Active && eng.AlarmActive;
-        if (alarm && !wasAlarm && oneShot && alarmClip) oneShot.PlayOneShot(alarmClip, 0.6f);
+        if (alarm && !wasAlarm && oneShot && alarmClip) oneShot.PlayOneShot(alarmClip, 0.6f * AudioPolicy.WarningGain);
         wasAlarm = alarm;
     }
 
