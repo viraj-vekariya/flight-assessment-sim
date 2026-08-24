@@ -69,28 +69,53 @@ batteries; details in `FINAL_CHANGE_REPORT.md`):
 
 ---
 
-## PHASE 2 — REGRESSION 🔄
+## PHASE 2 — REGRESSION ✅
 
-The flight model changed, so every claim resting on it must be re-established rather
-than assumed. This is the same discipline `FINAL_TEST_REPORT.md` applied when trim and
-brakes were added.
+The flight model changed, so every claim resting on it was re-established rather than
+assumed. Same discipline `FINAL_TEST_REPORT.md` applied when trim and brakes were added.
 
-- 🔄 12-mission battery re-run (`-missiontest`)
-- ⬜ 50-check control battery re-run (`-controltest`)
+- ✅ 12-mission battery re-run — **12/12, 0 problems**
+- ✅ 50-check control battery re-run — **0 problems**, and the frame-rate independence
+  check still reads 0.614 / 0.614 / 0.614 at 30 / 60 / 90 FPS against an analytic 0.614.
 
-**Checkpoint: 12/12 missions, 0 problems; 50/50 control checks.**
+**No regression from the wind model or the fin term.** Expected: with zero wind
+configured, `WindModel.Sample()` returns exactly `Vector3.zero`, and the fin term is
+proportional to lateral airspeed, which is ~0 in coordinated flight. The batteries
+confirm the expectation rather than the expectation excusing the batteries.
 
 ---
 
-## PHASE 3 — MISSION BANK: 12 → 36 ⬜
+## PHASE 3 — MISSION BANK: 12 → 42, ON TWO AXES ✅
 
-3 task categories (TAKE-OFF · EN-ROUTE · LANDING) × 3 workload classes × 4 variants,
-where the four variants in a cell use four DIFFERENT cognitive mechanisms rather than
-being cosmetic re-skins. Under external design review before implementation, because
-the statistical consequences of a 36-mission bank are not obvious and are the part of
-this work I cannot test my way to.
+Design reviewed externally before implementation, because the statistical consequences
+of a large bank are not obvious and are the part of this work that cannot be tested into
+correctness. Two conclusions changed the design:
 
-**Checkpoint: battery green on all 36; a written defence of the blocking scheme.**
+1. **Crosswind does not belong on the Low/Medium/High scale.** It raises manual demand
+   by construction, and the cognitive axis is interpretable *only* because manual demand
+   is matched within each phase row. Crosswind became a second axis with its own
+   analysis. See `MISSION_BANK_DESIGN.md` §2.
+2. **A large bank is the classic way an experiment becomes a demonstration.** So the
+   bank grew and the SESSION did not: a participant still flies the same verified twelve.
+
+**Delivered — 42 missions:**
+- **Cognitive axis, 36** — 4 phases × 3 classes × 3 interchangeable variants. The
+  original twelve are variant 1, unchanged. Variants 2 and 3 reach the same class by a
+  *different cognitive mechanism*, and the battery **fails** any cell whose variants
+  repeat a mechanism.
+- **Psychomotor-integrated axis, 6** — crosswind take-off and landing at three graded
+  crosswind levels, each isolating its cognitive component as a discrete
+  continue-or-abandon decision against the C172's 15 kt demonstrated crosswind.
+- `ControlActivity.cs` — control travel, rate, per-axis SD, hands-on fraction. A
+  manipulation check on the cognitive axis; the covariate an EEG effect must survive on
+  the psychomotor one.
+- Bank design checks in the battery: grid completeness, unique ids, mechanism
+  distinctness, motor matching per row, PLI ordering per column, mandatory metadata, no
+  crosswind on the cognitive axis, and every possible session a complete crossed grid.
+- `variant_equivalence.csv` — the a-priori half of the exchangeability evidence.
+
+**Checkpoint: design checks OK; quick battery 12/12 at 82 telemetry columns; full
+42-mission battery running.** 🔄
 
 ---
 

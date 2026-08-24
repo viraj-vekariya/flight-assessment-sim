@@ -128,6 +128,36 @@ workload-relevant variable, within each cell**. So the battery emits, per varian
 
 `variant_equivalence.csv`, written by the mission battery, is that evidence.
 
+### A real failure this check caught, before any participant flew
+
+The exchangeability table was written first and read second, which is the right way
+round. Reading it showed that the three variants of a cell **did not agree on predicted
+load**: spreads reached **17.5 points on a 0-100 scale** (Climb/MEDIUM: 49.8, 67.2,
+65.5), with Cruise/LOW at 14.0 and Approach/HIGH at 15.8.
+
+A dimension-by-dimension diff against variant 1 showed the cause, and it was systematic
+rather than random: **every single new variant had been scored one point higher on
+MentalDemand**, plus incidental inflation on the low-weight background dimensions
+(communication, error consequence, procedural load, situation awareness). It was an
+anchoring drift, not a disagreement about the missions — the original author used `0`
+freely for "essentially absent" in the LOW cells, and the new missions used `1` for the
+same thing.
+
+That matters, and not only cosmetically. A variant scoring 17 points above its siblings
+is not a second realisation of MEDIUM; it is drifting toward HIGH. Since variant is
+assigned by participant, a participant's *effective* workload class would then depend on
+which variant they were given — which is variant becoming a confound with class, exactly
+what the rotation exists to prevent.
+
+The new variants were re-anchored to variant 1's scale, keeping each mission's
+**signature dimension** (the one its mechanism is named for) untouched — M1V2 keeps
+WorkingMemory 4, M2V2 keeps Uncertainty 4, M3V3 keeps Perception 4 — and removing the
+drift elsewhere. Result: **every cell now inside an 8-point tolerance, worst spread 5.8,
+and the Low < Medium < High ordering still holds in all twelve phase-row columns.**
+
+The 8-point tolerance is now **enforced by the mission battery**, so the table cannot
+drift again without the battery failing.
+
 ### If the variants turn out NOT to be exchangeable
 
 They are not averaged together and hoped away. In order of preference:
