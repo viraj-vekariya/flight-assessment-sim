@@ -42,8 +42,8 @@ For *what each piece approximates*, see `MISSION_IMPLEMENTATION.md`.
         ┌────────────────┼────────────────┬──────────────┐
         │                │                │              │
    telemetry.csv     events.csv     nasa_tlx.json   metadata.json
-    50 Hz, 77 col    53-tag vocab    participant's   spec + PRE-REGISTERED
-    physics-locked   4 clocks each   own responses   predictions
+    50 Hz, 82 col    53-tag vocab    participant's   spec + axis + variant
+    physics-locked   4 clocks each   own responses   + PRE-REGISTERED preds
         │                │
         └────────┬───────┘
                  │
