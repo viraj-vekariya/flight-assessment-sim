@@ -1,7 +1,14 @@
 # FlightAssessmentSim — Final
 
-The consolidated project: a photoreal Cessna 172 glass cockpit driving a **twelve-mission
-EEG cognitive-workload experiment**. This is the only project to use from now on.
+The consolidated project: a photoreal Cessna 172 glass cockpit driving an **EEG
+cognitive-workload experiment**. This is the only project to use from now on.
+
+**Bank: 42 missions. Session: 12.** Those are different numbers on purpose. The bank holds
+36 cognitive-axis missions (4 flight phases × 3 workload classes × 3 interchangeable
+variants) plus 6 crosswind missions on a separate psychomotor axis. A participant flies
+twelve — one variant index per phase row — because 42 × 300 s is over three hours of
+flying inside one EEG session and fatigue would dominate every contrast the study exists
+to measure. See `MISSION_BANK_DESIGN.md`.
 
 Working title: *Automatic Workload Assessment using Brain Signal Classification*.
 
@@ -15,10 +22,13 @@ projects are untouched and remain on disk as references. See `MERGE_ARCHITECTURE
 
 | # | Document | Answers |
 |---|---|---|
-| 1 | **`FINAL_MISSION_DESIGN.md`** | What the twelve missions are. *Generated from code — never hand-edit.* |
-| 2 | **`DESIGN_CRITIQUE.md`** | What is wrong with this experiment. Read it second, not last. |
-| 3 | `MERGE_ARCHITECTURE.md` | What came from where, and what was deliberately dropped |
-| 4 | `FINAL_EXPERIMENT_PROTOCOL.md` | How to run a session; the duration decision; threats to validity |
+| 0 | **`FINAL_CHANGE_REPORT.md`** | What changed most recently, what each automated check caught, and what is still not done |
+| 1 | **`MISSION_BANK_DESIGN.md`** | The 42-mission bank, the two axes, and why crosswind is not on the Low/Medium/High scale |
+| 2 | **`FINAL_MISSION_DESIGN.md`** | Every mission, in full. *Generated from code — never hand-edit.* |
+| 3 | **`DESIGN_CRITIQUE.md`** | What is wrong with this experiment. Read it early, not last. |
+| 4 | `FINAL_ARCHITECTURE.md` | How the pieces fit, and the seven contracts that make it a measuring instrument |
+| 5 | `MERGE_ARCHITECTURE.md` | What came from where, and what was deliberately dropped |
+| 6 | `FINAL_EXPERIMENT_PROTOCOL.md` | How to run a session; the duration decision; threats to validity |
 | 5 | `COGNITIVE_LOAD_MODEL.md` | Why each mission got its class, and how to prove the labelling wrong |
 | 6 | `FINAL_EEG_INTEGRATION.md` | How EEG attaches and aligns; the data-leakage trap |
 | 7 | `NASA_TLX.md` | The subjective instrument and the two corrections made to it |
@@ -32,6 +42,8 @@ projects are untouched and remain on disk as references. See `MERGE_ARCHITECTURE
 | 15 | `VR_CALIBRATION.md` | The two-minute per-participant VR setup |
 | 16 | **`VR_EXPERIMENT_CONSIDERATIONS.md`** | What VR does to the science. Read before collecting VR data. |
 | 17 | `VR_PHASE_REPORT.md` | The cockpit/VR phase: what was built, fixed, measured, and left unverified |
+| 18 | **`HARDWARE_CONTROLS.md`** | Physical yoke, throttle, pedals and toe brakes: wiring, calibration, and why modality must not be pooled |
+| 19 | **`WINDOWS_DEPLOYMENT.md`** | Taking it to the lab PC — and an honest statement of what is not yet built |
 
 ---
 
