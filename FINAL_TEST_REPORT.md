@@ -1,11 +1,53 @@
 # FINAL_TEST_REPORT
 
-Verification of the merged project and the redesigned twelve-mission experiment.
+Verification of the project and the 42-mission bank.
 
-**Status: 0 compile errors, 0 warnings. Mission battery 12/12, 0 problems. All twelve
-missions fly to completion under the scripted pilot.**
+**Status: 0 compile errors. Mission battery 42/42, 0 problems. Cockpit control battery
+0 problems. Wind battery 46 checks, 0 problems. Windows build succeeds.**
 
-Raw output: `mission_test_report.txt`.
+Raw output: `mission_test_report.txt`, `control_test_report.txt`, `wind_test_report.txt`,
+`variant_equivalence.csv`, `build_win2.log`.
+
+---
+
+## 0. The four batteries, and what each is for
+
+| Battery | Flag | Scope | Result |
+|---|---|---|---|
+| **Mission** | `-missiontest` | flies all 42 missions end to end, then reads the files that landed on disk and asserts against them | 42/42, 0 problems |
+| **Bank design** | (runs with the mission battery, before anything flies) | properties of the mission TABLE — grid completeness, unique ids, mechanism distinctness, motor matching per row, PLI ordering per column, within-cell exchangeability, mandatory metadata, no wind on the cognitive axis, every possible session a complete grid, **terrain clearance under every nominal track** | OK |
+| **Cockpit controls** | `-controltest` | wiring, direction, gearing, detents, ownership expiry, reset, frame-rate independence | 0 problems |
+| **Wind** | `-windtest` | the wind model's arithmetic and its effect on the aeroplane, against closed-form predictions computed in the test | 46 checks, 0 problems |
+
+Add `-bankquick` to fly one variant index (the twelve a single participant gets) instead
+of the whole bank, or `-onlymission:ID` for one. Diagnosing a single mission by re-running
+all 42 is a ninety-minute feedback loop, which is slow enough that you stop investigating
+and start guessing.
+
+**Only one battery may run at a time.** `SimDriver` enforces it: the second driver to
+claim the aircraft stands down and says so. Two harnesses flying at once does not crash —
+it quietly changes every number the run reports, and that had already happened once.
+
+### The design checks deserve particular mention
+
+They are the cheapest tests in the project and they caught the most. They run before a
+single mission flies, they take milliseconds, and they found: variants that disagreed on
+predicted load by 17.5 points; a departure heading that flew into a hill; a cognitive-axis
+mission carrying crosswind. None of those is visible in the mission table — every number
+looks reasonable — and none would have been caught by flying, because flying only tells
+you what happened, not whether it was what the design intended.
+
+### What the wind battery asserts
+
+Numbers, against closed-form predictions computed **in the test** rather than read back
+out of the model: the geometry of a meteorological direction; the surface/free-stream
+relationship through the shear profile; a crosswind/headwind authoring round trip;
+groundspeed = airspeed − headwind; drift = atan(Vw/V); the direction the nose weathervanes
+on the ground; that a gust is reproducible from the seed and varies over a trial; and that
+zero wind is **exactly** zero.
+
+That last one is a contract, not a nicety: it is what allowed the wind model to be added
+without re-validating the missions that do not use it.
 
 ---
 

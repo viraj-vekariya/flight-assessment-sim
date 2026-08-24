@@ -119,18 +119,49 @@ correctness. Two conclusions changed the design:
 
 ---
 
-## PHASE 4 — SESSION / BLOCKING ⬜
-No participant can fly 36 × 300 s in one EEG session. The bank needs a counterbalanced
-per-session subset with the variant assignment recorded and reproducible.
+## PHASE 4 — SESSION / BLOCKING ✅
+`MissionLibrary.SessionMissions()` returns the twelve a given participant flies — one
+variant index per phase row, rotated by Latin square. `session.json` records
+`row_variants`, `bank_size` and `variants_per_cell`; every trial's `metadata.json`
+records its axis, variant, mechanism and cell. The operator grid shows all three variants
+and marks the assigned one.
 
-## PHASE 5 — METRICS & EVALUATION ⬜
-Crosswind-aware take-off and landing metrics (crab held, decrab timing, centreline
-deviation, drift integral) now that they are measurable.
+**Checkpoint:** a design check verifies that *every* possible participant's session is a
+complete crossed grid with no mixed variants inside a phase row. ✅
 
-## PHASE 6 — VR & PHYSICAL CONTROLS ⬜
-Validate the XR loader chain, seated origin and reachability; confirm the hardware input
-path now that the override-wiping defect is fixed.
+## PHASE 5 — METRICS & EVALUATION ✅
+* **Motor covariates** (`ControlActivity`): travel, rate, per-axis SD, hands-on fraction.
+  A manipulation check on the cognitive axis; the covariate an EEG effect must survive on
+  the psychomotor one.
+* **Take-off:** rotation airspeed and distance, ground-roll centreline and heading
+  excursion, initial climb rate, rotate-to-level time.
+* **Landing:** touchdown distance from the threshold, touchdown speed, flare start height
+  and duration, glidepath RMS error, runway excursion, touchdown drift and bank, max
+  centreline deviation, mean |drift| below 60 m.
 
-## PHASE 7 — WINDOWS BUILD ⬜
+Two defects found here rather than assumed away: a completed navigation mission was
+scored `MISSION_FAILURE`, and mean |drift| read 154° because it was being integrated at a
+standstill.
 
-## PHASE 8 — DOCUMENTATION & FINAL CHANGE REPORT ⬜
+## PHASE 6 — VR & PHYSICAL CONTROLS ✅ *(configuration only — see limitations)*
+OpenXR loader chain verified in the asset files; Quest 3 / Quest Pro interaction profiles
+enabled alongside Oculus Touch and KHR Simple; seated origin reviewed and left unchanged
+(it is correct — it puts the headset at the measured pilot eye point and adds no comfort
+effects). `HardwareInput` gives physical yoke/throttle/pedals/toe-brakes a path in, which
+only became possible once the override-wiping defect was fixed.
+
+**Nothing here is hardware-verified.** No headset has been connected and no yoke plugged
+in. See `FINAL_CHANGE_REPORT.md` §11.
+
+## PHASE 7 — WINDOWS BUILD ✅
+`Builds/Windows/`, 127 MB, 0 errors. Required installing Windows Build Support *and*
+discovering that **the project had never been built into a player on any platform** — it
+has no scenes by design, and Unity refuses an empty scene list.
+
+**Not yet run on Windows.** No macOS host can do that.
+
+## PHASE 8 — DOCUMENTATION & FINAL CHANGE REPORT ✅
+`FINAL_CHANGE_REPORT.md`, `MISSION_BANK_DESIGN.md`, `HARDWARE_CONTROLS.md`,
+`WINDOWS_DEPLOYMENT.md` written; `FINAL_ARCHITECTURE.md`, `FINAL_EXPERIMENT_PROTOCOL.md`,
+`DESIGN_CRITIQUE.md`, `FINAL_PROJECT_README.md` updated; `FINAL_MISSION_DESIGN.md` and
+`FINAL_TELEMETRY_SCHEMA.md` regenerated from code.
