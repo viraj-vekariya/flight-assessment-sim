@@ -229,6 +229,94 @@ classifications are reported.
 
 ---
 
+### Does the 42-mission bank weaken the design rather than strengthen it?
+
+**Partly controlled, and this is the objection to take most seriously.**
+
+The honest case against the bank: more cells with one observation each buys breadth at
+the cost of the thing that makes a study answerable, and a large scenario count is the
+classic way an experiment turns into a demonstration. Twelve well-controlled missions
+with more repetitions per cell would give tighter estimates than forty-two with one shot
+each.
+
+The design answers that by **not spending the bank on the session**. A participant still
+flies the same twelve-trial crossed grid that was verified; the bank changes only *which
+realisation* of each cell they meet. So the per-session statistical design is unchanged
+— the bank costs the experiment nothing in power, because it is not in the experiment.
+
+What it buys is real but modest: a participant who repeats the study does not repeat the
+same trials; a variant that turns out not to work can be retired without collapsing the
+grid; and a class effect that survives across variants is a class effect rather than a
+property of one scenario.
+
+What remains **open**: variant is a between-subject factor, so with a realistic BTP
+sample (N in the tens, three variants) each variant is flown by only a handful of people.
+The exchangeability evidence will therefore be *underpowered* — it will not be possible
+to demonstrate that the variants are equivalent, only to fail to detect that they are
+not. That is a weaker statement and should be reported as one.
+
+### Are the three variants of a cell actually equivalent?
+
+**Partly controlled — and the first attempt failed the check.**
+
+A-priori, they are matched on the predicted load index to within 8 points on a 0–100
+scale, enforced by the mission battery. That tolerance was not met by the first draft:
+within-cell spreads reached **17.5**, because the new variants had been anchored one
+point high on MentalDemand across the board. They were re-anchored to variant 1's scale.
+
+But a-priori matching is a claim about the *design*, not about the participants. The
+empirical half — achieved task-demand parameters, flight-performance error and control
+activity per variant, with **effect sizes and confidence intervals**, not a
+non-significant ANOVA — can only be computed once data exists. `variant_equivalence.csv`
+is the pre-registered reference it will be tested against.
+
+If a variant turns out not to be exchangeable, it must not be averaged in and hoped away.
+The three defensible responses, in order, are in `MISSION_BANK_DESIGN.md`.
+
+### Is the crosswind block measuring cognitive workload?
+
+**No, and it does not claim to.**
+
+Crosswind raises manual demand by construction. Putting it on the Low/Medium/High scale
+would have destroyed the property that scale depends on — manual demand matched within
+each phase row — and it would have done so invisibly, because a crosswind mission looks
+like a perfectly reasonable "hard" condition.
+
+So it is a second axis. Three things make it defensible rather than merely separate:
+control activity is *measured* (eleven covariates) rather than assumed; the cognitive
+component is isolated as a discrete continue-or-abandon decision against a stated 15 kt
+limit, which on the take-off missions is made with the aeroplane **stationary at the
+holding point** and therefore free of movement artifact; and the conclusion is worded as
+*integrated psychomotor/cognitive demand*.
+
+What remains **open**: for a non-pilot, crosswind handling is substantially **skill
+acquisition**, not workload — and skill improves across a session in a way workload does
+not. Order within the block must be counterbalanced or a learning trend would be
+indistinguishable from a dose response. Even counterbalanced, a participant on their
+third crosswind landing is not the same pilot they were on their first, and this block
+cannot separate that from the crosswind level.
+
+### Could a mission fly into terrain and nobody notice?
+
+**Now controlled — it was not, and it happened.**
+
+The aerodrome sat on a flattened *corridor*, 260 m either side of the centreline and
+1.6 km long, which is exactly enough for a departure that goes straight ahead. That was
+all the old mission set contained. The moment a mission assigned a departure **turn**,
+the aeroplane left the corridor laterally while still climbing through 150 m and flew
+into ground that reaches ~190 m by 2.2 km out. Nothing in the mission table showed it:
+the numbers looked entirely reasonable.
+
+The mission battery caught it as `Destroyed (terrain impact)` at 131 m. The pad is now a
+3.2 km plain, and a design check samples the real terrain under every mission's nominal
+track. Turning missions went from −97 m of clearance to 216–739 m.
+
+The check tests the **nominal** track — the one a perfectly-flying pilot follows. A
+participant who wanders 500 m off track can still find terrain, which is a property of
+flying near hills, and is what the crash detection is for.
+
+---
+
 ## Threats this design does not address at all
 
 Listed separately so they are not buried among the mitigated ones.
