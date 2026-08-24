@@ -72,6 +72,14 @@ point: the existing batteries were good and passed throughout.
 | 7 | Mean \|drift\| of 154° on a crosswind take-off | reading the recorded telemetry | Drift computed from a near-zero ground track points anywhere at all. The crosswind axis's **own primary metric** would have been analysed as data. |
 | 8 | A stale `mission_test_report.txt` in the project root, dated the previous day, showing the old 12 missions and 77-column telemetry | comparing the report against the live log | Reading yesterday's result and believing it is today's. The report is now written to both locations. |
 | 9 | The scripted pilot could not follow waypoints | `L3V3` reported INCOMPLETE | A navigation mission looked broken when the autopilot was blind. |
+| 10 | `EvaluateSuccess()` had **no case for `ScenarioGoal.Navigate`** | full bank battery | It fell through to a branch scoring time-in-altitude/heading-tolerance — which `UpdateDeviation` never accumulates for a Navigate goal, so the ratio evaluated 0/1 and **a mission that reached every waypoint was written to `performance.json` as `MISSION_FAILURE`.** A participant's successful navigation trial would have been recorded as a failed one. |
+| 11 | A navigation mission **ended at its last waypoint** | reading the trial length | 97 s, then 221 s with a longer route, against the 300 s every other mission gets — and the shortfall scaled with how fast the participant flew, so **trial length would have varied with skill.** Duration is the design's central control. |
+| 12 | Mean \|drift\| of **154°** on a crosswind take-off | reading recorded telemetry | Drift computed from a near-zero ground track points anywhere at all. The crosswind axis's **own primary metric** would have been analysed as data. |
+| 13 | A **SPOILER lever in a Cessna 172** | looking at a cockpit render | Not a defect the code was unaware of — its own comment says a 172 has no spoilers and that no mission references it — but it sat in the quadrant beside the throttle where a participant could see and grab it, doing nothing. |
+| 14 | The MFD was a **game minimap**, and its range was fixed at 180 m | looking at a cockpit render | No route, no waypoints, no numbers, and a range so close that a waypoint 4 km ahead was twenty-two screens away — so the route the display exists to show could never have appeared on it. |
+| 15 | **The project had never been built into a player, on any platform** | first build attempt | `Cannot build untitled scene.` The world is built from code and there are no scenes, which works in the editor and cannot work in a player. An editor-only workflow had hidden a build-breaking assumption indefinitely. |
+| 16 | `PlayCapture.RunDesignShots` did not exist | running the command in `CockpitDesignShots`' own header | The documented way to render the cockpit review shots failed; they had only ever been produced by a generic timed run that exits on a stopwatch rather than when the renders finish. |
+| 17 | The control battery wrote its report **only** to `persistentDataPath` | comparing a report against the live log | A stale copy in the project root — where the docs tell a reader to look — served yesterday's result as if it were today's. This happened **twice** during this work, once with each harness. |
 
 ## 6. Mission structure
 
@@ -113,6 +121,39 @@ and its cognitive component isolated as a discrete continue-or-abandon decision 
 stated 15 kt demonstrated crosswind — which, on the take-off missions, is made with the
 aeroplane stationary at the holding point and therefore free of movement artifact.
 
+## 7b. Cockpit, displays and environment
+
+* **The MFD became a navigation display.** It was a top-down camera on the terrain with a
+  yellow triangle and eight compass letters — bright green, no route, no waypoints, no
+  numbers, and a **fixed 180 m range**, so a waypoint 4 km ahead was twenty-two screens
+  away and the route it exists to show could never have appeared. It now has a dim
+  overlay (so the ground is background rather than subject), the route and waypoints in
+  magenta, a GS / TRK / ALT data block, and **auto-ranging in steps from 250 m to 16 km**
+  with the range annotated — a range that never changes is decoration, not an instrument.
+  It shows **ground** speed and **track**, not airspeed and heading: in a wind those are
+  different numbers, and this is the display that answers "when do I get there".
+* **The spoiler lever was removed from the cockpit.** See §5, defect 13.
+* **Audio became a declared condition.** The engine had been hard-muted by
+  `engine.volume = 0f;  // (per request)` — a development convenience that would have
+  shipped. Engine note is a workload-relevant cue: carburettor icing (M2V2) and partial
+  power loss (H2V2) are *heard* before they are seen, so muting it silently removes the
+  primary cue from two missions and leaves their rationale describing a task the
+  participant is not given. `AudioPolicy` has three profiles, the choice is recorded in
+  `session.json`, and a trial recorded under anything but EXPERIMENT is flagged invalid
+  rather than quietly pooled.
+* **Physical flight controls have a path in.** Six named axes (yoke pitch/roll, rudder,
+  throttle, two toe brakes) with per-axis calibration. Unity's default input map defines
+  only a gamepad stick, so a yoke plugged into the lab PC moved nothing. See
+  `HARDWARE_CONTROLS.md`.
+* **The aerodrome plain.** Widened from a 260 m × 1.6 km corridor (sized only for
+  straight-ahead departures) to a circular plain, then **pulled back in** from 3.2 km to
+  2.4 km — the smallest radius that keeps every mission's terrain clearance comfortable
+  (145–706 m). A larger plain is safer but flattens the countryside the pilot can see,
+  and an empty world is its own kind of unrealism.
+* **Quest 3 and Quest Pro OpenXR interaction profiles enabled.** Only the original Oculus
+  Touch profile was on; a Quest 3's Touch Plus controllers will *usually* fall back to it,
+  and "usually" is diagnosed in the lab with a participant capped and waiting.
+
 ## 8. Data architecture
 
 * Telemetry **77 → 82 columns**: `groundspeed_kmh`, `drift_deg`, `sideslip_deg`,
@@ -145,20 +186,31 @@ wind is exactly zero.
 
 ## 10. Windows build
 
-**Not produced.** Only `MacStandaloneSupport` is installed in this editor; Windows Build
-Support is absent and Unity cannot cross-compile to a missing module.
+**Produced: `Builds/Windows/`, 127 MB, 0 errors, 0 warnings that matter.** Two blockers
+had to be cleared, and the second had never been noticed by anyone:
 
-Everything that does not require the module was done: a full static portability audit
-(clean — no Mac-only paths, `Path.Combine` throughout, `persistentDataPath` for all data,
-no editor-only dependencies in runtime code), a reproducible `BuildTool` that fails with
-the exact install command rather than an opaque error, and a deployment runbook. See
-`WINDOWS_DEPLOYMENT.md`.
+1. **Windows Build Support was not installed.** Only `MacStandaloneSupport` existed, and
+   Unity cannot cross-compile to a missing module. Installed via the Hub CLI.
+2. **The project had never been built into a player at all.** It has no scenes by design;
+   Unity refuses an empty scene list. `BuildTool` now creates an empty bootstrap scene —
+   a launch point, not a level — and registers it.
+
+The build ships `StreamingAssets` complete (the GLB cockpit, sky, terrain textures, voice
+callouts), writes a `build_manifest.json` identifying what produced it, and deletes
+Unity's own `..._BurstDebugInformation_DoNotShip` folder.
+
+Supporting work: a full static portability audit (clean — no Mac-only paths,
+`Path.Combine` throughout, `persistentDataPath` for all data, no editor-only dependencies
+in runtime code) and a deployment runbook. See `WINDOWS_DEPLOYMENT.md`.
+
+**It has never been RUN on Windows.** No macOS host can do that, and first launch on the
+lab PC is a real test rather than a formality.
 
 ## 11. Remaining hardware-dependent tests
 
 Nothing below has been faked or asserted:
 
-* The Windows build itself.
+* **Running** the Windows build on Windows.
 * **Meta Quest**: headset detection, seated-origin comfort, control reachability, frame
   timing under the real cockpit load. The OpenXR loader chain is configured and
   `XRSetup.Verify` reports every link, but no headset has been connected.

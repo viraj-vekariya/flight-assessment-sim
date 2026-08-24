@@ -2,6 +2,9 @@
 
 ## 1. Status, stated plainly
 
+**A Windows build now exists: `Builds/Windows/`, 127 MB, 0 errors.** Two things had to
+be fixed before it could be produced, and the second one had never been noticed.
+
 **Windows Build Support (Mono) was missing and has been installed.** The development
 machine originally had only `MacStandaloneSupport` under `PlaybackEngines/`, and Unity
 cannot cross-compile to a target whose module is absent — so no Windows build was
@@ -14,6 +17,29 @@ Also done, and independent of the module:
 * verification that no runtime script has an editor-only dependency;
 * a reproducible build script (§3) that fails with the exact install command rather
   than an opaque error if the module is ever missing again.
+
+### The project had never been built into a player, on any platform
+
+The first build attempt failed with `Cannot build untitled scene.`
+
+This project has **no scenes, on purpose**: the terrain, aerodrome, aircraft and cockpit
+are all constructed from C# at runtime, and `Bootstrap` spawns `GameManager` through
+`[RuntimeInitializeOnLoadMethod]`. In the **editor** that works with no scene at all —
+press Play and the world builds itself — which is why the project ran for months without
+one and why nothing ever noticed.
+
+A **player** cannot. Unity refuses an empty scene list, falls back to "the current
+scene", and in batch mode that is an unsaved untitled one.
+
+`BuildTool.EnsureBootstrapScene()` now creates `Assets/Scenes/Bootstrap.unity` if the
+project has no scenes, and registers it. **The scene is deliberately empty** — a launch
+point, not a level. Nothing is wired in it, so it cannot drift out of step with the code
+that builds the world, and the project keeps the single-launch-path property that makes
+"which scene was that recorded in?" an unaskable question.
+
+The lesson generalises: *an editor-only workflow can hide a build-breaking assumption
+indefinitely.* Nothing else in the project is known to have the same shape, but nothing
+else had been build-tested either until now.
 
 The build's own status is recorded in `FINAL_CHANGE_REPORT.md` §10 — for the same reason
 the VR documentation records what needs a headset: an unverified claim in a deployment
@@ -53,6 +79,13 @@ UNITY=/Applications/Unity/Hub/Editor/6000.0.77f1/Unity.app/Contents/MacOS/Unity
 the build is reproducible from a command line rather than from remembered dialog
 settings.
 
+`build_manifest.json` is written beside the build, recording the Unity version, the build
+time, the bank size, the telemetry column count and the marker-vocabulary size — so a
+folder found on a lab PC months later can be identified rather than guessed at. Unity's
+`..._BurstDebugInformation_DoNotShip` folder is deleted automatically; it is several MB
+of symbols a laboratory has no use for, and it sits inside a folder people are told to
+copy wholesale.
+
 ## 4. On the laboratory PC
 
 1. **Copy the whole build folder**, not just the `.exe`. `FlightAssessmentSim_Data/` and
@@ -86,7 +119,11 @@ does not crash, it quietly changes every number the run reports.
 
 ## 6. What remains hardware-dependent
 
-* The Windows build itself (module not installed).
+* **Running** the Windows build. It compiles and packages cleanly on this machine, but
+  it has never been LAUNCHED on Windows — no macOS host can do that. First run on the lab
+  PC is a real test, not a formality: check the world builds, the GLB cockpit loads (the
+  panel is photoreal, not flat-shaded primitives), the displays light up, and the data
+  folder is writable.
 * Meta Quest: headset detection, seated-origin comfort, control reachability, frame
   timing under the real cockpit load.
 * Yoke/throttle/pedal axis numbering and travel.
