@@ -265,8 +265,14 @@ public class CessnaPhysics : MonoBehaviour
 
         // Drift = where you are GOING minus where you are POINTING. The single number
         // that says whether the pilot is compensating for the crosswind.
+        // DRIFT IS ONLY DEFINED WHEN THERE IS A TRACK. The gate used to be 1 m/s, which
+        // is far too low: a nearly-stationary aeroplane being pushed sideways by the
+        // wind has a "track" pointing anywhere at all, so drift read up to 180 degrees.
+        // That is not a large drift angle, it is a division by almost zero — and it
+        // poisoned the crosswind axis's own primary metric, which averages |drift|.
+        // 5 m/s is below taxi speed and well below anything the metric cares about.
         Vector3 track = groundVel; track.y = 0f;
-        DriftAngleDeg = track.sqrMagnitude > 1f
+        DriftAngleDeg = track.sqrMagnitude > 25f
             ? Mathf.DeltaAngle(HeadingDeg, NormalizeHeading(Mathf.Atan2(track.x, track.z) * Mathf.Rad2Deg))
             : 0f;
         Vector3 lv = transform.InverseTransformDirection(vel);

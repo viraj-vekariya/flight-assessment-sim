@@ -405,8 +405,15 @@ public class ScenarioEngine : MonoBehaviour
         if (h < 60f && Mathf.Abs(ac.transform.position.z) < Aerodrome.RunwayHalfLength + 60f)
         {
             maxCenterlineDev = Mathf.Max(maxCenterlineDev, Mathf.Abs(ac.transform.position.x));
-            driftAbsInt += Mathf.Abs(ac.DriftAngleDeg) * dt;
-            driftTime += dt;
+            // Only integrate drift while there is a real ground track to have drifted
+            // from. Holding the brakes on a windy stand is not a drift error, and
+            // including it made a crosswind take-off report a mean |drift| of 154
+            // degrees, which is nonsense and would have been analysed as data.
+            if (ac.GroundSpeedMs > 8f)
+            {
+                driftAbsInt += Mathf.Abs(ac.DriftAngleDeg) * dt;
+                driftTime += dt;
+            }
         }
     }
 
