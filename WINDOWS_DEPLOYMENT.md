@@ -2,20 +2,22 @@
 
 ## 1. Status, stated plainly
 
-**A Windows build has NOT been produced, and cannot be produced on the development
-machine as it stands.** The Unity installation here has only `MacStandaloneSupport`
-under `PlaybackEngines/`; **Windows Build Support (Mono) is not installed**, and Unity
-cannot cross-compile to a target whose module is absent.
+**Windows Build Support (Mono) was missing and has been installed.** The development
+machine originally had only `MacStandaloneSupport` under `PlaybackEngines/`, and Unity
+cannot cross-compile to a target whose module is absent — so no Windows build was
+possible at all. `WindowsStandaloneSupport` is now present and
+`modules.json` records `windows-mono` as selected.
 
-What *has* been done is everything that does not require that module:
+Also done, and independent of the module:
 
 * a full static portability audit of the codebase (§2), which is **clean**;
 * verification that no runtime script has an editor-only dependency;
-* the build configuration and the exact command to run (§3).
+* a reproducible build script (§3) that fails with the exact install command rather
+  than an opaque error if the module is ever missing again.
 
-This is recorded rather than papered over, for the same reason the VR documentation
-records what needs a headset: an unverified claim in a deployment document is worse than
-an admitted gap, because someone will rely on it on the day.
+The build's own status is recorded in `FINAL_CHANGE_REPORT.md` §10 — for the same reason
+the VR documentation records what needs a headset: an unverified claim in a deployment
+document is worse than an admitted gap, because someone will rely on it on the day.
 
 ## 2. Portability audit — what was checked and what was found
 
@@ -32,7 +34,7 @@ an admitted gap, because someone will rely on it on the day.
 
 ## 3. Producing the build
 
-Install the module once, on this machine or the lab machine:
+If the module is ever missing (a fresh machine, a new editor version), install it once:
 
 ```bash
 "/Applications/Unity Hub.app/Contents/MacOS/Unity Hub" -- --headless \
