@@ -29,13 +29,14 @@ using UnityEngine;
 
 public static class BuildTool
 {
-    const string ProductName = "FlightAssessmentSim";
+    /// <summary>The player's file name. NOT the product name — see Build().</summary>
+    const string ExeStem = "FlightAssessmentSim";
 
     [MenuItem("Tools/Experiment/Build Windows (lab)")]
-    public static void BuildWindows() => Build(BuildTarget.StandaloneWindows64, "Windows", ProductName + ".exe");
+    public static void BuildWindows() => Build(BuildTarget.StandaloneWindows64, "Windows", ExeStem + ".exe");
 
     [MenuItem("Tools/Experiment/Build macOS (development)")]
-    public static void BuildMac() => Build(BuildTarget.StandaloneOSX, "macOS", ProductName + ".app");
+    public static void BuildMac() => Build(BuildTarget.StandaloneOSX, "macOS", ExeStem + ".app");
 
     static void Build(BuildTarget target, string label, string exeName)
     {
@@ -72,8 +73,21 @@ public static class BuildTool
             options = BuildOptions.None,
         };
 
-        PlayerSettings.productName = ProductName;
-        PlayerSettings.companyName = "DefaultCompany";      // keep persistentDataPath stable
+        // DO NOT SET productName OR companyName HERE.
+        //
+        // Unity derives Application.persistentDataPath from them, and that is where ALL
+        // experiment data lives. An earlier version of this file set
+        // `productName = "FlightAssessmentSim"` as a tidy-up, and simply RUNNING THE
+        // BUILD silently moved the data folder from
+        //     .../DefaultCompany/FlightAssessmentSimFinal/FlightSimData/experiment
+        // to  .../DefaultCompany/FlightAssessmentSim/FlightSimData/experiment
+        // — for the editor as well as the player. Every path in the documentation
+        // pointed at the old folder, and a study already under way would have had its
+        // participants split across two directories with nothing to indicate why.
+        //
+        // A build must not change the project's identity. The player's FILE NAME is a
+        // build-time choice (ExeStem); the product NAME is a project-level fact and is
+        // left exactly as the project has it.
         PlayerSettings.runInBackground = true;              // never pause during EEG recording
         PlayerSettings.resizableWindow = false;
         PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
@@ -163,7 +177,7 @@ public static class BuildTool
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("{");
-        sb.AppendLine("  \"product\": \"" + ProductName + "\",");
+        sb.AppendLine("  \"product\": \"" + PlayerSettings.productName + "\",");
         sb.AppendLine("  \"platform\": \"" + label + "\",");
         sb.AppendLine("  \"unity_version\": \"" + Application.unityVersion + "\",");
         sb.AppendLine("  \"built_utc\": \"" + System.DateTime.UtcNow.ToString("o") + "\",");
@@ -174,7 +188,11 @@ public static class BuildTool
         sb.AppendLine("  \"variants_per_cell\": " + MissionLibrary.VariantCount + ",");
         sb.AppendLine("  \"telemetry_columns\": " + ExperimentLogger.TelemetryHeader().Split(',').Length + ",");
         sb.AppendLine("  \"telemetry_hz\": " + ExperimentLogger.TelemetryHz + ",");
-        sb.AppendLine("  \"marker_tags\": " + EventMarkers.All.Length);
+        sb.AppendLine("  \"marker_tags\": " + EventMarkers.All.Length + ",");
+        // Record WHERE this build will write, because it is derived from the product and
+        // company names and is therefore a property of the build, not a constant.
+        sb.AppendLine("  \"data_folder\": \"" + PlayerSettings.companyName + "/" +
+                      PlayerSettings.productName + "/FlightSimData/experiment\"");
         sb.AppendLine("}");
         File.WriteAllText(Path.Combine(outDir, "build_manifest.json"), sb.ToString());
         Debug.Log("[BuildTool] wrote build_manifest.json");

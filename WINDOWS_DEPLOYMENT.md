@@ -96,7 +96,19 @@ copy wholesale.
 2. **Check the write path.** Data goes to
    `%USERPROFILE%\AppData\LocalLow\DefaultCompany\FlightAssessmentSimFinal\FlightSimData\experiment`.
    On a locked-down institutional machine, confirm this is writable *before* a
-   participant is in the chair.
+   participant is in the chair. `build_manifest.json` states the folder explicitly,
+   because it is derived from the product and company names rather than being a constant.
+
+   **This project's data root is `FlightAssessmentSimFinal`. The OTHER project versions
+   on disk (`- VR`, `- Extra - Copy`, the `Phase N` copies) use `FlightAssessmentSim`,
+   and therefore write to a DIFFERENT folder that already contains earlier data
+   (a `P003` from 21 Aug 2026, among others).** Do not mix them, and do not assume a
+   folder called `FlightAssessmentSim` belongs to this build.
+
+   This is not hypothetical: an earlier version of `BuildTool` set `productName` as a
+   tidy-up, and merely running a build silently redirected this project's data — editor
+   included — into the other projects' folder. `BuildTool` no longer touches the
+   project's identity, and the reason is commented in the file so nobody re-adds it.
 3. **Bind the controls** — see `HARDWARE_CONTROLS.md` §5.
 4. **Check XR** if running in VR — see `VR_CALIBRATION.md`. The OpenXR loader chain is
    configured in `Assets/XR/`; `XRSetup.Verify` reports every link.

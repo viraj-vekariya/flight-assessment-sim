@@ -1,6 +1,6 @@
 MISSION TEST REPORT
 ===================
-generated 2026-08-24 14:58:17
+generated 2026-08-24 15:36:53
 unity 6000.0.77f1   timeScale 8
 
 BANK DESIGN CHECKS
@@ -22,7 +22,7 @@ bank: 42 missions  (36 cognitive axis, 6 psychomotor axis)
    H3V2   hdg     0  alt   850  no rising terrain on the nominal track
    H4V2   hdg     0  alt   500  no rising terrain on the nominal track
    L1V3   hdg     0  alt   800  no rising terrain on the nominal track
-   L3V3   route 3 legs, 11840 m  min clearance     599 m at 6538 m
+   L3V3   route 4 legs, 13609 m  min clearance     510 m at 5934 m
    L4V3   hdg     0  alt   400  no rising terrain on the nominal track
    M1V3   hdg     0  alt   600  no rising terrain on the nominal track
    M2V3   hdg   350  alt   850  no rising terrain on the nominal track
