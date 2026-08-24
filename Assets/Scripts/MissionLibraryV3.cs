@@ -334,11 +334,11 @@ public static class MissionLibraryV3
     static MissionDefinition L3()
     {
         var m = MissionLibrary.CruiseBase("L3V3", "Waypoint navigation", WorkloadClass.Low, 3);
-        m.Objective = "Track a three-waypoint route at 700 m.";
-        m.Brief = "Straight and level at 700 m. A route is displayed on the navigation display. " +
+        m.Objective = "Track a four-waypoint route at 700 m.";
+        m.Brief = "Straight and level at 700 m. A four-point route is displayed on the navigation display. " +
                   "Fly it, holding altitude. There is no time limit and no other traffic. " +
                   "Clear day, light air.";
-        m.Events.Add(MissionDefinition.Msg(1f, "MAINTAIN 700 M. CLEARED DIRECT ALPHA, THEN BRAVO, THEN CHARLIE."));
+        m.Events.Add(MissionDefinition.Msg(1f, "MAINTAIN 700 M. CLEARED ALPHA, BRAVO, CHARLIE, DELTA."));
         // ROUTE LENGTH IS A DURATION CONTROL, not scenery. The first version had ONE
         // waypoint 5 km ahead; the aeroplane reached it at 97 s and the trial ENDED
         // there — 37 s of task after a 60 s baseline, against the 300 s every other
@@ -350,9 +350,21 @@ public static class MissionLibraryV3
         //
         // The legs also stay west of x = +3 km and clear of both named peaks, which the
         // terrain-clearance design check now verifies leg by leg rather than assuming.
-        m.Waypoints.Add(new Waypoint(new Vector3(-1200f, 700f, 1200f), "ALPHA", 220f));
-        m.Waypoints.Add(new Waypoint(new Vector3(1500f, 700f, 4200f), "BRAVO", 220f));
-        m.Waypoints.Add(new Waypoint(new Vector3(-300f, 700f, 8200f), "CHARLIE", 220f));
+        //
+        // THE ROUTE STAYS OVER LAND. The first version ran out to z = +8.2 km, which is
+        // past this world's coastline (~4.3 km): the external render showed the aeroplane
+        // over open water with nothing to navigate by but a magenta line. Coastal
+        // navigation is a real thing, but a LOW reference mission whose whole content is
+        // "look at the display and track to a point" should not also be the emptiest
+        // scene in the bank — there is nothing out there to build a picture from, which
+        // is the opposite of what the mission is about.
+        //
+        // Four legs in a rough circuit, all inside 3.6 km of the field, ~13.6 km total:
+        // over terrain the whole way, and still long enough to occupy the trial.
+        m.Waypoints.Add(new Waypoint(new Vector3(-2200f, 700f, 1500f), "ALPHA", 220f));
+        m.Waypoints.Add(new Waypoint(new Vector3(-1000f, 700f, 3400f), "BRAVO", 220f));
+        m.Waypoints.Add(new Waypoint(new Vector3(2200f, 700f, 2600f), "CHARLIE", 220f));
+        m.Waypoints.Add(new Waypoint(new Vector3(1200f, 700f, -1200f), "DELTA", 220f));
         m.Goal = ScenarioGoal.Navigate;
         m.Mechanism = "reference - steady-state tracking to displayed targets";
         m.Profile = new WorkloadProfile {
@@ -369,7 +381,7 @@ public static class MissionLibraryV3
         m.EegRelevance = "Phase-matched baseline for M3V3 and H3V3, with the navigation display in " +
                          "active use so display scanning is present in the reference too.";
         m.ExpectedErrors = "Wandering off track; losing altitude while looking at the display; turning early or late at a waypoint.";
-        m.SuccessCriteria = "All three waypoints reached, altitude held within +/- 70 m.";
+        m.SuccessCriteria = "All four waypoints reached, altitude held within +/- 70 m.";
         m.FailureConditions = "Crash; loss of control.";
         m.AviationBasis = "Pilotage and basic navigation display use; FAA-H-8083-25 ch.16.";
         m.Approximations = "The waypoints are markers in the world and symbols on the MFD; there is no " +

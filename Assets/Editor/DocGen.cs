@@ -99,6 +99,10 @@ public static class DocGen
                 sb.AppendLine(row + man + " |");
             }
         sb.AppendLine();
+        sb.AppendLine("Manual demand is matched WITHIN each phase row (spread <= 1 on a 0-4 scale), which");
+        sb.AppendLine("is where the class contrast is made — so a difference inside a row cannot be muscle");
+        sb.AppendLine("activity rather than cognitive load.");
+        sb.AppendLine();
 
         // ---- within-cell exchangeability ----
         sb.AppendLine("## Variant exchangeability (design check)");
@@ -148,11 +152,7 @@ public static class DocGen
         sb.AppendLine("*crosswind increased cognitive workload*.");
         sb.AppendLine();
 
-                sb.AppendLine("Manual demand is matched WITHIN each phase row (spread <= 1 on a 0-4 scale), which");
-        sb.AppendLine("is where the class contrast is made — so a difference inside a row cannot be muscle");
-        sb.AppendLine("activity rather than cognitive load.");
-        sb.AppendLine();
-
+        
         // ---- class separation check ----
         sb.AppendLine("## Class separation (design check)");
         sb.AppendLine();

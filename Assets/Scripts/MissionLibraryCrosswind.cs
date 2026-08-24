@@ -212,7 +212,13 @@ public static class MissionLibraryCrosswind
         m.Profile = new WorkloadProfile {
             MentalDemand = 2 + lvl, TemporalDemand = 3 + (lvl > 1 ? 1 : 0), DecisionComplexity = 2 + (lvl > 0 ? 1 : 0),
             WorkingMemory = 2, AttentionSwitching = 2 + lvl, SituationAwareness = 3 + (lvl > 1 ? 1 : 0),
-            Perception = 2 + lvl, ManualControl = 3 + lvl, ProceduralLoad = 2,
+            // The demand scale is 0-4. `3 + lvl` reached FIVE at the top level, which is
+            // off the end of the scale the whole workload model is defined on — it does
+            // not merely look wrong in the table, it silently inflates the PLI by a
+            // dimension the weighting never anticipated. A crosswind landing at the
+            // demonstrated limit is the hardest thing to fly in the bank, so it belongs
+            // at the top of the scale, not past it.
+            Perception = 2 + lvl, ManualControl = Mathf.Min(4, 3 + lvl), ProceduralLoad = 2,
             Uncertainty = 1 + lvl, Communication = 2, ErrorConsequence = 3 + (lvl > 1 ? 1 : 0) };
         m.Expected = new ExpectedTlx {
             Mental = 50 + 14 * lvl, Physical = 46 + 18 * lvl, Temporal = 46 + 14 * lvl,

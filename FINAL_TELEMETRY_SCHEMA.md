@@ -25,65 +25,70 @@ One `telemetry.csv` per trial. Columns, in order:
 | 16 | `ind_airspeed_kmh` | **indicated** — differs from true under a pitot/static failure |
 | 17 | `ind_altitude_m` | **indicated** — differs from true under a static failure |
 | 18 | `ind_vspeed_ms` | **indicated** |
-| 19 | `in_pitch` |  |
-| 20 | `in_roll` |  |
-| 21 | `in_yaw` |  |
-| 22 | `throttle` |  |
-| 23 | `flaps_actual` | where the flaps really are |
-| 24 | `flaps_selected` | the detent the pilot selected (differs when the motor has failed) |
-| 25 | `spoiler` |  |
-| 26 | `brake` |  |
-| 27 | `trim` | elevator trim, +1 nose up .. -1 nose down. Trim is the one control that REDUCES workload — a participant holding a sustained elevator force all trial is carrying a motor load the design intends them to trim off |
-| 28 | `elevator_cmd` | stick + trim combined (`pitch - trim x 0.35`) — this, not `pitch`, is what the elevator actually does. Separates a pilot fighting the aeroplane from one who has trimmed it |
-| 29 | `brake_pressure` | wheel-brake pressure 0-1, analog. Ground only — brake input is ignored in flight |
-| 30 | `ovr_pitch` | 1 when something other than the keyboard commanded pitch this frame (a cockpit control, VR hand, or scripted pilot) |
-| 31 | `ovr_roll` | as `ovr_pitch`, for roll |
-| 32 | `ovr_yaw` | as `ovr_pitch`, for yaw |
-| 33 | `ovr_throttle` | as `ovr_pitch`, for throttle |
-| 34 | `ovr_trim` | as `ovr_pitch`, for trim |
-| 35 | `ovr_brake` | as `ovr_pitch`, for the wheel brakes |
-| 36 | `control_held` | the id of the cockpit control physically held this frame (`yoke`, `throttle`, `trim`, `flaps`, `brake`, ...) or empty. **The key column for separating motor activity from cognitive workload**: comparing LOW and HIGH windows in which this is empty throughout tests whether a workload effect survives with the hand movement removed. See `VR_EXPERIMENT_CONSIDERATIONS.md` §1 |
-| 37 | `ctrl_jerk` | sum of |Δ control| per second — the motor-artifact regressor |
-| 38 | `target_alt_m` | the assigned altitude; not a glidepath target on an approach |
-| 39 | `target_hdg_deg` |  |
-| 40 | `alt_err_m` | **only interpretable while `segment` is BASELINE, or in a hold mission.** On a landing mission the target stays at the level-off altitude, so this grows as the aeroplane descends on the approach — use `cross_track_m` and the touchdown metrics there instead |
-| 41 | `hdg_err_deg` | error against the currently assigned heading |
-| 42 | `dist_to_wpt_m` |  |
-| 43 | `cross_track_m` | lateral offset from the runway centreline (x = 0) |
-| 44 | `nearest_traffic_m` |  |
-| 45 | `taxi_phase` |  |
-| 46 | `grounded` |  |
-| 47 | `stalled` |  |
-| 48 | `stall_warn` |  |
-| 49 | `weather_active` |  |
-| 50 | `gauge_fault` |  |
-| 51 | `mission_phase` |  |
-| 52 | `segment` | `BASELINE` during the in-task baseline, `TASK` after, `REST_EO`/`REST_EC` in rest blocks |
-| 53 | `engine_state` |  |
-| 54 | `engine_power_01` |  |
-| 55 | `rpm` |  |
-| 56 | `oil_press_psi` |  |
-| 57 | `oil_temp_c` |  |
-| 58 | `carb_ice_01` | modelled induction-ice accretion 0-1 (not visible to the pilot) |
-| 59 | `carb_heat` |  |
-| 60 | `fuel_left_l` |  |
-| 61 | `fuel_right_l` |  |
-| 62 | `fuel_flow_lph` |  |
-| 63 | `fuel_selector` |  |
-| 64 | `alternator` |  |
-| 65 | `bus_volts` | electrical bus voltage |
-| 66 | `battery_ah` | remaining battery charge |
-| 67 | `load_shed` |  |
-| 68 | `static_blocked` |  |
-| 69 | `pitot_blocked` |  |
-| 70 | `alt_static_open` |  |
-| 71 | `attitude_ok` |  |
-| 72 | `radio_ok` |  |
-| 73 | `flap_motor_ok` |  |
-| 74 | `flap_asym` |  |
-| 75 | `door_open` |  |
-| 76 | `brakes_ok` |  |
-| 77 | `armed_failure` | the abnormality currently armed, or `None` |
+| 19 | `groundspeed_kmh` |  |
+| 20 | `drift_deg` |  |
+| 21 | `sideslip_deg` |  |
+| 22 | `wind_n_ms` |  |
+| 23 | `wind_e_ms` |  |
+| 24 | `in_pitch` |  |
+| 25 | `in_roll` |  |
+| 26 | `in_yaw` |  |
+| 27 | `throttle` |  |
+| 28 | `flaps_actual` | where the flaps really are |
+| 29 | `flaps_selected` | the detent the pilot selected (differs when the motor has failed) |
+| 30 | `spoiler` |  |
+| 31 | `brake` |  |
+| 32 | `trim` | elevator trim, +1 nose up .. -1 nose down. Trim is the one control that REDUCES workload — a participant holding a sustained elevator force all trial is carrying a motor load the design intends them to trim off |
+| 33 | `elevator_cmd` | stick + trim combined (`pitch - trim x 0.35`) — this, not `pitch`, is what the elevator actually does. Separates a pilot fighting the aeroplane from one who has trimmed it |
+| 34 | `brake_pressure` | wheel-brake pressure 0-1, analog. Ground only — brake input is ignored in flight |
+| 35 | `ovr_pitch` | 1 when something other than the keyboard commanded pitch this frame (a cockpit control, VR hand, or scripted pilot) |
+| 36 | `ovr_roll` | as `ovr_pitch`, for roll |
+| 37 | `ovr_yaw` | as `ovr_pitch`, for yaw |
+| 38 | `ovr_throttle` | as `ovr_pitch`, for throttle |
+| 39 | `ovr_trim` | as `ovr_pitch`, for trim |
+| 40 | `ovr_brake` | as `ovr_pitch`, for the wheel brakes |
+| 41 | `control_held` | the id of the cockpit control physically held this frame (`yoke`, `throttle`, `trim`, `flaps`, `brake`, ...) or empty. **The key column for separating motor activity from cognitive workload**: comparing LOW and HIGH windows in which this is empty throughout tests whether a workload effect survives with the hand movement removed. See `VR_EXPERIMENT_CONSIDERATIONS.md` §1 |
+| 42 | `ctrl_jerk` | sum of |Δ control| per second — the motor-artifact regressor |
+| 43 | `target_alt_m` | the assigned altitude; not a glidepath target on an approach |
+| 44 | `target_hdg_deg` |  |
+| 45 | `alt_err_m` | **only interpretable while `segment` is BASELINE, or in a hold mission.** On a landing mission the target stays at the level-off altitude, so this grows as the aeroplane descends on the approach — use `cross_track_m` and the touchdown metrics there instead |
+| 46 | `hdg_err_deg` | error against the currently assigned heading |
+| 47 | `dist_to_wpt_m` |  |
+| 48 | `cross_track_m` | lateral offset from the runway centreline (x = 0) |
+| 49 | `nearest_traffic_m` |  |
+| 50 | `taxi_phase` |  |
+| 51 | `grounded` |  |
+| 52 | `stalled` |  |
+| 53 | `stall_warn` |  |
+| 54 | `weather_active` |  |
+| 55 | `gauge_fault` |  |
+| 56 | `mission_phase` |  |
+| 57 | `segment` | `BASELINE` during the in-task baseline, `TASK` after, `REST_EO`/`REST_EC` in rest blocks |
+| 58 | `engine_state` |  |
+| 59 | `engine_power_01` |  |
+| 60 | `rpm` |  |
+| 61 | `oil_press_psi` |  |
+| 62 | `oil_temp_c` |  |
+| 63 | `carb_ice_01` | modelled induction-ice accretion 0-1 (not visible to the pilot) |
+| 64 | `carb_heat` |  |
+| 65 | `fuel_left_l` |  |
+| 66 | `fuel_right_l` |  |
+| 67 | `fuel_flow_lph` |  |
+| 68 | `fuel_selector` |  |
+| 69 | `alternator` |  |
+| 70 | `bus_volts` | electrical bus voltage |
+| 71 | `battery_ah` | remaining battery charge |
+| 72 | `load_shed` |  |
+| 73 | `static_blocked` |  |
+| 74 | `pitot_blocked` |  |
+| 75 | `alt_static_open` |  |
+| 76 | `attitude_ok` |  |
+| 77 | `radio_ok` |  |
+| 78 | `flap_motor_ok` |  |
+| 79 | `flap_asym` |  |
+| 80 | `door_open` |  |
+| 81 | `brakes_ok` |  |
+| 82 | `armed_failure` | the abnormality currently armed, or `None` |
 
 ## events.csv
 

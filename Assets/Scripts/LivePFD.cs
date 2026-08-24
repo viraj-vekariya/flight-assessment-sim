@@ -16,7 +16,7 @@ public class LivePFD : MonoBehaviour
     public Transform screenQuad;
 
     Transform horizon;
-    TextMesh spdText, altText, hdgText, vsText;
+    TextMesh spdText, altText, hdgText, vsText, flapText, trimText;
 
     static readonly Color Blue   = new Color(0.40f, 0.72f, 1.00f);   // readouts (readable blue)
     static readonly Color Dim    = new Color(0.58f, 0.68f, 0.82f);   // labels
@@ -83,6 +83,23 @@ public class LivePFD : MonoBehaviour
         vsText = Text(scene, new Vector3(0f, -1.02f, 0.1f), ValSize * 0.8f, true, font, Blue);
         Text(scene, new Vector3(0f, -1.26f, 0.1f), LabSize, false, font, Dim).text = "VS  m/s";
 
+        // FLAP POSITION AND TRIM.
+        //
+        // The PFD showed heading, speed, altitude and vertical speed — and nothing about
+        // the aeroplane's CONFIGURATION. A real 172 has a flap position indicator, and
+        // the difference between the flap SELECTOR and the flap POSITION is the whole
+        // content of the flap-failure mission: the lever moves, the flaps do not, and
+        // without an indicator the only cue is the aeroplane not slowing down, which is
+        // a much harsher and much less realistic way to discover it.
+        //
+        // ACTUAL position is shown, as the real indicator does. When it disagrees with
+        // what the pilot selected, the readout says so — that is the indication a real
+        // cockpit gives, and noticing it is the pilot's job, not the display's.
+        flapText = Text(scene, new Vector3(-1.58f, -1.02f, 0.1f), ValSize * 0.7f, true, font, Blue);
+        Text(scene, new Vector3(-1.58f, -1.26f, 0.1f), LabSize, false, font, Dim).text = "FLAP";
+        trimText = Text(scene, new Vector3(1.58f, -1.02f, 0.1f), ValSize * 0.7f, true, font, Blue);
+        Text(scene, new Vector3(1.58f, -1.26f, 0.1f), LabSize, false, font, Dim).text = "TRIM";
+
         SetLayer(scene, PFDLayer);
 
         // ── PFD camera → RenderTexture (high-res, aspect = physical screen) ──
@@ -123,6 +140,22 @@ public class LivePFD : MonoBehaviour
         if (hdgText) hdgText.text = Mathf.RoundToInt(phys.HeadingDeg).ToString("000") + "°";
         if (spdText) spdText.text = Mathf.RoundToInt(phys.AirspeedKmh).ToString();
         if (altText) altText.text = Mathf.RoundToInt(phys.AltitudeM).ToString();
+        if (flapText)
+        {
+            int actual = Mathf.RoundToInt(phys.Flaps01 * 100f);
+            var ctl = phys.GetComponent<AircraftController>();
+            int selected = ctl != null ? Mathf.RoundToInt(ctl.FlapsSelected * 100f) : actual;
+            // Amber when the flaps are not where they were asked to be — the flap-motor
+            // failure's one honest visual cue.
+            bool disagree = Mathf.Abs(selected - actual) > 4;
+            flapText.text = disagree ? actual + "/" + selected : actual.ToString();
+            flapText.color = disagree ? new Color(1f, 0.75f, 0.2f) : new Color(0.40f, 0.72f, 1.00f);
+        }
+        if (trimText)
+        {
+            float t = phys.trim;
+            trimText.text = Mathf.Abs(t) < 0.02f ? "0" : (t > 0f ? "U" : "D") + Mathf.Abs(t).ToString("F2");
+        }
         if (vsText)
         {
             float vs = phys.VerticalSpeedMs;
