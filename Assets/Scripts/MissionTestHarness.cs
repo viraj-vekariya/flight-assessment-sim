@@ -84,6 +84,9 @@ public class MissionTestHarness : MonoBehaviour
     readonly List<string> problems = new List<string>();
     readonly List<string> outcomes = new List<string>();
     int restartTested;
+    bool navDiagged;
+    bool navDiag;            // verbose per-mission steering log (-navdiag)
+    float lastNavLog;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // DESIGN CHECKS — properties of the mission TABLE
@@ -300,6 +303,43 @@ public class MissionTestHarness : MonoBehaviour
             float approachRun = landing ? Vector3.Distance(new Vector3(p0.x, 0f, p0.z), thr) : 0f;
 
             float worst = 1e9f; float worstAt = 0f; Vector3 worstP = p0;
+
+            // A NAVIGATION mission does not fly the assigned heading — it flies its
+            // ROUTE, and a leg can point somewhere the heading never does. Checking the
+            // heading for those missions checks a track the aeroplane never flies.
+            if (m.Goal == ScenarioGoal.Navigate && m.Waypoints.Count > 0)
+            {
+                Vector3 legFrom = p0;
+                float travelled = 0f;
+                for (int wi = 0; wi < m.Waypoints.Count; wi++)
+                {
+                    Vector3 legTo = m.Waypoints[wi].Pos;
+                    Vector3 flat = new Vector3(legTo.x - legFrom.x, 0f, legTo.z - legFrom.z);
+                    float legLen = flat.magnitude;
+                    if (legLen < 1f) { legFrom = legTo; continue; }
+                    Vector3 ld = flat / legLen;
+                    for (float d = 0f; d <= legLen; d += StepM)
+                    {
+                        Vector3 pt = legFrom + ld * d;
+                        float hgt = Mathf.Min(alt, m.StartAltitudeM + (travelled + d) * 0.11f);
+                        if (hgt < 60f) continue;
+                        float g2 = WorldBuilder.SampleGroundY(pt.x, pt.z);
+                        if (g2 < 20f) continue;
+                        float cl = hgt - g2;
+                        if (cl < worst) { worst = cl; worstAt = travelled + d; worstP = pt; }
+                    }
+                    travelled += legLen;
+                    legFrom = legTo;
+                }
+                if (worst > 1e8f)
+                { report.AppendLine($"   {m.Id,-6} route {m.Waypoints.Count} legs, {travelled:F0} m — no rising terrain"); continue; }
+                report.AppendLine($"   {m.Id,-6} route {m.Waypoints.Count} legs, {travelled:F0} m  min clearance {worst,7:F0} m at {worstAt:F0} m");
+                if (worst < MarginM)
+                    Problem("design", $"{m.Id}: route clears terrain by only {worst:F0} m (need {MarginM:F0}) " +
+                            $"at x={worstP.x:F0} z={worstP.z:F0}");
+                continue;
+            }
+
             Vector3 dir = landing ? (thr - new Vector3(p0.x, 0f, p0.z)).normalized
                                   : new Vector3(Mathf.Sin(hdg * Mathf.Deg2Rad), 0f, Mathf.Cos(hdg * Mathf.Deg2Rad));
             float span = landing ? approachRun : TrackM;
@@ -424,8 +464,22 @@ public class MissionTestHarness : MonoBehaviour
             // even at 8x, so the quick form exists for iteration; the full form is what
             // must pass before data collection.
             bool quick = false;
-            foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-bankquick") quick = true;
-            if (quick)
+            string only = null;
+            foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-navdiag") navDiag = true;
+            foreach (var a in System.Environment.GetCommandLineArgs())
+            {
+                if (a == "-bankquick") quick = true;
+                // -onlymission:ID flies ONE mission. Diagnosing a single mission by
+                // re-running all 42 is a 90-minute feedback loop, which is slow enough
+                // that you stop investigating and start guessing.
+                if (a.StartsWith("-onlymission:")) only = a.Substring("-onlymission:".Length);
+            }
+            if (!string.IsNullOrEmpty(only))
+            {
+                queue.Add(only);
+                report.AppendLine("SINGLE MISSION: " + only);
+            }
+            else if (quick)
             {
                 foreach (var m in MissionLibrary.SessionMissions(0)) queue.Add(m.Id);
                 report.AppendLine("QUICK MODE: one variant index only (" + queue.Count + " missions).");
@@ -476,7 +530,7 @@ public class MissionTestHarness : MonoBehaviour
         ac.flaps = m.StartFlaps01; ac.spoiler = 0f; ac.braking = false; ac.brakeInput01 = 0f; ac.trim = 0f;
         ac.yawInput = 0f;
         currentDir = eng.Experiment != null ? eng.Experiment.TrialDir : "";
-        stage = Stage.Fly; stageT = 0f; ackDelay = 0f;
+        stage = Stage.Fly; stageT = 0f; ackDelay = 0f; navDiagged = false; lastNavLog = -99f;
         lastPitch = ac.PitchDeg;
     }
 
@@ -612,6 +666,12 @@ public class MissionTestHarness : MonoBehaviour
             // pilot flew the mission's initial heading forever and every navigation
             // mission was reported INCOMPLETE, which looks like a broken mission and is
             // actually a blind autopilot.
+            if (!navDiagged && eng.Current != null)
+            {
+                navDiagged = true;
+                Log($"NAVDIAG {eng.Current.Id}: scenarioGoal={eng.Current.Goal} missionGoal={m.Goal} " +
+                    $"hasWpt={eng.HasWaypoint} wpts={eng.Current.Waypoints.Count} curTargetHdg={eng.CurTargetHdg:F1}");
+            }
             wantHdg = (eng.HasWaypoint && eng.Current != null && eng.Current.Goal == ScenarioGoal.Navigate)
                     ? Mathf.Atan2(eng.WaypointPos.x - ac.transform.position.x,
                                   eng.WaypointPos.z - ac.transform.position.z) * Mathf.Rad2Deg
@@ -680,6 +740,13 @@ public class MissionTestHarness : MonoBehaviour
         }
         ac.rollInput = Mathf.Clamp(0.035f * (targetBank - trueBank), -0.7f, 0.7f);
         ac.yawInput = 0f;
+        if (navDiag && eng.Time01 - lastNavLog > 20f)
+        {
+            lastNavLog = eng.Time01;
+            Log($"NAV t={eng.Time01:F0} wantHdg={wantHdg:F1} hdg={ac.HeadingDeg:F1} " +
+                $"tgtBank={targetBank:F1} trueBank={trueBank:F1} roll={ac.rollInput:F3} " +
+                $"hasWpt={eng.HasWaypoint} goal={eng.Current.Goal}");
+        }
     }
 
     /// <summary>Scripted ground pilot: steers along the taxi route with the rudder,

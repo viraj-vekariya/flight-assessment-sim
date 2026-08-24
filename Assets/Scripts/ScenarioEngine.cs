@@ -1007,7 +1007,16 @@ public class ScenarioEngine : MonoBehaviour
         switch (Current.Goal)
         {
             case ScenarioGoal.Navigate:
-                if (wpIdx >= Current.Waypoints.Count || Time01 >= Current.Duration) Complete();
+                // An EXPERIMENT navigation mission runs its full nominal duration, like
+                // every other mission except a landing. Ending at the last waypoint broke
+                // the design's central duration control without saying so: L3V3 finished
+                // at 221 s, giving 161 s of task against the 240 s every other mission
+                // gets, and the shortfall depended on how fast the participant flew —
+                // so trial length would have varied with skill, which is exactly the kind
+                // of thing that must not vary. The pilot simply holds the last leg.
+                // The legacy (non-experiment) path keeps its old behaviour.
+                if (IsExperiment) { if (Time01 >= Current.Duration) Complete(); }
+                else if (wpIdx >= Current.Waypoints.Count || Time01 >= Current.Duration) Complete();
                 break;
             case ScenarioGoal.Land:
                 // An experiment landing mission must run its full nominal duration OR
@@ -1172,7 +1181,21 @@ public class ScenarioEngine : MonoBehaviour
             case ScenarioGoal.Land:         return landed || goAroundInitiated;
             case ScenarioGoal.TaxiTakeoff:  return rotated && !holdShortBusted;
             case ScenarioGoal.TakeoffClimb: return climbDone;
-            default:                        return inTolT / Mathf.Max(1f, sampleT) > 0.5f;
+            // NAVIGATE was missing, and its absence was not visible until the bank
+            // gained a navigation mission: it fell through to `default`, which scores
+            // TIME IN ALTITUDE/HEADING TOLERANCE — and UpdateDeviation does not even
+            // accumulate a tracking window for a Navigate goal, so sampleT stayed 0,
+            // the ratio evaluated 0 / 1, and a mission that reached every waypoint was
+            // written to performance.json as MISSION_FAILURE. A participant's
+            // successful navigation trial would have been labelled a failed one.
+            case ScenarioGoal.Navigate:     return wpReached >= Current.Waypoints.Count;
+            case ScenarioGoal.Mission:      return landed && wpReached >= Current.Waypoints.Count;
+            default:
+                // And guard the ratio itself: with no tracking window at all, 0/1 = 0 is
+                // not "flew badly", it is "this goal does not track". Failing on it turns
+                // a missing case into a silent wrong answer instead of a loud one.
+                if (sampleT < 1f) return !ac.Crashed;
+                return inTolT / sampleT > 0.5f;
         }
     }
 
