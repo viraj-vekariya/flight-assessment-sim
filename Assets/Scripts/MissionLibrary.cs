@@ -172,17 +172,20 @@ public static class MissionLibrary
         return r < 0 ? 1 : ((participantNumber + r) % VariantCount) + 1;
     }
 
-    public static List<MissionDefinition> ForClass(WorkloadClass c)
+    /// <summary>Missions of a workload class. Defaults to the COGNITIVE axis, because
+    /// the crosswind missions are a different construct and pooling them with the
+    /// cognitive scale is exactly the mistake the two-axis design exists to prevent.</summary>
+    public static List<MissionDefinition> ForClass(WorkloadClass c, LoadAxis axis = LoadAxis.Cognitive)
     {
         var o = new List<MissionDefinition>();
-        foreach (var m in All()) if (m.Class == c) o.Add(m);
+        foreach (var m in All()) if (m.Class == c && m.Axis == axis) o.Add(m);
         return o;
     }
 
-    public static List<MissionDefinition> ForPhase(FlightPhase p)
+    public static List<MissionDefinition> ForPhase(FlightPhase p, LoadAxis axis = LoadAxis.Cognitive)
     {
         var o = new List<MissionDefinition>();
-        foreach (var m in All()) if (m.Phase == p) o.Add(m);
+        foreach (var m in All()) if (m.Phase == p && m.Axis == axis) o.Add(m);
         return o;
     }
 

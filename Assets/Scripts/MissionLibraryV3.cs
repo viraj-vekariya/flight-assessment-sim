@@ -87,9 +87,9 @@ public static class MissionLibraryV3
         m.TargetAltitudeM = 600f;
         m.Mechanism = "prospective memory - holding an instruction until its condition occurs";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 3,
-            AttentionSwitching = 3, SituationAwareness = 3, Perception = 3, ManualControl = 2,
-            ProceduralLoad = 3, Uncertainty = 2, Communication = 3, ErrorConsequence = 3 };
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 3,
+            AttentionSwitching = 3, SituationAwareness = 2, Perception = 3, ManualControl = 2,
+            ProceduralLoad = 2, Uncertainty = 1, Communication = 2, ErrorConsequence = 2 };
         m.Expected = new ExpectedTlx { Mental = 60, Physical = 30, Temporal = 44, Performance = 48, Effort = 60, Frustration = 42 };
         m.LoadRationale =
             "MEDIUM by PROSPECTIVE MEMORY — remembering to do something later, on a cue that is not a " +
@@ -199,9 +199,9 @@ public static class MissionLibraryV3
         m.TargetAltitudeM = 400f;
         m.Mechanism = "reference - steady-state tracking with a turn and a level-off";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 1, TemporalDemand = 1, DecisionComplexity = 1, WorkingMemory = 1,
-            AttentionSwitching = 1, SituationAwareness = 1, Perception = 1, ManualControl = 2,
-            ProceduralLoad = 1, Uncertainty = 0, Communication = 1, ErrorConsequence = 1 };
+            MentalDemand = 1, TemporalDemand = 0, DecisionComplexity = 0, WorkingMemory = 1,
+            AttentionSwitching = 0, SituationAwareness = 1, Perception = 1, ManualControl = 2,
+            ProceduralLoad = 0, Uncertainty = 0, Communication = 0, ErrorConsequence = 0 };
         m.Expected = new ExpectedTlx { Mental = 29, Physical = 26, Temporal = 21, Performance = 25, Effort = 30, Frustration = 15 };
         m.LoadRationale =
             "The climb row's reference. Two instructions arrive close together and then nothing else " +
@@ -237,9 +237,9 @@ public static class MissionLibraryV3
         m.TargetAltitudeM = 400f;
         m.Mechanism = "working memory turnover across mixed verbal and numeric items";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 3, DecisionComplexity = 2, WorkingMemory = 4,
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 1, WorkingMemory = 4,
             AttentionSwitching = 3, SituationAwareness = 2, Perception = 2, ManualControl = 2,
-            ProceduralLoad = 2, Uncertainty = 1, Communication = 4, ErrorConsequence = 2 };
+            ProceduralLoad = 1, Uncertainty = 1, Communication = 3, ErrorConsequence = 1 };
         m.Expected = new ExpectedTlx { Mental = 64, Physical = 30, Temporal = 56, Performance = 50, Effort = 62, Frustration = 46 };
         m.LoadRationale =
             "MEDIUM by VOLUME of items rather than by their difficulty, which distinguishes it from " +
@@ -342,9 +342,9 @@ public static class MissionLibraryV3
         m.Goal = ScenarioGoal.Navigate;
         m.Mechanism = "reference - steady-state tracking to a displayed target";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 1, TemporalDemand = 1, DecisionComplexity = 1, WorkingMemory = 1,
-            AttentionSwitching = 1, SituationAwareness = 2, Perception = 1, ManualControl = 2,
-            ProceduralLoad = 1, Uncertainty = 0, Communication = 1, ErrorConsequence = 1 };
+            MentalDemand = 1, TemporalDemand = 0, DecisionComplexity = 0, WorkingMemory = 1,
+            AttentionSwitching = 0, SituationAwareness = 2, Perception = 1, ManualControl = 2,
+            ProceduralLoad = 0, Uncertainty = 0, Communication = 0, ErrorConsequence = 0 };
         m.Expected = new ExpectedTlx { Mental = 30, Physical = 25, Temporal = 20, Performance = 26, Effort = 30, Frustration = 15 };
         m.LoadRationale =
             "The cruise row's reference, realised as navigation rather than as a heading hold. " +
@@ -382,9 +382,9 @@ public static class MissionLibraryV3
         m.AmbientTurbulence = 0.08f;
         m.Mechanism = "visual search and sustained monitoring under degraded input";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 2,
-            AttentionSwitching = 4, SituationAwareness = 3, Perception = 4, ManualControl = 2,
-            ProceduralLoad = 1, Uncertainty = 3, Communication = 2, ErrorConsequence = 3 };
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 1, WorkingMemory = 2,
+            AttentionSwitching = 4, SituationAwareness = 2, Perception = 4, ManualControl = 2,
+            ProceduralLoad = 1, Uncertainty = 2, Communication = 2, ErrorConsequence = 1 };
         m.Expected = new ExpectedTlx { Mental = 60, Physical = 30, Temporal = 42, Performance = 52, Effort = 62, Frustration = 50 };
         m.LoadRationale =
             "MEDIUM by PERCEPTUAL load, the third distinct mechanism in this cell alongside M3's " +
@@ -530,9 +530,9 @@ public static class MissionLibraryV3
         m.Events.Add(MissionDefinition.Probe(T0 + 160f, "REPORT DOWNWIND — respond", 6f, 10f));
         m.Mechanism = "abandoning a committed procedure and executing a rehearsed alternative";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 3, DecisionComplexity = 2, WorkingMemory = 2,
-            AttentionSwitching = 3, SituationAwareness = 3, Perception = 3, ManualControl = 3,
-            ProceduralLoad = 4, Uncertainty = 2, Communication = 2, ErrorConsequence = 3 };
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 2,
+            AttentionSwitching = 2, SituationAwareness = 3, Perception = 3, ManualControl = 3,
+            ProceduralLoad = 4, Uncertainty = 2, Communication = 2, ErrorConsequence = 2 };
         m.Expected = new ExpectedTlx { Mental = 62, Physical = 50, Temporal = 66, Performance = 56, Effort = 68, Frustration = 50 };
         m.LoadRationale =
             "MEDIUM by PROCEDURAL EXECUTION under the reluctance to abandon a plan. The go-around is a " +
@@ -588,9 +588,9 @@ public static class MissionLibraryV3
         m.Events.Add(MissionDefinition.Probe(T0 + 190f, "CONFIRM YOUR SEQUENCE NUMBER — respond", 6f, 10f));
         m.Mechanism = "startle followed immediately by re-planning at high stakes";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 4, TemporalDemand = 4, DecisionComplexity = 3, WorkingMemory = 4,
-            AttentionSwitching = 4, SituationAwareness = 4, Perception = 3, ManualControl = 3,
-            ProceduralLoad = 4, Uncertainty = 3, Communication = 3, ErrorConsequence = 4 };
+            MentalDemand = 3, TemporalDemand = 4, DecisionComplexity = 3, WorkingMemory = 3,
+            AttentionSwitching = 3, SituationAwareness = 4, Perception = 3, ManualControl = 3,
+            ProceduralLoad = 4, Uncertainty = 2, Communication = 2, ErrorConsequence = 4 };
         m.Expected = new ExpectedTlx { Mental = 86, Physical = 54, Temporal = 86, Performance = 70, Effort = 88, Frustration = 72 };
         m.LoadRationale =
             "HIGH by STARTLE FOLLOWED BY LOAD, which is the sequence the startle literature identifies " +

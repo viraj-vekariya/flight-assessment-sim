@@ -97,17 +97,28 @@ public static class MissionLibraryV2
         // The change arrives while still taxiing: the pilot must REPLACE a briefed plan
         // rather than build one, which is the working-memory cost this cell is about.
         m.Events.Add(MissionDefinition.Readback(T0 + 8f, "CHANGE OF DEPARTURE: after airborne turn LEFT " +
-                     "heading 330, climb 750 m. READ BACK", 9f, 6f));
-        m.Events.Add(MissionDefinition.TakeoffClearance(104f, "left heading 330, climb 750 m.", 7f));
-        m.Events.Add(MissionDefinition.Atc(150f, ScenarioEventType.AltitudeChange, 750f, "climb and maintain 750 m"));
-        m.Events.Add(MissionDefinition.Atc(158f, ScenarioEventType.HeadingChange, 330f, "left heading 330"));
-        m.Events.Add(MissionDefinition.Probe(232f, "CONFIRM ASSIGNED HEADING — respond", 6f, 12f));
-        m.TargetAltitudeM = 750f; m.TargetHeadingDeg = 330f;
+                     "heading 340, climb 750 m. READ BACK", 9f, 6f));
+        m.Events.Add(MissionDefinition.TakeoffClearance(104f, "left heading 340, climb 750 m.", 7f));
+        m.Events.Add(MissionDefinition.Atc(146f, ScenarioEventType.AltitudeChange, 750f, "climb and maintain 750 m"));
+        m.Events.Add(MissionDefinition.Atc(186f, ScenarioEventType.HeadingChange, 340f, "left heading 340"));
+        m.Events.Add(MissionDefinition.Probe(238f, "CONFIRM ASSIGNED HEADING — respond", 6f, 10f));
+        // TargetHeadingDeg is the target from t = 0, NOT the amended one: the amendment
+        // arrives via the HeadingChange event at 158 s and must not be pre-applied.
+        // Setting it to 330 here made the climb-out target 330 from brake release, so the
+        // aeroplane turned left off the flattened aerodrome corridor while still below
+        // 150 m and flew into rising ground — the battery caught it as
+        // "Destroyed (terrain impact)" at 131 m, x = -677 m.
+        m.TargetAltitudeM = 750f;
+        // And the amended heading itself is now 340 rather than 330, and the climb is
+        // commanded BEFORE the turn, so the nominal track stays inside the departure
+        // corridor until the aeroplane is high enough to cross the hills. Verified by
+        // the terrain-clearance design check, not by eye.
+        m.TargetHeadingDeg = 0f;
         m.Mechanism = "working memory - replacing a briefed plan";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 4,
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 4,
             AttentionSwitching = 2, SituationAwareness = 2, Perception = 2, ManualControl = 2,
-            ProceduralLoad = 2, Uncertainty = 1, Communication = 3, ErrorConsequence = 2 };
+            ProceduralLoad = 2, Uncertainty = 1, Communication = 2, ErrorConsequence = 2 };
         m.Expected = new ExpectedTlx { Mental = 60, Physical = 30, Temporal = 45, Performance = 45, Effort = 58, Frustration = 38 };
         m.LoadRationale =
             "MEDIUM by working memory, and specifically by INTERFERENCE rather than by volume. The " +
@@ -125,7 +136,7 @@ public static class MissionLibraryV2
         m.ExpectedErrors = "Flying the ORIGINAL runway heading after take-off; climbing to 600 m " +
                            "instead of 750 m; answering the probe with the briefed rather than the " +
                            "amended heading.";
-        m.SuccessCriteria = "Amended clearance acknowledged, hold short respected, established on 330 " +
+        m.SuccessCriteria = "Amended clearance acknowledged, hold short respected, established on 340 " +
                             "at 750 m.";
         m.FailureConditions = "Runway incursion; crash; established on the original clearance at the " +
                               "end of the trial.";
@@ -217,9 +228,9 @@ public static class MissionLibraryV2
         m.TargetAltitudeM = 400f;
         m.Mechanism = "reference - steady-state tracking with one target change";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 1, TemporalDemand = 1, DecisionComplexity = 1, WorkingMemory = 1,
-            AttentionSwitching = 1, SituationAwareness = 1, Perception = 1, ManualControl = 2,
-            ProceduralLoad = 1, Uncertainty = 0, Communication = 1, ErrorConsequence = 1 };
+            MentalDemand = 1, TemporalDemand = 0, DecisionComplexity = 0, WorkingMemory = 1,
+            AttentionSwitching = 0, SituationAwareness = 1, Perception = 1, ManualControl = 2,
+            ProceduralLoad = 0, Uncertainty = 0, Communication = 0, ErrorConsequence = 0 };
         m.Expected = new ExpectedTlx { Mental = 28, Physical = 26, Temporal = 20, Performance = 24, Effort = 30, Frustration = 14 };
         m.LoadRationale =
             "The climb row's reference. Two target changes across 300 s is well inside what a single " +
@@ -257,9 +268,9 @@ public static class MissionLibraryV2
         m.TargetAltitudeM = 400f;
         m.Mechanism = "diagnosis of a gradual, ambiguous cue";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 2, DecisionComplexity = 3, WorkingMemory = 2,
-            AttentionSwitching = 3, SituationAwareness = 3, Perception = 3, ManualControl = 2,
-            ProceduralLoad = 3, Uncertainty = 4, Communication = 1, ErrorConsequence = 2 };
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 2, WorkingMemory = 1,
+            AttentionSwitching = 3, SituationAwareness = 2, Perception = 2, ManualControl = 2,
+            ProceduralLoad = 2, Uncertainty = 4, Communication = 1, ErrorConsequence = 1 };
         m.Expected = new ExpectedTlx { Mental = 62, Physical = 32, Temporal = 40, Performance = 52, Effort = 62, Frustration = 48 };
         m.LoadRationale =
             "MEDIUM by UNCERTAINTY, which is the opposite pole from variant 1's mechanism. M2 is a " +
@@ -364,9 +375,9 @@ public static class MissionLibraryV2
         m.TargetHeadingDeg = 0f;
         m.Mechanism = "reference - steady-state tracking with one turn";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 1, TemporalDemand = 1, DecisionComplexity = 1, WorkingMemory = 1,
-            AttentionSwitching = 1, SituationAwareness = 1, Perception = 1, ManualControl = 2,
-            ProceduralLoad = 1, Uncertainty = 0, Communication = 1, ErrorConsequence = 1 };
+            MentalDemand = 1, TemporalDemand = 0, DecisionComplexity = 0, WorkingMemory = 1,
+            AttentionSwitching = 0, SituationAwareness = 1, Perception = 1, ManualControl = 2,
+            ProceduralLoad = 0, Uncertainty = 0, Communication = 0, ErrorConsequence = 0 };
         m.Expected = new ExpectedTlx { Mental = 26, Physical = 24, Temporal = 18, Performance = 24, Effort = 28, Frustration = 13 };
         m.LoadRationale =
             "The cruise row's reference, with a single 20° turn so that the reference contains the " +
@@ -404,9 +415,9 @@ public static class MissionLibraryV2
         m.TargetHeadingDeg = 0f;
         m.Mechanism = "re-planning against competing constraints";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 2, DecisionComplexity = 4, WorkingMemory = 3,
-            AttentionSwitching = 2, SituationAwareness = 3, Perception = 1, ManualControl = 2,
-            ProceduralLoad = 2, Uncertainty = 2, Communication = 3, ErrorConsequence = 2 };
+            MentalDemand = 2, TemporalDemand = 2, DecisionComplexity = 4, WorkingMemory = 3,
+            AttentionSwitching = 2, SituationAwareness = 2, Perception = 1, ManualControl = 2,
+            ProceduralLoad = 1, Uncertainty = 1, Communication = 3, ErrorConsequence = 1 };
         m.Expected = new ExpectedTlx { Mental = 66, Physical = 28, Temporal = 44, Performance = 50, Effort = 64, Frustration = 44 };
         m.LoadRationale =
             "MEDIUM by RE-PLANNING rather than by retention. Variant 1 of this cell loads working " +
@@ -546,9 +557,9 @@ public static class MissionLibraryV2
         m.Events.Add(MissionDefinition.Probe(T0 + 132f, "CONFIRM LANDING RUNWAY — respond", 6f, 10f));
         m.Mechanism = "re-planning under time pressure late in a committed approach";
         m.Profile = new WorkloadProfile {
-            MentalDemand = 3, TemporalDemand = 4, DecisionComplexity = 2, WorkingMemory = 3,
-            AttentionSwitching = 3, SituationAwareness = 3, Perception = 2, ManualControl = 3,
-            ProceduralLoad = 3, Uncertainty = 1, Communication = 3, ErrorConsequence = 3 };
+            MentalDemand = 2, TemporalDemand = 4, DecisionComplexity = 2, WorkingMemory = 3,
+            AttentionSwitching = 2, SituationAwareness = 3, Perception = 2, ManualControl = 3,
+            ProceduralLoad = 2, Uncertainty = 1, Communication = 2, ErrorConsequence = 2 };
         m.Expected = new ExpectedTlx { Mental = 66, Physical = 46, Temporal = 74, Performance = 56, Effort = 68, Frustration = 52 };
         m.LoadRationale =
             "MEDIUM by TIME PRESSURE on a committed plan, where variant 1 of this cell is degraded " +

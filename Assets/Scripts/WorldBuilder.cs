@@ -272,10 +272,34 @@ public static class WorldBuilder
         //
         // Beyond ~4.3 km the terrain is already sea, so the visible change is a normal
         // flat aerodrome and approach plain rather than a scoured landscape.
+        //   *** WIDENED FROM A CORRIDOR TO A PLAIN ***
+        //   The shape above was a narrow corridor: flat 260 m either side and 1.6 km
+        //   straight out. That is exactly enough for a departure that goes STRAIGHT
+        //   ahead, and the mission set at the time only had those. Once missions began
+        //   assigning departure TURNS, the aeroplane left the corridor laterally while
+        //   still climbing through 150 m and flew into ground that reaches ~190 m by
+        //   2.2 km out. The automated terrain-clearance check found it on M1V2
+        //   ("Destroyed (terrain impact)", 131 m, x = -677) and then showed that even
+        //   the straight-out departures were passing within about 40 m of the rising
+        //   ground — tight enough that ordinary tracking error would have hit it.
+        //
+        //   So the aerodrome now sits on a CIRCULAR PLAIN of radius 3.2 km, blended out
+        //   over 900 m, which is both what a real aerodrome sits on and what makes a
+        //   departure turn safe: at 3.2 km a climbing C172 is near 350 m, well above the
+        //   terrain as it starts to rise. The long approach corridor on -Z is kept
+        //   unchanged, because the 12 km straight-in still needs it.
+        //
+        //   Flattening only ever LOWERS terrain, so this cannot make any previously
+        //   verified mission less safe.
+        float rad = Mathf.Sqrt(x * x + z * z);
+        float dPlain = Mathf.Max(0f, rad - 3200f);
+
         float ax = Mathf.Max(0f, Mathf.Abs(x) - 260f);
-        float az = z < 0f ? Mathf.Max(0f, -z - 10000f) : Mathf.Max(0f, z - 1600f);
-        float d = Mathf.Sqrt(ax * ax + az * az);
-        float f = 1f - Smooth(0f, 700f, d);
+        float az = z < 0f ? Mathf.Max(0f, -z - 10000f) : 0f;
+        float dCorridor = Mathf.Sqrt(ax * ax + az * az);
+
+        float d = Mathf.Min(dPlain, dCorridor);
+        float f = 1f - Smooth(0f, 900f, d);
         return Mathf.Lerp(y, 0f, f);
     }
 
@@ -366,6 +390,12 @@ public static class WorldBuilder
     // Ground height = the SAME function that built the heightmap, so settlements
     // sit exactly on the terrain surface (no SampleHeight offset ambiguity).
     static float GroundY(float x, float z) => Height(x, z);
+
+    /// <summary>Terrain height at a world position, exposed so the mission battery can
+    /// check that a mission's nominal track actually clears the ground. It is the SAME
+    /// function that built the heightmap, so the check tests the terrain that exists
+    /// rather than an approximation of it.</summary>
+    public static float SampleGroundY(float x, float z) => Height(x, z);
 
     // ================= WATER =================
     static void BuildWater(Transform parent)

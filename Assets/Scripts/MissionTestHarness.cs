@@ -164,6 +164,37 @@ public class MissionTestHarness : MonoBehaviour
                             $"{l.Id}={l.Profile.PLI:F1} {md.Id}={md.Profile.PLI:F1} {h.Id}={h.Profile.PLI:F1}");
             }
 
+        // (e2) WITHIN-CELL EXCHANGEABILITY. The three variants of a cell are supposed to
+        // be interchangeable realisations of it, so their PREDICTED loads must agree. If
+        // variant 2 of a MEDIUM cell scores 17 points above variant 1, the two are not
+        // two versions of MEDIUM — one of them is drifting toward the next class, and a
+        // participant's workload class would depend on which variant they happened to be
+        // assigned. That is variant becoming a confound with class, which is precisely
+        // what the rotation is designed to prevent.
+        //
+        // 8 points on a 0-100 scale is the declared tolerance: tight enough to mean
+        // something, loose enough to permit variants that genuinely load different
+        // dimensions. This check found a real defect when it was written — the new
+        // variants had been anchored one point high on MentalDemand across the board,
+        // giving within-cell spreads up to 17.5. See FINAL_CHANGE_REPORT.md.
+        const float VariantPliTolerance = 8f;
+        foreach (var phase in MissionLibrary.Rows)
+            foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+            {
+                float lo = 1e9f, hi = -1e9f; string detail = "";
+                for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+                {
+                    var mm = MissionLibrary.Cell(phase, c, v);
+                    if (mm == null) continue;
+                    float pli = mm.Profile.PLI;
+                    lo = Mathf.Min(lo, pli); hi = Mathf.Max(hi, pli);
+                    detail += $"{mm.Id}={pli:F1} ";
+                }
+                if (hi - lo > VariantPliTolerance)
+                    Problem("design", $"{phase}/{c}: variants disagree on predicted load by " +
+                            $"{hi - lo:F1} (tolerance {VariantPliTolerance:F0})  [{detail.Trim()}]");
+            }
+
         // (f) Every mission must carry the metadata a reader needs to reproduce it. An
         // empty rationale is how a mission that cannot be defended gets into a bank.
         foreach (var m in all)
@@ -204,9 +235,106 @@ public class MissionTestHarness : MonoBehaviour
             }
         }
 
+        CheckTerrainClearance();
         WriteVariantEquivalenceTable();
         report.AppendLine(problems.Count == 0 ? "design checks: OK" : "design checks: " + problems.Count + " PROBLEM(S)");
         report.AppendLine();
+    }
+
+    /// <summary>Fly every mission's NOMINAL track against the real terrain and report the
+    /// minimum clearance.
+    ///
+    /// WHY THIS EXISTS
+    ///   The aerodrome sits on a flattened pad — 260 m either side of the centreline,
+    ///   1.6 km out on departure — and beyond it the ground rises to about 350 m. A
+    ///   mission that assigns a heading off the runway axis at a low altitude therefore
+    ///   sends the aeroplane into a hill, and NOTHING in the mission table shows it: the
+    ///   numbers look perfectly reasonable, and the failure only appears when someone
+    ///   flies it. It appeared exactly that way here — M1V2 assigned a 330 degree
+    ///   departure and the battery reported "Destroyed (terrain impact)" at 131 m.
+    ///
+    ///   Checking clearance by eye does not scale to 42 missions and would not survive
+    ///   the next edit. So the nominal track is reconstructed from the mission's own
+    ///   assigned headings and altitudes, the terrain is sampled underneath it, and a
+    ///   mission whose clearance falls below the margin is a design failure — not a
+    ///   flyability note.
+    ///
+    /// WHAT IT IS NOT
+    ///   It checks the NOMINAL track — the one a perfectly-flying pilot follows. A
+    ///   participant who wanders 500 m off track can still find terrain, which is a
+    ///   property of flying near hills and is what the crash detection is for. The
+    ///   margin below is deliberately generous to absorb ordinary tracking error.</summary>
+    void CheckTerrainClearance()
+    {
+        const float MarginM = 90f;      // required clearance below the nominal track
+        const float StepM = 120f;       // sample spacing along the track
+        const float TrackM = 7000f;     // how far out to check
+
+        var sb = new StringBuilder();
+        sb.AppendLine("terrain clearance along each mission's nominal track (margin " + MarginM.ToString("F0") + " m):");
+        foreach (var m in MissionLibrary.All())
+        {
+            // Reconstruct the assigned heading/altitude the mission ends up on: start
+            // with its declared targets, then apply every scheduled target change.
+            float hdg = m.TargetHeadingDeg, alt = m.TargetAltitudeM;
+            float climbAlt = alt;
+            foreach (var e in m.Events)
+            {
+                if (e.Type == ScenarioEventType.HeadingChange) hdg = e.Value;
+                if (e.Type == ScenarioEventType.AltitudeChange) { alt = e.Value; climbAlt = Mathf.Min(climbAlt, e.Value); }
+            }
+            // THE FLIGHT PROFILE. Taken from flown telemetry, not assumed: L1's recorded
+            // climb-out is 59 m at z=712, 144 m at z=1513, 236 m at z=2314 — a steady
+            // 11% gradient from a lift-off point near the departure end of the runway.
+            // An earlier version of this check assumed 7% from the THRESHOLD and
+            // reported every mission as failing, including the verified ones. A check
+            // that cries wolf on known-good missions is worse than no check, because
+            // the first thing anyone does is stop believing it.
+            bool landing = m.Goal == ScenarioGoal.Land;
+            bool ground0 = m.Start == ScenarioStart.Runway || m.Goal == ScenarioGoal.TaxiTakeoff;
+            Vector3 p0 = landing ? m.StartPos
+                       : ground0 ? new Vector3(0f, 0f, Aerodrome.RunwayHalfLength) : m.StartPos;
+            // A landing mission's profile is the approach path: from where it starts to
+            // the runway threshold, over the ACTUAL distance between them.
+            Vector3 thr = new Vector3(0f, 0f, Aerodrome.ThresholdZ);
+            float approachRun = landing ? Vector3.Distance(new Vector3(p0.x, 0f, p0.z), thr) : 0f;
+
+            float worst = 1e9f; float worstAt = 0f; Vector3 worstP = p0;
+            Vector3 dir = landing ? (thr - new Vector3(p0.x, 0f, p0.z)).normalized
+                                  : new Vector3(Mathf.Sin(hdg * Mathf.Deg2Rad), 0f, Mathf.Cos(hdg * Mathf.Deg2Rad));
+            float span = landing ? approachRun : TrackM;
+            for (float d = 0f; d <= span; d += StepM)
+            {
+                Vector3 p = p0 + dir * d;
+                float here = landing
+                           ? Mathf.Lerp(m.StartAltitudeM, 0f, Mathf.Clamp01(d / Mathf.Max(1f, approachRun)))
+                           : Mathf.Min(alt, m.StartAltitudeM + d * 0.11f);
+                // SKIP the parts of the profile that are DELIBERATELY near the ground:
+                // the take-off roll and initial climb, and the flare. A clearance check
+                // that flags an aeroplane for being 20 ft up on short final is measuring
+                // the wrong thing, and would bury the one real hit among 24 false ones —
+                // which is exactly what the first version of this check did.
+                if (here < 60f) continue;
+                float gY = WorldBuilder.SampleGroundY(p.x, p.z);
+                // Only measure against ground that is actually RISING. The aerodrome
+                // plain is at elevation zero, so over it "clearance" is simply the
+                // aeroplane's height, and a climb-out passing 66 m over flat grass is
+                // not a terrain problem — flagging it would bury the real hits. What
+                // this check is for is ground that comes UP to meet the aeroplane.
+                if (gY < 20f) continue;
+                float clear = here - gY;
+                if (clear < worst) { worst = clear; worstAt = d; worstP = p; }
+            }
+            if (worst > 1e8f)
+            { report.AppendLine($"   {m.Id,-6} hdg {hdg,5:F0}  alt {alt,5:F0}  no rising terrain on the nominal track"); continue; }
+            string line = $"   {m.Id,-6} hdg {hdg,5:F0}  alt {alt,5:F0}  min clearance {worst,7:F0} m at {worstAt,5:F0} m out";
+            sb.AppendLine(line);
+            if (worst < MarginM)
+                Problem("design", $"{m.Id}: nominal track clears terrain by only {worst:F0} m " +
+                        $"(need {MarginM:F0}) at {worstAt:F0} m out on heading {hdg:F0}, " +
+                        $"x={worstP.x:F0} z={worstP.z:F0}");
+        }
+        report.Append(sb.ToString());
     }
 
     /// <summary>Write the a-priori half of the variant-exchangeability evidence: for
@@ -479,7 +607,15 @@ public class MissionTestHarness : MonoBehaviour
         else
         {
             wantAlt = eng.CurTargetAlt;
-            wantHdg = eng.CurTargetHdg;
+            // NAVIGATION. On a Navigate-goal mission the assigned HEADING is not where
+            // the aeroplane should point — the WAYPOINT is. Without this the scripted
+            // pilot flew the mission's initial heading forever and every navigation
+            // mission was reported INCOMPLETE, which looks like a broken mission and is
+            // actually a blind autopilot.
+            wantHdg = (eng.HasWaypoint && eng.Current != null && eng.Current.Goal == ScenarioGoal.Navigate)
+                    ? Mathf.Atan2(eng.WaypointPos.x - ac.transform.position.x,
+                                  eng.WaypointPos.z - ac.transform.position.z) * Mathf.Rad2Deg
+                    : eng.CurTargetHdg;
             wantSpeed = 180f;                                  // cruise / climb
         }
         if (engineOut) wantSpeed = 130f;                       // best glide

@@ -1,86 +1,136 @@
 MISSION TEST REPORT
 ===================
-generated 2026-08-23 10:36:14
+generated 2026-08-24 13:58:39
 unity 6000.0.77f1   timeScale 8
 
+BANK DESIGN CHECKS
+------------------
+bank: 42 missions  (36 cognitive axis, 6 psychomotor axis)
+   L1     hdg     0  alt   600  no rising terrain on the nominal track
+   L2     hdg     0  alt   900  no rising terrain on the nominal track
+   L3     hdg     0  alt   700  no rising terrain on the nominal track
+   L4     hdg     0  alt   500  no rising terrain on the nominal track
+   M4     hdg     0  alt   500  no rising terrain on the nominal track
+   H2     hdg     0  alt   900  no rising terrain on the nominal track
+   H4     hdg     0  alt   500  no rising terrain on the nominal track
+   L1V2   hdg     0  alt   600  no rising terrain on the nominal track
+   L2V2   hdg     0  alt   800  no rising terrain on the nominal track
+   L4V2   hdg     0  alt   500  no rising terrain on the nominal track
+   M2V2   hdg     0  alt   800  no rising terrain on the nominal track
+   M4V2   hdg     0  alt   500  no rising terrain on the nominal track
+   H2V2   hdg     0  alt   900  no rising terrain on the nominal track
+   H3V2   hdg     0  alt   850  no rising terrain on the nominal track
+   H4V2   hdg     0  alt   500  no rising terrain on the nominal track
+   L1V3   hdg     0  alt   800  no rising terrain on the nominal track
+   L3V3   hdg     0  alt   700  no rising terrain on the nominal track
+   L4V3   hdg     0  alt   400  no rising terrain on the nominal track
+   M1V3   hdg     0  alt   600  no rising terrain on the nominal track
+   M2V3   hdg   350  alt   850  no rising terrain on the nominal track
+   M3V3   hdg     0  alt   700  no rising terrain on the nominal track
+   M4V3   hdg     0  alt   500  no rising terrain on the nominal track
+   H1V3   hdg     0  alt   600  no rising terrain on the nominal track
+   H4V3   hdg   300  alt   600  no rising terrain on the nominal track
+   XT1    hdg     0  alt   600  no rising terrain on the nominal track
+   XL1    hdg     0  alt   500  no rising terrain on the nominal track
+   XT2    hdg     0  alt   600  no rising terrain on the nominal track
+   XL2    hdg     0  alt   500  no rising terrain on the nominal track
+   XT3    hdg     0  alt   600  no rising terrain on the nominal track
+   XL3    hdg     0  alt   500  no rising terrain on the nominal track
+terrain clearance along each mission's nominal track (margin 90 m):
+   M1     hdg    40  alt   700  min clearance     287 m at  3600 m out
+   M2     hdg   330  alt   900  min clearance     522 m at  2640 m out
+   M3     hdg    20  alt   780  min clearance     681 m at  5640 m out
+   H1     hdg   320  alt   800  min clearance     244 m at  3600 m out
+   H3     hdg    60  alt   500  min clearance     216 m at  4560 m out
+   L3V2   hdg    20  alt   700  min clearance     601 m at  5640 m out
+   M1V2   hdg   340  alt   750  min clearance     243 m at  3720 m out
+   M3V2   hdg   315  alt   900  min clearance     739 m at  5160 m out
+   H1V2   hdg    25  alt   600  min clearance     297 m at  3480 m out
+   L2V3   hdg   340  alt   700  min clearance     554 m at  2280 m out
+   H2V3   hdg    50  alt   800  min clearance     595 m at  2760 m out
+   H3V3   hdg    10  alt   600  min clearance     524 m at  5760 m out
+wrote variant_equivalence.csv
+design checks: OK
+
+QUICK MODE: one variant index only (12 missions).
 missions queued: 12
 
 ── L1  Normal departure from the stand  [LOW]  PLI 28.0
-   telemetry: 15001 rows x 77 cols, monotonic  OK
-   events: 23 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN WAYPOINT
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 24 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN WAYPOINT
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
    restart: new trial folder allocated  OK
    restart: systems reset clean  OK
    restart: mission clock reset  OK
-   telemetry: 15001 rows x 77 cols, monotonic  OK
-   events: 23 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN WAYPOINT
-   scripted-pilot outcome: SUCCESS
-   in-task baseline: 2999 rows  OK
-
-── L2  Steady assigned climb  [LOW]  PLI 18.0
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 9 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TARGET_CHANGE TLX_START TLX_SUBMIT
-   scripted-pilot outcome: SUCCESS
-   in-task baseline: 2999 rows  OK
-
-── L3  Straight-and-level cruise hold  [LOW]  PLI 12.8
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 8 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TLX_START TLX_SUBMIT
-   scripted-pilot outcome: SUCCESS
-   in-task baseline: 2999 rows  OK
-
-── L4  Routine approach and landing  [LOW]  PLI 29.3
-   telemetry: 14392 rows x 77 cols, monotonic  OK
-   events: 13 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TLX_START TLX_SUBMIT TOUCHDOWN
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 24 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN WAYPOINT
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
 ── M1  Departure with traffic and a two-part clearance  [MEDIUM]  PLI 52.8
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 33 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN TRAFFIC_ONSET WAYPOINT WEATHER_END WEATHER_ONSET
-   scripted-pilot outcome: SUCCESS
-   in-task baseline: 2999 rows  OK
-
-── M2  Cabin door opens on the climb-out  [MEDIUM]  PLI 49.8
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 18 rows; ATC_MESSAGE BASELINE_END BASELINE_START CUE_ONSET MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TRIGGER_ARMED WARNING_APPEARS
-   scripted-pilot outcome: SUCCESS
-   in-task baseline: 2999 rows  OK
-
-── M3  Multi-part ATC re-clearances in the cruise  [MEDIUM]  PLI 49.5
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 22 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT
-   scripted-pilot outcome: SUCCESS
-   in-task baseline: 2999 rows  OK
-
-── M4  Deteriorating weather and a late runway change  [MEDIUM]  PLI 57.5
-   telemetry: 14309 rows x 77 cols, monotonic  OK
-   events: 21 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PROBE_HIT PROBE_ONSET TLX_START TLX_SUBMIT TOUCHDOWN WEATHER_END WEATHER_ONSET
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 30 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN TRAFFIC_ONSET WAYPOINT WEATHER_END WEATHER_ONSET
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
 ── H1  Amended clearance, blocked runway, departure conflict  [HIGH]  PLI 87.0
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 35 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START DECISION_MADE DECISION_PROMPT MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE PROBE_HIT TARGET_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN TRAFFIC_ONSET WAYPOINT WEATHER_END WEATHER_ONSET
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 41 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START DECISION_MADE DECISION_PROMPT MISSION_END MISSION_START MISSION_SUCCESS PHASE_CHANGE PROBE_HIT TARGET_CHANGE TLX_START TLX_SUBMIT TOUCHDOWN TRAFFIC_ONSET WAYPOINT WEATHER_END WEATHER_ONSET
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
-── H2  Alternator failure on the departure climb  [HIGH]  PLI 78.8
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 27 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET DECISION_MADE DECISION_PROMPT FAILURE_RESOLVED MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TRIGGER_ARMED
+── L2V2  Assigned climb with one amendment  [LOW]  PLI 12.8
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 10 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TARGET_CHANGE TLX_START TLX_SUBMIT
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
-── H3  Unreliable instruments in the cruise  [HIGH]  PLI 86.0
-   telemetry: 15000 rows x 77 cols, monotonic  OK
-   events: 27 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET DECISION_MADE DECISION_PROMPT FAILURE_RESOLVED MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE TARGET_CHANGE TLX_START TLX_SUBMIT TRIGGER_ARMED WEATHER_END WEATHER_ONSET
+── M2V2  Carburettor ice on the climb  [MEDIUM]  PLI 51.8
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 24 rows; ATC_MESSAGE BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET FAILURE_RESOLVED MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TRIGGER_ARMED
+   scripted-pilot outcome: SUCCESS
+   in-task baseline: 2999 rows  OK
+
+── H2V2  Partial power loss after take-off — the turn-back decision  [HIGH]  PLI 84.3
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 27 rows; ATC_MESSAGE BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET DECISION_MADE DECISION_PROMPT MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TRIGGER_ARMED WARNING_APPEARS
+   scripted-pilot outcome: SUCCESS
+   in-task baseline: 2999 rows  OK
+
+── L3V3  Single-waypoint navigation  [LOW]  PLI 14.8
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 8 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_FAILURE MISSION_START TLX_START TLX_SUBMIT
+   scripted-pilot outcome: INCOMPLETE   <- review flyability, not a test failure
+   in-task baseline: 2999 rows  OK
+
+── M3V3  Traffic search in reduced visibility  [MEDIUM]  PLI 53.3
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 18 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PROBE_HIT PROBE_ONSET TLX_START TLX_SUBMIT TRAFFIC_ONSET WEATHER_END WEATHER_ONSET
+   scripted-pilot outcome: SUCCESS
+   in-task baseline: 2999 rows  OK
+
+── H3V3  Everything at once in the cruise  [HIGH]  PLI 89.5
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 33 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE PROBE_HIT PROBE_ONSET TARGET_CHANGE TLX_START TLX_SUBMIT TRAFFIC_ONSET TRIGGER_ARMED WARNING_APPEARS
+   scripted-pilot outcome: SUCCESS
+   in-task baseline: 2999 rows  OK
+
+── L4  Routine approach and landing  [LOW]  PLI 29.3
+   telemetry: 14227 rows x 82 cols, monotonic  OK
+   events: 19 rows; ATC_MESSAGE BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS TLX_START TLX_SUBMIT TOUCHDOWN
+   scripted-pilot outcome: SUCCESS
+   in-task baseline: 2999 rows  OK
+
+── M4  Deteriorating weather and a late runway change  [MEDIUM]  PLI 57.5
+   telemetry: 14217 rows x 82 cols, monotonic  OK
+   events: 27 rows; ATC_MESSAGE ATC_READBACK_OK BASELINE_END BASELINE_START MISSION_END MISSION_START MISSION_SUCCESS PROBE_HIT PROBE_ONSET TLX_START TLX_SUBMIT TOUCHDOWN WEATHER_END WEATHER_ONSET
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
 ── H4  Engine failure on the approach  [HIGH]  PLI 76.3
-   telemetry: 15001 rows x 77 cols, monotonic  OK
-   events: 28 rows; ATC_MESSAGE BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET DECISION_MADE DECISION_PROMPT MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE TLX_START TLX_SUBMIT TOUCHDOWN TRIGGER_ARMED WARNING_APPEARS
+   telemetry: 15000 rows x 82 cols, monotonic  OK
+   events: 34 rows; ATC_MESSAGE BASELINE_END BASELINE_START CHECKLIST_COMPLETE CHECKLIST_ITEM CHECKLIST_START CONFIGURATION_CHANGE CUE_ONSET DECISION_MADE DECISION_PROMPT MISSION_END MISSION_START MISSION_SUCCESS PILOT_FIRST_RESPONSE TLX_START TLX_SUBMIT TOUCHDOWN TRIGGER_ARMED WARNING_APPEARS
    scripted-pilot outcome: SUCCESS
    in-task baseline: 2999 rows  OK
 
@@ -88,7 +138,7 @@ SUMMARY
 -------
 missions run : 12
 problems     : 0
-scripted-pilot outcomes: L1=SUCCESS  L1=SUCCESS  L2=SUCCESS  L3=SUCCESS  L4=SUCCESS  M1=SUCCESS  M2=SUCCESS  M3=SUCCESS  M4=SUCCESS  H1=SUCCESS  H2=SUCCESS  H3=SUCCESS  H4=SUCCESS
+scripted-pilot outcomes: L1=SUCCESS  L1=SUCCESS  M1=SUCCESS  H1=SUCCESS  L2V2=SUCCESS  M2V2=SUCCESS  H2V2=SUCCESS  L3V3=INCOMPLETE  M3V3=SUCCESS  H3V3=SUCCESS  L4=SUCCESS  M4=SUCCESS  H4=SUCCESS
   (outcomes are a flyability sanity check, NOT part of the pass/fail.
    The scripted pilot is a crude autopilot, not a model of a participant.)
   (none)

@@ -86,7 +86,8 @@ public class MenuUI : MonoBehaviour
         GUILayout.Space(4);
 
         var missions = MissionLibrary.ForClass((WorkloadClass)classIdx);
-        GUILayout.Label(ClassNames[classIdx] + " — " + missions.Count + " missions, one per flight phase, each " +
+        GUILayout.Label(ClassNames[classIdx] + " — " + missions.Count + " cognitive-axis missions (" +
+                        MissionLibrary.VariantCount + " variants x 4 phases), each " +
                         MissionLibrary.StandardDurationS.ToString("F0") + " s with a " +
                         MissionLibrary.StandardBaselineS.ToString("F0") + " s in-task baseline", small);
 
@@ -103,22 +104,45 @@ public class MenuUI : MonoBehaviour
         }
         GUILayout.EndScrollView();
 
-        // The design grid, so the experimenter can see at a glance that phase is fully
-        // crossed with workload class — which is the point of this mission set.
-        GUILayout.Label("DESIGN GRID  (phase x class, fully crossed — every class appears in every phase)", body);
-        GUILayout.Label("   " + "PHASE".PadRight(11) + "LOW".PadRight(6) + "MEDIUM".PadRight(8) + "HIGH", small);
-        foreach (FlightPhase ph in new[] { FlightPhase.Takeoff, FlightPhase.Climb, FlightPhase.Cruise, FlightPhase.Approach })
+        // THE DESIGN GRID. Shows every variant of every cell, and marks the one THIS
+        // participant is assigned, so the operator can see both the bank and the session
+        // at a glance. (The previous version displayed only the last mission matching
+        // each cell, which once variants existed meant it silently showed variant 3 and
+        // looked as though the bank had one mission per cell.)
+        int pnum = ParticipantManager.IsSet
+                 ? ExperimentSession.StableNumber(ParticipantManager.ID) + (ParticipantManager.Session - 1) : 0;
+        GUILayout.Label("DESIGN GRID — cognitive axis  (" + MissionLibrary.CognitiveAxis().Count +
+                        " missions: 4 phases x 3 classes x " + MissionLibrary.VariantCount +
+                        " variants).  * = assigned to this participant.", body);
+        GUILayout.Label("   " + "PHASE".PadRight(10) + "v".PadRight(3) +
+                        "LOW".PadRight(14) + "MEDIUM".PadRight(14) + "HIGH", small);
+        foreach (FlightPhase ph in MissionLibrary.Rows)
         {
-            string row = "   " + ph.ToString().ToUpper().PadRight(11);
-            foreach (WorkloadClass wc in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+            int assigned = MissionLibrary.VariantForRow(pnum, ph);
+            for (int v = 1; v <= MissionLibrary.VariantCount; v++)
             {
-                string cell = "—";
-                foreach (var mm in MissionLibrary.All())
-                    if (mm.Phase == ph && mm.Class == wc) cell = mm.Id + " " + mm.Profile.PLI.ToString("F0");
-                row += cell.PadRight(wc == WorkloadClass.Low ? 6 : 8);
+                string row = "   " + (v == 1 ? ph.ToString().ToUpper().PadRight(10) : "".PadRight(10));
+                row += ((v == assigned ? "*" : " ") + v).PadRight(3);
+                foreach (WorkloadClass wc in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+                {
+                    var mm = MissionLibrary.Cell(ph, wc, v);
+                    row += (mm == null ? "—" : mm.Id + " " + mm.Profile.PLI.ToString("F0")).PadRight(14);
+                }
+                GUILayout.Label(row, small);
             }
-            GUILayout.Label(row, small);
         }
+        GUILayout.Label("   this participant flies: " + ExperimentSessionRowSummary(pnum), small);
+
+        // THE SECOND AXIS, shown separately because it IS separate. Crosswind raises
+        // manual demand by construction, so these are never pooled with the cognitive
+        // scale and the operator must not be able to mistake them for part of it.
+        GUILayout.Space(4);
+        GUILayout.Label("SECOND AXIS — psychomotor-integrated (crosswind).  NOT on the Low/Medium/High " +
+                        "cognitive scale; analysed separately with the control-activity covariates.", body);
+        string xrow = "   ";
+        foreach (var mm in MissionLibrary.PsychomotorAxis())
+            xrow += mm.Id + " " + mm.CrosswindMs.ToString("F1") + "m/s   ";
+        GUILayout.Label(xrow, small);
 
         GUILayout.Space(6);
         GUILayout.Label(
@@ -129,6 +153,20 @@ public class MenuUI : MonoBehaviour
             "TASK     SPACE acknowledge / checklist item      C view   R restart   Esc menu",
             small);
         GUILayout.EndArea();
+    }
+
+    /// <summary>"Takeoff v2 · Climb v3 · Cruise v1 · Approach v2" — the variant this
+    /// participant is assigned in each phase row, computed the same way the session
+    /// builder computes it so the display cannot drift from what is actually flown.</summary>
+    static string ExperimentSessionRowSummary(int pnum)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int r = 0; r < MissionLibrary.Rows.Length; r++)
+        {
+            if (r > 0) sb.Append(" · ");
+            sb.Append(MissionLibrary.Rows[r]).Append(" v").Append(MissionLibrary.VariantForRow(pnum, MissionLibrary.Rows[r]));
+        }
+        return sb.ToString();
     }
 
     void DrawDetail(GameManager gm)

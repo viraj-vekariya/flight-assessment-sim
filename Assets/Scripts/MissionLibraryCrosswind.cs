@@ -82,9 +82,16 @@ public static class MissionLibraryCrosswind
 
     static string Kt(float ms) => Mathf.RoundToInt(ms * 1.94384f).ToString();
 
+    /// <summary>Class labels the crosswind LEVEL, not a position on the cognitive
+    /// scale. The two cannot be confused because every accessor filters on Axis, and a
+    /// crosswind HIGH and a cognitive HIGH are never pooled.</summary>
+    static WorkloadClass ClassOfLevel(int level) =>
+        level == 0 ? WorkloadClass.Low : level == 1 ? WorkloadClass.Medium : WorkloadClass.High;
+
     static MissionDefinition Common(MissionDefinition m, int level)
     {
         m.Axis = LoadAxis.PsychomotorIntegrated;
+        m.Class = ClassOfLevel(level);
         m.Variant = level + 1;
         m.Mechanism = "psychomotor-integrated demand at a graded crosswind, with an isolated limit decision";
         // Headwind held at a constant 3 m/s so that only the CROSS component varies:

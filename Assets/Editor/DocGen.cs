@@ -21,7 +21,7 @@ public static class DocGen
         var ci = CultureInfo.InvariantCulture;
         var sb = new StringBuilder();
 
-        sb.AppendLine("# FINAL_MISSION_DESIGN — the twelve cognitive-workload missions");
+        sb.AppendLine("# FINAL_MISSION_DESIGN — the mission bank");
         sb.AppendLine();
         sb.AppendLine("> **This file is GENERATED from `Assets/Scripts/MissionLibrary.cs` by");
         sb.AppendLine("> `Assets/Editor/DocGen.cs`. Do not edit it by hand — edit the mission set");
@@ -32,18 +32,41 @@ public static class DocGen
         sb.AppendLine("Every mission is **" + MissionLibrary.StandardDurationS.ToString("F0", ci) +
                       " s** long with a **" + MissionLibrary.StandardBaselineS.ToString("F0", ci) +
                       " s in-task baseline** at its head. Duration is held constant across all three");
-        sb.AppendLine("workload classes on purpose — see `EXPERIMENT_PROTOCOL.md`.");
+        sb.AppendLine("workload classes on purpose — see `FINAL_EXPERIMENT_PROTOCOL.md`.");
+        sb.AppendLine();
+        sb.AppendLine("## The bank, and the session");
+        sb.AppendLine();
+        sb.AppendLine("The bank holds **" + MissionLibrary.All().Count + " missions** on **two experimental axes**:");
+        sb.AppendLine();
+        sb.AppendLine("* **Cognitive axis — " + MissionLibrary.CognitiveAxis().Count + " missions.** 4 flight phases x 3 workload");
+        sb.AppendLine("  classes x " + MissionLibrary.VariantCount + " interchangeable variants. Manual demand is MATCHED within each");
+        sb.AppendLine("  phase row, which is what licenses reading a class difference as cognitive rather");
+        sb.AppendLine("  than muscular.");
+        sb.AppendLine("* **Psychomotor-integrated axis — " + MissionLibrary.PsychomotorAxis().Count + " missions.** Crosswind take-offs and");
+        sb.AppendLine("  landings at graded crosswind levels. Deliberately NOT on the Low/Medium/High");
+        sb.AppendLine("  scale: crosswind raises manual demand by construction, so putting it there would");
+        sb.AppendLine("  break the matching the cognitive axis depends on. Analysed separately, with the");
+        sb.AppendLine("  control-activity covariates, and its cognitive component isolated as a discrete");
+        sb.AppendLine("  continue-or-abandon decision against a stated crosswind limit.");
+        sb.AppendLine();
+        sb.AppendLine("**A participant flies TWELVE**, not " + MissionLibrary.All().Count + ": one variant index per phase row,");
+        sb.AppendLine("rotated by Latin square. " + MissionLibrary.All().Count + " x " + MissionLibrary.StandardDurationS.ToString("F0", ci) + " s is over three hours of flying inside one");
+        sb.AppendLine("EEG session, and fatigue would dominate every contrast the study exists to measure.");
+        sb.AppendLine("Within a phase row all three classes share one variant, so the Low-Medium-High");
+        sb.AppendLine("contrast is always variant-matched; across rows the participant meets different");
+        sb.AppendLine("variants, so variant is not perfectly nested in participant. See `MISSION_BANK_DESIGN.md`.");
         sb.AppendLine();
 
         // ---- summary table ----
         sb.AppendLine("## Final mission table");
         sb.AppendLine();
-        sb.AppendLine("| ID | Class | Mission | Primary workload mechanism | Main abnormality | Time pressure | Multitasking | Decision complexity | PLI |");
-        sb.AppendLine("|----|-------|---------|----------------------------|------------------|---------------|--------------|---------------------|-----|");
+        sb.AppendLine("| ID | Axis | Phase | Class | v | Mission | Cognitive mechanism | Main abnormality | Time pressure | Multitasking | Decision complexity | PLI |");
+        sb.AppendLine("|----|------|-------|-------|---|---------|---------------------|------------------|---------------|--------------|---------------------|-----|");
         foreach (var m in MissionLibrary.All())
         {
-            sb.AppendLine("| " + m.Id + " | " + m.ClassTag + " | " + m.Name + " | " +
-                          Mechanism(m) + " | " + Abnormality(m) + " | " +
+            sb.AppendLine("| " + m.Id + " | " + (m.Axis == LoadAxis.Cognitive ? "cog" : "psy") + " | " +
+                          m.Phase + " | " + m.ClassTag + " | " + m.Variant + " | " + m.Name + " | " +
+                          (string.IsNullOrEmpty(m.Mechanism) ? Mechanism(m) : m.Mechanism) + " | " + Abnormality(m) + " | " +
                           Bar(m.Profile.TemporalDemand) + " | " +
                           Bar(m.Profile.AttentionSwitching) + " | " +
                           Bar(m.Profile.DecisionComplexity) + " | " +
@@ -60,27 +83,72 @@ public static class DocGen
         sb.AppendLine("Every class appears exactly once in every phase, so a class effect can never be");
         sb.AppendLine("a phase effect, and every mission has a phase-matched LOW baseline.");
         sb.AppendLine();
-        sb.AppendLine("| Flight phase | LOW | MEDIUM | HIGH | manual demand (L/M/H) |");
-        sb.AppendLine("|---|---|---|---|---|");
-        foreach (FlightPhase ph in new[] { FlightPhase.Takeoff, FlightPhase.Climb, FlightPhase.Cruise, FlightPhase.Approach })
-        {
-            string row = "| **" + ph.ToString() + "** ";
-            string man = "| ";
-            bool any = false;
+        sb.AppendLine("| Flight phase | v | LOW | MEDIUM | HIGH | manual demand (L/M/H) |");
+        sb.AppendLine("|---|---|---|---|---|---|");
+        foreach (FlightPhase ph in MissionLibrary.Rows)
+            for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+            {
+                string row = "| " + (v == 1 ? "**" + ph.ToString() + "**" : "") + " | " + v + " ";
+                string man = "| ";
+                foreach (WorkloadClass wc in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
+                {
+                    var mm = MissionLibrary.Cell(ph, wc, v);
+                    row += "| " + (mm == null ? "—" : mm.Id + " " + mm.Name + " (PLI " + mm.Profile.PLI.ToString("F0", ci) + ")") + " ";
+                    man += (wc == WorkloadClass.Low ? "" : "/") + (mm == null ? "—" : mm.Profile.ManualControl.ToString());
+                }
+                sb.AppendLine(row + man + " |");
+            }
+        sb.AppendLine();
+
+        // ---- within-cell exchangeability ----
+        sb.AppendLine("## Variant exchangeability (design check)");
+        sb.AppendLine();
+        sb.AppendLine("The variants of a cell are supposed to be interchangeable realisations of it, so");
+        sb.AppendLine("their PREDICTED loads must agree. A variant scoring well above its siblings is not");
+        sb.AppendLine("a second version of that class — it is drifting toward the next one, and since");
+        sb.AppendLine("variant is assigned by participant, a participant's effective class would then");
+        sb.AppendLine("depend on which variant they were given. Tolerance: **8 points on the 0-100 PLI**,");
+        sb.AppendLine("enforced by the mission battery.");
+        sb.AppendLine();
+        sb.AppendLine("| Cell | " + JoinVariantHeaders() + " | spread | within tolerance |");
+        sb.AppendLine("|---|" + RepeatCol(MissionLibrary.VariantCount + 2) + "|");
+        foreach (FlightPhase ph in MissionLibrary.Rows)
             foreach (WorkloadClass wc in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
             {
-                string cell = "—"; string mm2 = "—";
-                foreach (var mm in MissionLibrary.All())
-                    if (mm.Phase == ph && mm.Class == wc)
-                    { cell = mm.Id + " " + mm.Name + " (PLI " + mm.Profile.PLI.ToString("F0", ci) + ")";
-                      mm2 = mm.Profile.ManualControl.ToString(); any = true; }
-                row += "| " + cell + " ";
-                man += (wc == WorkloadClass.Low ? "" : "/") + mm2;
+                float lo = 1e9f, hi = -1e9f;
+                string cells = "";
+                for (int v = 1; v <= MissionLibrary.VariantCount; v++)
+                {
+                    var mm = MissionLibrary.Cell(ph, wc, v);
+                    if (mm == null) { cells += "| — "; continue; }
+                    float pv = mm.Profile.PLI;
+                    lo = Mathf.Min(lo, pv); hi = Mathf.Max(hi, pv);
+                    cells += "| " + mm.Id + " " + pv.ToString("F1", ci) + " ";
+                }
+                float sp = hi - lo;
+                sb.AppendLine("| " + ph + "/" + wc.ToString().ToUpper() + " " + cells +
+                              "| " + sp.ToString("F1", ci) + " | " + (sp <= 8f ? "yes" : "**NO**") + " |");
             }
-            if (any) sb.AppendLine(row + man + " |");
-        }
         sb.AppendLine();
-        sb.AppendLine("Manual demand is matched WITHIN each phase row (spread <= 1 on a 0-4 scale), which");
+
+        // ---- the second axis ----
+        sb.AppendLine("## The psychomotor-integrated axis (crosswind)");
+        sb.AppendLine();
+        sb.AppendLine("| ID | Mission | Crosswind | Headwind | Gust | Surface wind | Manual demand | PLI |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|");
+        foreach (var m in MissionLibrary.PsychomotorAxis())
+            sb.AppendLine("| " + m.Id + " | " + m.Name + " | " + m.CrosswindMs.ToString("F1", ci) + " m/s | " +
+                          m.HeadwindMs.ToString("F1", ci) + " m/s | " + m.WindGustMs.ToString("F1", ci) + " m/s | " +
+                          m.WindReport + " | " + m.Profile.ManualControl + " | " + m.Profile.PLI.ToString("F0", ci) + " |");
+        sb.AppendLine();
+        sb.AppendLine("These PLI values are **not comparable with the cognitive axis's**: they come from");
+        sb.AppendLine("the same weighted model, but the model deliberately weights ManualControl LOW, and");
+        sb.AppendLine("ManualControl is precisely what these missions manipulate. A finding from this axis");
+        sb.AppendLine("is stated as *increased integrated psychomotor/cognitive demand*, never as");
+        sb.AppendLine("*crosswind increased cognitive workload*.");
+        sb.AppendLine();
+
+                sb.AppendLine("Manual demand is matched WITHIN each phase row (spread <= 1 on a 0-4 scale), which");
         sb.AppendLine("is where the class contrast is made — so a difference inside a row cannot be muscle");
         sb.AppendLine("activity rather than cognitive load.");
         sb.AppendLine();
@@ -92,7 +160,7 @@ public static class DocGen
         sb.AppendLine("|-------|---|---------|---------|----------|----------------------|");
         foreach (WorkloadClass c in new[] { WorkloadClass.Low, WorkloadClass.Medium, WorkloadClass.High })
         {
-            var list = MissionLibrary.ForClass(c);
+            var list = MissionLibrary.ForClass(c);   // cognitive axis only, by default
             float mn = 999f, mx = -1f, sum = 0f; int manMin = 9, manMax = -1;
             foreach (var m in list)
             {
@@ -168,7 +236,12 @@ public static class DocGen
         sb.AppendLine();
         sb.AppendLine("| field | value |");
         sb.AppendLine("|-------|-------|");
+        Row(sb, "Experimental axis", m.Axis == LoadAxis.Cognitive
+                ? "cognitive (manual demand matched within the phase row)"
+                : "psychomotor-integrated (manual demand is the manipulation — NOT on the L/M/H scale)");
         Row(sb, "Workload class", m.ClassTag);
+        Row(sb, "Variant", m.Variant + " of " + MissionLibrary.VariantCount);
+        Row(sb, "Cognitive mechanism", m.Mechanism);
         Row(sb, "Flight phase", m.Phase.ToString());
         Row(sb, "Start", m.Start + " at " + m.StartPos.ToString("F0"));
         Row(sb, "Altitude / airspeed / heading", m.StartAltitudeM.ToString("F0", ci) + " m / " +
@@ -233,6 +306,20 @@ public static class DocGen
         sb.AppendLine("**Required event markers** — `" + string.Join("`, `", m.RequiredMarkers) + "`");
         sb.AppendLine();
         sb.AppendLine("---");
+    }
+
+    static string JoinVariantHeaders()
+    {
+        var sb = new StringBuilder();
+        for (int v = 1; v <= MissionLibrary.VariantCount; v++) { if (v > 1) sb.Append(" | "); sb.Append("variant " + v); }
+        return sb.ToString();
+    }
+
+    static string RepeatCol(int n)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < n; i++) sb.Append("---|");
+        return sb.ToString();
     }
 
     static void Row(StringBuilder sb, string k, string v) => sb.AppendLine("| " + k + " | " + v + " |");
