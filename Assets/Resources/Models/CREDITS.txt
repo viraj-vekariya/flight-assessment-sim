@@ -1,0 +1,13 @@
+3D models — CC0 (public domain) from Kenney (kenney.nl)
+
+  Models/city/building-a..f      = Kenney "City Kit (Commercial)"  (CC0)
+  Models/houses/building-type-a..e = Kenney "City Kit (Suburban)"  (CC0)
+  Models/nature/tree_*, cliff_*_rock = Kenney "Nature Kit"          (CC0)
+
+Source: https://kenney.nl  — License: CC0 1.0 (no attribution required; recorded
+for the thesis). OBJ format; city/house models use the shared Textures/colormap.png
+atlas, nature models use solid material colours.
+
+Loaded at runtime by ModelLibrary.cs (Resources.Load) and placed on the terrain by
+WorldBuilder. If the models are absent/unimported, WorldBuilder FALLS BACK to its
+code-built primitive buildings/trees, so the world always builds.

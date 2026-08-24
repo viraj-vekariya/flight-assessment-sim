@@ -1,0 +1,111 @@
+COCKPIT CONTROL TEST
+====================
+generated 2026-08-23 10:35:14
+unity 6000.0.77f1
+
+controls built: 8
+VR status     : VR: no XR loader active (desktop). Expected on macOS — OpenXR is Windows/Android only. On Windows, check Project Settings > XR Plug-in Management > OpenXR is ticked.
+modality      : Desktop
+
+
+── YOKE  (position grab -> pitch + roll)
+   OK    full aft -> nose-up elevator   [pitchInput=-1.00]
+   OK    full forward -> nose-down elevator   [pitchInput=1.00]
+   OK    full right -> right roll   [rollInput=1.00]
+   OK    full left -> left roll   [rollInput=-1.00]
+   OK    half travel -> ~half deflection   [|pitchInput|=0.41]
+   OK    release hands pitch back   [PitchOverridden=False]
+
+── THROTTLE  (position lever -> phys.throttle)
+   OK    idle   [throttle=0.00]
+   OK    midpoint   [throttle=0.50]
+   OK    full   [throttle=1.00]
+   OK    push forward increases power   [0.20 -> 0.88]
+
+── TRIM WHEEL  (position wheel -> phys.trim, +1 nose up)
+   OK    neutral   [trim=0.00]
+   OK    full nose up   [trim=1.00]
+   OK    nose-up trim biases the elevator nose up   [elevatorCmd=-0.35]
+   OK    full nose down   [trim=-1.00]
+   OK    nose-down trim biases the elevator nose down   [elevatorCmd=0.35]
+   OK    wind forward -> nose down   [trim=-0.66]
+
+── FLAP LEVER  (detents -> selected flap)
+   OK    detent UP selected   [selected=UP]
+   OK    detent 10° selected   [selected=10°]
+   OK    detent FULL selected   [selected=FULL]
+   OK    flaps actually extend   [flaps_actual=1.00]
+   OK    flap failure: selection moves   [selected=UP]
+   OK    flap failure: actual stays where the motor died   [flaps_actual=1.00 authority=1.00]
+   OK    flaps retract once the motor is restored   [flaps_actual=0.00]
+
+── BRAKE  (spring lever -> analog wheel brakes, ground only)
+   OK    aircraft is on the ground (wheel brakes only exist there)   [Grounded=True]
+   OK    off   [braking=False]
+   OK    full applied   [braking=True pressure=1.00]
+   OK    partial pressure   [pressure=0.50]
+   OK    releases to zero   [pressure=0.00]
+   OK    airborne: brake input is ignored   [braking=False pressure=0.00]
+
+── SPOILER LEVER  (detents -> spoiler; held stowed during a recorded trial)
+   OK    detent 0 selected   [index=0]
+   OK    detent 1 selected   [index=1]
+   OK    detent 2 selected   [index=2]
+   OK    spoiler actually extends   [spoiler=1.00]
+   OK    returns to UP   [spoiler=0.00]
+
+── CARB HEAT  (toggle)
+   OK    click flips state   [state=True]
+   OK    click flips back   [state=False]
+
+── ORANGE CONTROL (carb heat) — independent of the removed switches
+   OK    the two black switches are gone from the cockpit   [load_shed=absent alt_static=absent]
+   OK    orange control is present and positioned   [cockpit-local (-0.068, 0.385, 0.750)]
+   OK    orange control is VISIBLE   [4 enabled renderers]
+   OK    orange control still has its orange knob   [orange material found]
+   OK    orange control shares no hierarchy with another control   [own GameObject, own transform]
+   OK    orange control is INTERACTABLE   [collider r=0.026]
+   OK    orange control still toggles   [state=True]
+   OK    orange control toggles back   [state=False]
+   OK    orange control did not move while being used   [drift 0.00000 m in the cockpit frame]
+
+── FUEL SELECTOR  (3-position rotary)
+   OK    cycles through all three tanks   [Right -> Left -> Both]
+
+── SYSTEMS  (no cockpit object — keyboard H/J/K/L path)
+   OK    carb heat can be set   [CarbHeatOn=True]
+   OK    load shed can be set   [LoadShed=True]
+   OK    alternate static can be opened   [AlternateStaticOpen=True]
+   OK    tank can be changed   [Selector=Left]
+   OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
+
+── CONTROL OWNERSHIP  (the override latch regression)
+   OK    a single write takes ownership   [PitchOverridden=true]
+   OK    ownership EXPIRES without further writes   [PitchOverridden=False (latched = keyboard would be dead)]
+
+── RESET  (no state may survive a trial change)
+   OK    trim cleared   [trim=0.000]
+   OK    brake cleared   [pressure=0.00]
+   OK    flap selection cleared   [selected=UP]
+   OK    carb heat cleared   [carbHeat=False]
+   OK    load shed cleared   [loadShed=False]
+   OK    fuel selector back to BOTH   [selector=Both]
+   OK    no override still owned   [AnyOverride=False]
+
+── FRAME RATE INDEPENDENCE  (30 / 60 / 90 FPS must agree)
+    30 FPS -> value 0.614   (analytic 0.614, 1 frames, dt=0.0333s, t=0.0333s)
+    60 FPS -> value 0.614   (analytic 0.614, 2 frames, dt=0.0167s, t=0.0333s)
+    90 FPS -> value 0.614   (analytic 0.614, 3 frames, dt=0.0111s, t=0.0333s)
+   OK    the frame rates were actually simulated   [30 FPS ran 1 frame of 0.0333s, 90 FPS ran 3 of 0.0111s]
+   OK    30 FPS follows the time-constant curve   [measured=0.614 analytic=0.614]
+   OK    60 FPS follows the time-constant curve   [measured=0.614 analytic=0.614]
+   OK    90 FPS follows the time-constant curve   [measured=0.614 analytic=0.614]
+   OK    30/60/90 FPS agree with each other   [spread=0.000 (a per-frame Lerp would spread ~0.5)]
+
+SUMMARY
+-------
+problems: 0
+  (none)
+
+NOTE: this verifies WIRING, DIRECTION, GEARING and RESET. Whether a control is
+comfortable or reachable in VR needs a headset and a person.

@@ -1,0 +1,15 @@
+Terrain ground textures — CC0 (public domain), from ambientCG.com
+
+  grass.jpg  = Grass004   (Color)
+  dirt.jpg   = Ground037  (Color)
+  rock.jpg   = Rock030    (Color)
+  sand.jpg   = Ground054  (Color)
+  snow.jpg   = Snow010A   (Color)
+
+Source: https://ambientcg.com  — License: CC0 1.0 (no attribution required;
+included anyway for provenance). Downloaded as the 1K-JPG colour maps.
+
+These are loaded at runtime by TerrainTextures.cs from this StreamingAssets folder.
+If a file is missing, the code falls back to a procedurally-generated texture, so
+the project still runs with no texture files present. To swap in your own, replace
+the .jpg here with the same file name (grass/dirt/rock/sand/snow.jpg).

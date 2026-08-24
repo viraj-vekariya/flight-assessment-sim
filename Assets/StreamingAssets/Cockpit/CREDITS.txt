@@ -1,0 +1,4 @@
+Cockpit 3D model: "FREE Cessna 172SP" by NLM
+Source: Sketchfab — licensed CC-BY 4.0 (attribution required).
+Attribution must be shown wherever this build is presented/published.
+Used as the interactive cockpit interior (glass G1000 panel, yokes, pedals).

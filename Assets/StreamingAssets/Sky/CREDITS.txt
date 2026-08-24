@@ -1,0 +1,8 @@
+Sky — CC0 (public domain) HDRI from Poly Haven (polyhaven.com)
+
+  sky.jpg = "mud_road_puresky" (2K HDRI), tonemapped to an equirectangular JPG.
+
+Source: https://polyhaven.com/a/mud_road_puresky  — License: CC0 1.0.
+Loaded at runtime by WorldBuilder.SetupDayLighting as a Skybox/Panoramic
+(latitude-longitude) skybox, with image-based ambient light. If this file is
+missing, the code falls back to Unity's procedural sky.

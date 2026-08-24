@@ -1,0 +1,13 @@
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+*.csproj
+*.sln
+*.slnx
+*.log
+mono_crash*.json
+.DS_Store
