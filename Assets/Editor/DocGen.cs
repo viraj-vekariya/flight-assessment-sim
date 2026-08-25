@@ -14,16 +14,6 @@ using UnityEngine;
 // or from the editor: Tools -> Experiment -> Regenerate mission docs.
 public static class DocGen
 {
-    /// <summary>Do nothing, successfully. Reaching this method at all is the proof:
-    /// Unity only resolves an -executeMethod target after every script has compiled, so a
-    /// run that prints COMPILE OK could not have had a compile error. Cheaper and far less
-    /// ambiguous than grepping a log for "error CS" and trusting the absence of a match.</summary>
-    public static void CompileOnly()
-    {
-        UnityEngine.Debug.Log("[COMPILE] COMPILE OK");
-        UnityEditor.EditorApplication.Exit(0);
-    }
-
     [MenuItem("Tools/Experiment/Regenerate mission docs")]
     public static void Generate()
     {

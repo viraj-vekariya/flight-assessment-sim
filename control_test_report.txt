@@ -1,9 +1,9 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-08-25 01:02:06
+generated 2026-08-23 10:35:14
 unity 6000.0.77f1
 
-controls built: 9
+controls built: 8
 VR status     : VR: no XR loader active (desktop). Expected on macOS — OpenXR is Windows/Android only. On Windows, check Project Settings > XR Plug-in Management > OpenXR is ticked.
 modality      : Desktop
 
@@ -20,7 +20,7 @@ modality      : Desktop
    OK    idle   [throttle=0.00]
    OK    midpoint   [throttle=0.50]
    OK    full   [throttle=1.00]
-   OK    push forward increases power   [0.20 -> 0.99]
+   OK    push forward increases power   [0.20 -> 0.88]
 
 ── TRIM WHEEL  (position wheel -> phys.trim, +1 nose up)
    OK    neutral   [trim=0.00]
@@ -28,8 +28,7 @@ modality      : Desktop
    OK    nose-up trim biases the elevator nose up   [elevatorCmd=-0.35]
    OK    full nose down   [trim=-1.00]
    OK    nose-down trim biases the elevator nose down   [elevatorCmd=0.35]
-   OK    roll the rim DOWN -> nose up   [trim=0.66]
-   OK    the wheel rolls the same way the hand does   [near-rim moved -82.2 mm in y for nose-up trim]
+   OK    wind forward -> nose down   [trim=-0.66]
 
 ── FLAP LEVER  (detents -> selected flap)
    OK    detent UP selected   [selected=UP]
@@ -48,18 +47,24 @@ modality      : Desktop
    OK    releases to zero   [pressure=0.00]
    OK    airborne: brake input is ignored   [braking=False pressure=0.00]
 
+── SPOILER LEVER  (detents -> spoiler; held stowed during a recorded trial)
+   OK    detent 0 selected   [index=0]
+   OK    detent 1 selected   [index=1]
+   OK    detent 2 selected   [index=2]
+   OK    spoiler actually extends   [spoiler=1.00]
+   OK    returns to UP   [spoiler=0.00]
+
 ── CARB HEAT  (toggle)
    OK    click flips state   [state=True]
    OK    click flips back   [state=False]
 
-── ENGINE CLUSTER — carb heat, and independence from its neighbours
-   OK    LOAD SHED and ALT STATIC are present as cockpit objects   [load_shed=present alt_static=present]
-   OK    orange control is present and positioned   [cockpit-local (0.072, 0.430, 0.759)]
-   OK    carb heat is VISIBLE   [7 enabled renderers]
-   OK    carb heat is visibly smaller than the throttle   [carb heat 9 mm across, throttle 12 mm]
-   OK    carb heat and throttle cannot be grabbed as one   [centres 34 mm apart, radii sum 31 mm]
+── ORANGE CONTROL (carb heat) — independent of the removed switches
+   OK    the two black switches are gone from the cockpit   [load_shed=absent alt_static=absent]
+   OK    orange control is present and positioned   [cockpit-local (-0.068, 0.385, 0.750)]
+   OK    orange control is VISIBLE   [4 enabled renderers]
+   OK    orange control still has its orange knob   [orange material found]
    OK    orange control shares no hierarchy with another control   [own GameObject, own transform]
-   OK    orange control is INTERACTABLE   [collider r=0.015]
+   OK    orange control is INTERACTABLE   [collider r=0.026]
    OK    orange control still toggles   [state=True]
    OK    orange control toggles back   [state=False]
    OK    orange control did not move while being used   [drift 0.00000 m in the cockpit frame]
@@ -88,23 +93,14 @@ modality      : Desktop
    OK    no override still owned   [AnyOverride=False]
 
 ── FRAME RATE INDEPENDENCE  (30 / 60 / 90 FPS must agree)
-    30 FPS -> value 0.486   (analytic 0.487, 1 frames, dt=0.0333s, t=0.0333s)
-    60 FPS -> value 0.486   (analytic 0.487, 2 frames, dt=0.0167s, t=0.0333s)
-    90 FPS -> value 0.486   (analytic 0.487, 3 frames, dt=0.0111s, t=0.0333s)
+    30 FPS -> value 0.614   (analytic 0.614, 1 frames, dt=0.0333s, t=0.0333s)
+    60 FPS -> value 0.614   (analytic 0.614, 2 frames, dt=0.0167s, t=0.0333s)
+    90 FPS -> value 0.614   (analytic 0.614, 3 frames, dt=0.0111s, t=0.0333s)
    OK    the frame rates were actually simulated   [30 FPS ran 1 frame of 0.0333s, 90 FPS ran 3 of 0.0111s]
-   OK    30 FPS follows the time-constant curve   [measured=0.486 analytic=0.487]
-   OK    60 FPS follows the time-constant curve   [measured=0.486 analytic=0.487]
-   OK    90 FPS follows the time-constant curve   [measured=0.486 analytic=0.487]
+   OK    30 FPS follows the time-constant curve   [measured=0.614 analytic=0.614]
+   OK    60 FPS follows the time-constant curve   [measured=0.614 analytic=0.614]
+   OK    90 FPS follows the time-constant curve   [measured=0.614 analytic=0.614]
    OK    30/60/90 FPS agree with each other   [spread=0.000 (a per-frame Lerp would spread ~0.5)]
-
-── REACH AMBIGUITY  (no two capture volumes may overlap)
-   OK    no two controls share a capture volume   [0 overlapping pairs; tightest pair carb_heat / throttle with 3 mm to spare]
-
-── SEATED VISIBILITY  (primary controls must be inside the pilot's frame)
-   OK    yoke is inside the seated frame   [elev -29.0 (limit 39.0), azim 0.0 (limit 47.2)]
-   OK    throttle is inside the seated frame   [elev -28.2 (limit 39.0), azim 23.1 (limit 47.2)]
-   OK    flaps is inside the seated frame   [elev -33.9 (limit 39.0), azim 31.5 (limit 47.2)]
-   OK    brake is inside the seated frame   [elev -33.9 (limit 39.0), azim -16.0 (limit 47.2)]
 
 SUMMARY
 -------

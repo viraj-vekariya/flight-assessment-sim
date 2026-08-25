@@ -448,44 +448,17 @@ public class PhysicalControl : MonoBehaviour
     void UpdateVisual()
     {
         if (spec.visual == null) return;
-        // A visual that has never had its rest datum recorded would otherwise be animated
-        // away from the origin, which is not where it was built. Capture late rather than
-        // animate from the wrong place.
-        if (!visualBaseCaptured) CaptureVisualRest();
         float t = spec.centred ? smoothed : smoothed;   // -1..1 or 0..1, as configured
         if (spec.visualIsRotation)
-            spec.visual.localRotation = visualRestRot * Quaternion.AngleAxis(t * spec.visualTravel, spec.visualAxis);
+            spec.visual.localRotation = Quaternion.AngleAxis(t * spec.visualTravel, spec.visualAxis);
         else
             spec.visual.localPosition = visualBase + spec.visualAxis.normalized * (t * spec.visualTravel);
     }
 
     Vector3 visualBase;
-    bool visualBaseCaptured;
-
-    /// <summary>Record the visual's REST transform, so animation is measured from where
-    /// the geometry was actually built rather than from the origin.
-    ///
-    /// This must be called AFTER `spec` is assigned. It used to happen in Awake(), which
-    /// runs the instant AddComponent is called — i.e. before the builder had created any
-    /// geometry or set the spec — so `visualBase` was always Vector3.zero. The visible
-    /// consequence: a slide handle built at the top of its channel (flaps, at rest) was
-    /// snapped to the channel's CENTRE on the first frame and then driven to a full travel
-    /// BEYOND the end stop at full deflection. The handle hung outside its own slot at
-    /// every position except the middle, which is exactly the "flap control is in a bad
-    /// position" complaint — the control was correct, the rest datum was not.</summary>
-    public void CaptureVisualRest()
-    {
-        if (spec.visual == null) { visualBaseCaptured = true; return; }
-        visualBase = spec.visual.localPosition;
-        visualRestRot = spec.visual.localRotation;
-        visualBaseCaptured = true;
-    }
-
-    Quaternion visualRestRot = Quaternion.identity;
-
     void Awake()
     {
-        // NOT the visual rest: see CaptureVisualRest. At Awake the spec is still empty.
+        if (spec.visual != null) visualBase = spec.visual.localPosition;
         if (controller == null) controller = GetComponentInParent<AircraftController>();
     }
 

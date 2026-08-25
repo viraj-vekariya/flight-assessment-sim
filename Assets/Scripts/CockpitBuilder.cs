@@ -388,42 +388,6 @@ public static class CockpitBuilder
         cam.cullingMask = ~(1 << AircraftBuilder.ExteriorLayer); // don't draw the plane's exterior
         camGo.AddComponent<AudioListener>();
         camGo.AddComponent<CockpitCamera>();
-        BuildCabinFill(camGo.transform);
-    }
-
-    /// <summary>A soft fill light inside the cabin, rendering ONLY the cockpit layer.
-    ///
-    /// WHY A LIGHT THAT IS NOT REALLY THERE
-    ///   The scene is lit by one directional sun and a flat ambient term. A flat ambient
-    ///   gives every surface the same contribution regardless of what is around it, so it
-    ///   cannot produce the light that in a real cabin bounces off the windscreen, the
-    ///   glareshield and the pilot's own lap and fills the panel. The panel faces aft, away
-    ///   from the sun, so with no bounce it renders at ambient only — which is why every
-    ///   control below the glareshield came out as a dark grey silhouette that a participant
-    ///   would have to guess at.
-    ///
-    ///   This stands in for that bounce. It is deliberately weak, warm, shadowless and
-    ///   short-range, and its culling mask means it cannot touch the terrain, the aeroplane's
-    ///   exterior or anything else in the world — so it changes how the cockpit READS
-    ///   without changing the scene's lighting or the appearance of anything outside.
-    ///
-    ///   It is an approximation and is recorded as one. The alternative — leaving the panel
-    ///   unreadable — would have been a much larger distortion of the task.</summary>
-    static void BuildCabinFill(Transform eye)
-    {
-        var g = new GameObject("CabinFill");
-        g.transform.SetParent(eye, false);
-        // Slightly above and behind the eye, so the panel is lit from where the pilot's own
-        // head is rather than from a point in front of them, which would flatten it.
-        g.transform.localPosition = new Vector3(0f, 0.18f, -0.25f);
-        var l = g.AddComponent<Light>();
-        l.type = LightType.Point;
-        l.color = new Color(1f, 0.965f, 0.92f);
-        l.intensity = 1.35f;
-        l.range = 2.6f;
-        l.shadows = LightShadows.None;
-        l.renderMode = LightRenderMode.ForcePixel;
-        l.cullingMask = 1 << CockpitLayer;
     }
 
     // ===== (EXTRA) real-cockpit detailing =====================================

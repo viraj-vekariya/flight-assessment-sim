@@ -21,7 +21,6 @@ using GLTFast;
 public class RealCockpit : MonoBehaviour
 {
     public CessnaPhysics phys;
-    AircraftSystems systems;
     public Transform cockpitRoot;
     public Camera cockpitCam;
 
@@ -54,13 +53,6 @@ public class RealCockpit : MonoBehaviour
                       //   below the cabin floor and on the cockpit layer, so hiding it changes nothing
         "Object_17",  // REVERT_CANDIDATE: rudder bar — wide floor element spanning both sides; check in-sim and remove if it exposes raw floor geometry
         "Object_60",  // center console
-        // Object_107: the model's OWN throttle quadrant, a 29 x 11 x 38 mm bracket under
-        // the panel centre. This build's throttle is a push-pull plunger in the engine
-        // cluster where a 172's is, so the model's quadrant drives nothing and cannot be
-        // grabbed — and from the seat it read as two unexplained grey pegs hanging under
-        // the control wheel. Identified by the design probe's yoke-volume report rather
-        // than guessed at.
-        "Object_107",
         "Object_64",  // rear seats
     };
     // The seat BODY (cushion + back + headrest) is a single TWIN mesh spanning both seats,
@@ -71,9 +63,6 @@ public class RealCockpit : MonoBehaviour
     // Both wheels live in one mesh, so the pilot half is cut out of it (KeepHalf) and slid
     // to the centreline (CentreGroup) together with its column hub — then hung under a pivot
     // whose local +Z runs along the column, toward the panel.
-    /// <summary>Draw a generated ram's-horn control wheel instead of the GLB's flat U.
-    /// Turn off to get the model's own mesh back.</summary>
-    public bool replaceYokeMesh = true;
     public string yokeTwinNode = "Object_90";   // twin mesh: both yoke wheels
     public string yokeHubNode  = "Object_94";   // pilot column hub (the stub at the panel)
     // Dynamic limits + smoothing (bounded, and self-centring because the inputs return to 0).
@@ -181,7 +170,6 @@ public class RealCockpit : MonoBehaviour
                   "the GLB cockpit is now the only interaction surface.");
 
         // Build the REAL cockpit's physical controls on the loaded model.
-        if (systems == null && phys != null) systems = phys.GetComponent<AircraftSystems>();
         var rig = holder.gameObject.AddComponent<CockpitControlRig>();
         rig.Build(holder.transform, phys);
 
@@ -287,31 +275,6 @@ public class RealCockpit : MonoBehaviour
             }
         }
 
-        // ── REPLACE THE WHEEL'S SHAPE, KEEP ITS RIG ────────────────────────────────
-        // The GLB's yoke is a flat U with two straight prongs, and from the seat it reads as
-        // a bracket rather than as something to hold. A generated ram's-horn wheel goes in
-        // its place, parented under the SAME yokeVisual, so every line of the pitch/roll
-        // animation below still drives it and nothing about the verified control mapping
-        // changes. The original mesh is disabled rather than deleted, so `replaceYokeMesh`
-        // turns the whole change off if the model is ever swapped for a better one.
-        if (replaceYokeMesh)
-        {
-            foreach (var r in yokeVisual.GetComponentsInChildren<Renderer>(true)) r.enabled = false;
-            // The COLUMN HUB too. It is parented to yokeShaft rather than to yokeVisual, so
-            // disabling the wheel alone left it behind as a pale ring floating in front of
-            // the new hub — the model's yoke half-deleted, which looks worse than either
-            // yoke on its own.
-            if (hub != null)
-                foreach (var r in hub.GetComponentsInChildren<Renderer>(true)) r.enabled = false;
-            var built = new GameObject("YokeWheelBuilt").transform;
-            built.SetParent(yokeVisual, false);
-            // The DRAWN wheel's centre, relative to the column axis the rig turns about.
-            built.localPosition = new Vector3(0f, wb.center.y - axis.y, wb.center.z - axis.z);
-            built.localRotation = Quaternion.identity;
-            CockpitHardware.ControlWheel(built, 300f);
-            Debug.Log($"RealCockpit: yoke mesh replaced with a built control wheel at {built.localPosition:F3}.");
-        }
-
         yokeRootBasePos = yokeRoot.localPosition;
         SetLayer(yokeRoot, CockpitBuilder.CockpitLayer);
         Debug.Log($"RealCockpit: yoke rigged — wheel size {wb.size:F3} centre {wb.center:F3}, "
@@ -355,39 +318,7 @@ public class RealCockpit : MonoBehaviour
         propPivot.position = c;
         propPivot.rotation = model.rotation;
         foreach (var t in nodes) t.SetParent(propPivot, true);
-
-        // The blades, so they can be faded out once they are turning too fast to draw.
-        var rends = new List<Renderer>();
-        foreach (var t in nodes) rends.AddRange(t.GetComponentsInChildren<Renderer>(true));
-        propBlades = rends.ToArray();
-
-        // The blur disc that replaces them: a flat translucent circle of the propeller's own
-        // diameter, in its own plane, so a spinning propeller reads as one.
-        float dia = has ? Mathf.Max(b.size.x, b.size.y) : 0.5f;
-        var discGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        var dcol = discGo.GetComponent<Collider>(); if (dcol != null) Destroy(dcol);
-        discGo.name = "PropDisc";
-        discGo.transform.SetParent(propPivot, false);
-        discGo.transform.localPosition = Vector3.zero;
-        discGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // axis along +Z
-        discGo.transform.localScale = new Vector3(dia, 0.0015f, dia);
-        var dm = new Material(Shader.Find("Sprites/Default"));
-        // Nearly clear, and light rather than dark. A real propeller disc is a faint
-        // shimmer you look straight through — you fly an approach looking THROUGH it. The
-        // first version used 30% black, which drew a dark dome over the runway and was a
-        // worse obstruction than the stationary blade it replaced.
-        dm.color = new Color(0.72f, 0.74f, 0.78f, 0f);
-        var dr = discGo.GetComponent<Renderer>();
-        dr.material = dm;
-        dr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        dr.receiveShadows = false;
-        discGo.layer = nodes[0].gameObject.layer;
-        propDisc = discGo.transform;
-        propDisc.gameObject.SetActive(false);
     }
-
-    Renderer[] propBlades;
-    Transform propDisc;
 
     // Slide a group of nodes by ONE common offset so the geometry that is ACTUALLY drawn
     // (the vertices referenced by the current triangles — after any KeepHalf cut) is centred on
@@ -484,38 +415,8 @@ public class RealCockpit : MonoBehaviour
                 yokeShaft.localScale = new Vector3(1f, 1f, Mathf.Clamp((shaftLen - curTravel) / shaftLen, 0.05f, 5f));
         }
 
-        // THE PROPELLER TURNS WITH RPM, NOT WITH THROTTLE.
-        //
-        // Driving it from throttle meant that at idle — which is how every mission starts,
-        // and how the aeroplane sits during every briefing and every baseline — the engine
-        // was running, the cockpit was full of engine noise, and the propeller was stopped
-        // dead with one blade lying diagonally across the windscreen. It was the single most
-        // conspicuous object in the pilot's forward view and it was wrong: a 172 idles at
-        // about 700 RPM and its propeller is a blur.
-        if (propPivot != null && systems != null)
-        {
-            float rpm = systems.RPM;
-            propPivot.Rotate(0f, 0f, rpm * 6f * Time.deltaTime, Space.Self);   // 6 deg per rev-minute
-            // Above a few hundred RPM a real propeller is not a set of blades, it is a faint
-            // disc. Rendering the blades at that speed gives a strobing wagon-wheel instead,
-            // because no frame rate can sample 40 revolutions a second. So the blades are
-            // faded out and the disc faded in, which is both what a pilot sees and the only
-            // thing that can be drawn honestly at 60 Hz.
-            float blur = Mathf.Clamp01((rpm - 250f) / 350f);
-            if (propBlades != null)
-                foreach (var r in propBlades) if (r != null) r.enabled = blur < 0.98f;
-            if (propDisc != null)
-            {
-                propDisc.gameObject.SetActive(blur > 0.02f);
-                var pr = propDisc.GetComponent<Renderer>();
-                if (pr != null && pr.material.HasProperty("_Color"))
-                {
-                    var c = pr.material.color;
-                    c.a = 0.085f * blur;
-                    pr.material.color = c;
-                }
-            }
-        }
+        if (propPivot != null)   // spin the front fan with throttle
+            propPivot.Rotate(0f, 0f, propSpinMax * phys.Throttle01 * Time.deltaTime, Space.Self);
     }
 
     static Transform FindDeep(Transform root, string name)

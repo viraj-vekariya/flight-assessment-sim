@@ -111,93 +111,12 @@ public class ControlTestHarness : MonoBehaviour
         yield return TestOwnershipHandback();
         yield return TestReset();
         yield return TestFrameRateIndependence();
-        yield return TestReachAmbiguity();
-        yield return TestSeatedVisibility();
 
         ControlCheckMode.Exit();
         Finish();
     }
 
     // ── individual controls ───────────────────────────────────────────────────
-
-
-    /// <summary>NO REACH MAY TAKE TWO CONTROLS.
-    ///
-    /// Every control has a capture radius, and the interactor takes the nearest control
-    /// whose radius contains the hand. If two radii overlap, a participant reaching for one
-    /// can get the other depending on millimetres of hand position — a control that behaves
-    /// differently on different trials, which in a workload experiment is noise attributed
-    /// to the wrong cause.
-    ///
-    /// This is checked pairwise across the whole cockpit rather than for the one pair
-    /// someone happened to worry about, because the layout has now been rearranged twice
-    /// and each rearrangement invalidated the previous hand-checked spacing.</summary>
-    IEnumerator TestReachAmbiguity()
-    {
-        Section("REACH AMBIGUITY  (no two capture volumes may overlap)");
-        var cs = rig.Controls;
-        int overlaps = 0;
-        string worst = "none"; float worstMargin = 9e9f;
-        for (int i = 0; i < cs.Length; i++)
-        {
-            if (cs[i] == null) continue;
-            for (int j = i + 1; j < cs.Length; j++)
-            {
-                if (cs[j] == null) continue;
-                // The yoke is exempt in one direction only: its capture volume is large by
-                // design (you reach for it blind) and it necessarily encloses nothing else,
-                // so the pair is judged on whether the SMALLER control is inside it.
-                float d = Vector3.Distance(cs[i].transform.position, cs[j].transform.position);
-                float need = cs[i].spec.captureRadius + cs[j].spec.captureRadius;
-                float margin = d - need;
-                if (margin < worstMargin) { worstMargin = margin; worst = cs[i].spec.id + " / " + cs[j].spec.id; }
-                if (margin < 0f)
-                {
-                    overlaps++;
-                    report.AppendLine(string.Format("      overlap: {0} and {1} — centres {2:F0} mm, radii sum {3:F0} mm",
-                        cs[i].spec.id, cs[j].spec.id, d * 1000f, need * 1000f));
-                }
-            }
-        }
-        Check("no two controls share a capture volume", overlaps == 0,
-              overlaps + " overlapping pairs; tightest pair " + worst
-              + " with " + (worstMargin * 1000f).ToString("F0") + " mm to spare");
-        yield break;
-    }
-
-    /// <summary>THE CONTROLS A PILOT USES CONSTANTLY MUST BE IN THE SEATED VIEW.
-    ///
-    /// A control can be correctly built, correctly wired, correctly placed on real panel
-    /// and still be useless because it is below the bottom of the frame. That happened to
-    /// the flap lever, the brake and the switch bank simultaneously, and every existing
-    /// test passed while it was true. The memory items are allowed to sit outside the
-    /// frame — they are a glance or a keystroke away and that is where the aeroplane keeps
-    /// them — but the primary controls are not.</summary>
-    IEnumerator TestSeatedVisibility()
-    {
-        Section("SEATED VISIBILITY  (primary controls must be inside the pilot's frame)");
-        var cam = System.Array.Find(Object.FindObjectsByType<Camera>(FindObjectsSortMode.None),
-                                    c2 => c2.name == "CockpitCamera");
-        if (cam == null) { Fail("seated visibility", "no CockpitCamera"); yield break; }
-
-        float halfV = cam.fieldOfView * 0.5f;
-        float halfH = Mathf.Atan(Mathf.Tan(halfV * Mathf.Deg2Rad) * Mathf.Max(1f, cam.aspect)) * Mathf.Rad2Deg;
-        string[] primary = { "yoke", "throttle", "flaps", "brake" };
-
-        foreach (string id in primary)
-        {
-            var c = Find(id);
-            if (c == null) { Fail(id + " visible from the seat", "control missing"); continue; }
-            Vector3 local = cam.transform.InverseTransformPoint(c.transform.position);
-            float elev = Mathf.Atan2(local.y, local.z) * Mathf.Rad2Deg;
-            float azim = Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg;
-            bool ok = local.z > 0f && Mathf.Abs(elev) <= halfV && Mathf.Abs(azim) <= halfH;
-            Check(id + " is inside the seated frame", ok,
-                  string.Format("elev {0:F1} (limit {1:F1}), azim {2:F1} (limit {3:F1})",
-                                elev, halfV, azim, halfH));
-        }
-        yield break;
-    }
 
     IEnumerator TestYoke()
     {
@@ -282,40 +201,12 @@ public class ControlTestHarness : MonoBehaviour
 
         c.SetSilently(0f); yield return WaitFrames(10);
 
-        // ROLLING THE RIM.
-        //
-        // The wheel is mounted edge-on in the pedestal's FRONT face, so the part of the rim
-        // the pilot can touch faces them and the hand moves UP and DOWN across it — not
-        // fore and aft, which is what this test used to assume from the days when the wheel
-        // was a knob on the left panel. Rolling the exposed rim DOWN carries the top of the
-        // wheel back toward the pilot, which is nose UP.
-        c.SetSilently(0f); yield return WaitFrames(10);
-        Vector3 hand0 = c.transform.position;
-        c.BeginGrab(hand0);
-        c.UpdateGrab(hand0 + c.transform.TransformDirection(Vector3.down).normalized * 0.04f);
+        // Winding the wheel FORWARD must trim nose DOWN.
+        c.BeginGrab(c.transform.position);
+        c.UpdateGrab(c.transform.position + c.transform.TransformDirection(Vector3.forward).normalized * 0.04f);
         yield return WaitFrames(10);
-        Check("roll the rim DOWN -> nose up", ac.trim > 0.05f, "trim=" + ac.trim.ToString("F2"));
-
-        // AND THE WHEEL MUST TURN THE SAME WAY THE HAND DID. A direct-manipulation control
-        // whose visual rolls against the fingers on it is worse than one that does not move
-        // at all, and the sign was wrong when this cockpit was first rebuilt.
-        Transform wheelVis = c.spec.visual;
-        if (wheelVis != null)
-        {
-            // A point on the rim nearest the pilot, before and after: it must move DOWN.
-            Vector3 rimLocal = new Vector3(0f, 0f, -0.020f);
-            Vector3 rimBefore = wheelVis.TransformPoint(rimLocal);
-            c.SetSilently(0f); yield return WaitFrames(14);
-            Vector3 rimNeutral = wheelVis.TransformPoint(rimLocal);
-            c.SetSilently(0.6f); yield return WaitFrames(14);
-            Vector3 rimUp = wheelVis.TransformPoint(rimLocal);
-            float dy = c.transform.InverseTransformPoint(rimUp).y
-                     - c.transform.InverseTransformPoint(rimNeutral).y;
-            Check("the wheel rolls the same way the hand does", dy < -0.001f,
-                  "near-rim moved " + (dy * 1000f).ToString("F1") + " mm in y for nose-up trim");
-        }
+        Check("wind forward -> nose down", ac.trim < -0.05f, "trim=" + ac.trim.ToString("F2"));
         c.EndGrab(); yield return WaitFrames(2);
-        c.SetSilently(0f); yield return WaitFrames(6);
     }
 
     IEnumerator TestFlaps()
@@ -435,58 +326,26 @@ public class ControlTestHarness : MonoBehaviour
               si == null ? "MISSING" : "enabled=" + si.enabled);
     }
 
-    /// <summary>CARB HEAT, and its independence from the switches beside it.
+    /// <summary>The two black switches on the left bay were removed. This proves the
+    /// ORANGE control beside them (carb heat) is untouched by that — present, in the same
+    /// place, still interactable, still animating.
     ///
-    /// UPDATED 25 Aug 2026. This test used to assert two things that the cockpit no longer
-    /// claims, and both were design decisions rather than defects:
-    ///
-    ///   - that LOAD SHED and ALT STATIC were ABSENT. They are back, because
-    ///     ChecklistLibrary gates HIGH missions on them and a headset has no keyboard, so
-    ///     without cockpit objects those drills were unperformable in VR. The test now
-    ///     asserts they are PRESENT — which is the property the experiment depends on.
-    ///
-    ///   - that carb heat had an ORANGE knob. It is black now. Orange was invented by an
-    ///     earlier build; on the aeroplane the powerplant controls are colour-coded black
-    ///     for throttle and carburettor heat and RED for mixture, and inventing a third
-    ///     colour throws away the one cue a pilot is trained on. Carb heat is now told
-    ///     apart from the throttle by SIZE and POSITION instead, so the test checks that.
-    ///
-    /// The original point of the test — that these controls do not share meshes, renderers
-    /// or parents, so touching one cannot move or hide another — is unchanged and still
-    /// checked below.</summary>
-
-    /// <summary>Widest dimension of the part of a control the HAND MEETS, metres — its
-    /// moving visual, not the whole assembly.
-    ///
-    /// Measuring the assembly measures the placard: the throttle's plunger is 35 mm across
-    /// but its placard plate is 40 mm wide, so a whole-control measurement reported the
-    /// throttle and the carb heat as almost the same size when their knobs differ by a
-    /// third. What a pilot tells apart by feel is the knob.</summary>
-    static float ControlSpan(PhysicalControl c)
-    {
-        Transform t = c.spec.visual != null ? c.spec.visual : c.transform;
-        var rs = t.GetComponentsInChildren<Renderer>(false);
-        bool any = false; Bounds b = new Bounds();
-        foreach (var r in rs)
-        {
-            if (!r.enabled) continue;
-            if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
-        }
-        if (!any) return 0f;
-        return Mathf.Max(b.size.x, b.size.y);
-    }
-
+    /// The concern was that the switches and the carb-heat knob might share a mesh, a
+    /// renderer or a parent, so that removing one moved or hid the other. They never did:
+    /// every control on this panel is built as its own GameObject with its own transform,
+    /// renderers and collider, and the bay behind them is a backing plate that nothing is
+    /// parented to. This test exists so that stays true rather than being asserted.</summary>
     IEnumerator TestOrangeControlIndependence()
     {
-        Section("ENGINE CLUSTER — carb heat, and independence from its neighbours");
+        Section("ORANGE CONTROL (carb heat) — independent of the removed switches");
 
-        Check("LOAD SHED and ALT STATIC are present as cockpit objects",
-              Find("load_shed") != null && Find("alt_static") != null,
-              "load_shed=" + (Find("load_shed") == null ? "ABSENT" : "present") +
-              " alt_static=" + (Find("alt_static") == null ? "ABSENT" : "present"));
+        Check("the two black switches are gone from the cockpit",
+              Find("load_shed") == null && Find("alt_static") == null,
+              "load_shed=" + (Find("load_shed") == null ? "absent" : "PRESENT") +
+              " alt_static=" + (Find("alt_static") == null ? "absent" : "PRESENT"));
 
         var c = Find("carb_heat");
-        if (c == null) { Fail("carb heat", "the carb-heat control is missing"); yield break; }
+        if (c == null) { Fail("carb heat", "the orange control disappeared with the switches"); yield break; }
 
         // LOCAL position, not world: the control is parented to the cockpit, which is
         // parented to the aeroplane, and a parked aeroplane creeps. Measuring in world
@@ -495,27 +354,16 @@ public class ControlTestHarness : MonoBehaviour
         Vector3 p0 = c.transform.localPosition;
         Check("orange control is present and positioned", true, "cockpit-local " + p0.ToString("F3"));
 
-        int rends = 0;
+        int rends = 0; bool orange = false;
         foreach (var r in c.GetComponentsInChildren<Renderer>(false))
-            if (r.enabled) rends++;
-        Check("carb heat is VISIBLE", rends > 0, rends + " enabled renderers");
-
-        // TOLD APART FROM THE THROTTLE BY SIZE, since they are deliberately the same
-        // family of control and the same colour, as on the aeroplane. If the two ever end
-        // up the same size, a participant reaching blind has nothing to go on.
-        var th = Find("throttle");
-        if (th != null)
         {
-            float ch = ControlSpan(c), ts = ControlSpan(th);
-            Check("carb heat is visibly smaller than the throttle", ch < ts * 0.85f,
-                  "carb heat " + (ch * 1000f).ToString("F0") + " mm across, throttle "
-                  + (ts * 1000f).ToString("F0") + " mm");
-            float gap = Vector3.Distance(c.transform.position, th.transform.position);
-            Check("carb heat and throttle cannot be grabbed as one",
-                  gap > c.spec.captureRadius + th.spec.captureRadius,
-                  "centres " + (gap * 1000f).ToString("F0") + " mm apart, radii sum "
-                  + ((c.spec.captureRadius + th.spec.captureRadius) * 1000f).ToString("F0") + " mm");
+            if (!r.enabled) continue;
+            rends++;
+            var col = r.sharedMaterial != null ? r.sharedMaterial.color : Color.black;
+            if (col.r > 0.6f && col.g > 0.25f && col.g < 0.65f && col.b < 0.25f) orange = true;
         }
+        Check("orange control is VISIBLE", rends > 0, rends + " enabled renderers");
+        Check("orange control still has its orange knob", orange, "orange material found");
 
         bool shared = false;
         foreach (var other in rig.Controls)

@@ -8,101 +8,23 @@ behind it. Implemented in `PhysicalControl.cs` (behaviour) and `CockpitControlRi
 
 ## 1. The control set
 
-**Rebuilt 25 August 2026.** The layout, the shapes and the sizes below all changed; the
-behaviour, the telemetry and the input mapping did not. See `COCKPIT_REDESIGN.md` for why.
+| Control | Kind | Target | Travel | Capture radius | Smoothing τ | Notes |
+|---|---|---|---|---|---|---|
+| **Yoke** | 2-axis grab | pitch + roll | 160 mm fore/aft, 180 mm across | 130 mm | 45 ms | centred; dead zone 0.02; response exp 1.25 |
+| **Throttle** | lever | `phys.throttle` 0–1 | 85 mm | 55 mm | 35 ms | push forward = power |
+| **Trim wheel** | wheel | `phys.trim` ±1 | 120 mm | 55 mm | 60 ms | wind forward = nose down |
+| **Flap lever** | detent lever | flap detent 0/0.5/1 | 75 mm | 50 mm | 50 ms | snaps to UP / 10° / FULL |
+| **Brake handle** | spring lever | `brakeInput01` 0–1 | 55 mm | 50 mm | 30 ms | releases to 0 |
+| **Carb heat** | pull knob | `CarbHeatOn` | — | 42 mm | 50 ms | out = ON |
+| **Fuel selector** | 3-position rotary | `Selector` | — | 48 mm | 60 ms | LEFT / BOTH / RIGHT |
+| **Load shed** | toggle | `LoadShed` | — | 36 mm | 40 ms | |
+| **Alternate static** | toggle | `AlternateStaticOpen` | — | 36 mm | 40 ms | |
 
-### Scale
-
-The GLB is **0.352x life size** — its cabin is 352 mm across where a 172's is a metre —
-and the cockpit camera sits inside that same small model, which is why it looks correct
-from the seat. Four independent features agree on the figure (panel width, eye-to-panel
-distance, eye height above the floor, rudder-pedal span), and it is `CockpitHardware.ModelScale`.
-
-Every piece of hardware is therefore authored in **real millimetres** and multiplied by
-`CockpitHardware.MM`, so any dimension in the source can be checked against a 172 drawing.
-Before this, dimensions were written directly in model units, which made every control
-about three times life size — the single reason the old throttle ball and flap paddle
-looked like toys glued to the panel.
-
-### Layout
-
-Measured surfaces the layout is built against (design probe, drawn-triangle bounds):
-
-| Surface | Where |
-|---|---|
-| Upper panel (`Object_50`) | z = 0.755, y 0.470–0.560, full width |
-| **Lower panel** (`Object_81`) | z = 0.760, y 0.270–0.470, x ±0.176 |
-| **Centre pedestal** (`Object_58`) | z = 0.667, y 0.250–0.450, x ±0.047 — stands 93 mm proud |
-| Yoke wheel | z = 0.710, 94 mm across, centred on the eye |
-| Rudder pedals (`Object_52`) | z = 0.755, y 0.270–0.310, x ±0.110 |
-| PFD / MFD glass | (−0.0709, 0.4921, 0.7535) and (0.0461, 0.4921, 0.7535), 85 × 56 |
-
-The pedestal drives everything: it occupies the centre strip and stands 93 mm closer to
-the pilot than the panel, so anything mounted on the lower panel behind it is invisible.
-The panel is therefore used as the aeroplane uses it — gauges and brake to the LEFT of the
-pedestal, trim and fuel ON it, engine controls and flaps to the RIGHT.
-
-| Control | Shape | Position (model) | Capture radius | Notes |
-|---|---|---|---|---|
-| **Yoke** | ram's-horn control wheel, 300 mm | (0, 0.436, 0.742) | 55 mm | grips raked aft, PTT on the left horn |
-| **Carb heat** | push-pull plunger, 24 mm knob | (0.072, 0.430, 0.7585) | 15 mm | pull OUT for heat ON |
-| **Throttle** | push-pull plunger, 32 mm knurled knob | (0.106, 0.430, 0.7585) | 16 mm | push IN for power; 55 mm travel |
-| **Mixture** | plunger, 28 mm red knob | (0.140, 0.430, 0.7585) | — | **geometry only, not interactive** |
-| **Flap lever** | gated lever, 3 gates | (0.154, 0.394, 0.7585) | 18 mm | UP / 10 / FULL, 52 mm travel |
-| **Brake** | parking-brake T-pull | (−0.072, 0.394, 0.7585) | 20 mm | spring-loaded; releases to 0 |
-| **Trim wheel** | 128 mm wheel, edge-on in the pedestal | (0, 0.393, 0.6655) | 28 mm | roll the rim DOWN for nose up |
-| **Fuel selector** | red rotary valve, bar handle | (0, 0.310, 0.6655) | 24 mm | L / BOTH / R |
-| **Load shed** | panel toggle | (−0.150, 0.332, 0.7585) | 9 mm | restored — see below |
-| **Alternate static** | panel toggle | (−0.128, 0.332, 0.7585) | 9 mm | restored — see below |
-
-**Shape is identity.** No two controls with different jobs share a shape: the throttle is
-the only knurled black plunger, the flaps the only gated lever, the trim the only wheel,
-the fuel valve the only rotary bar. That is what lets a pilot find a control without
-looking, and building every control out of the same slider vocabulary — which is what the
-previous version did — destroys precisely the property the cockpit exists to have.
-
-**Mixture is deliberately dead.** A 172 has three engine controls and a cockpit with two
-looks wrong. But the flight model has no mixture, so an interactive one would either do
-nothing (a control that lies) or would have to be invented, and inventing one adds a
-variable to a workload experiment that nothing in the design controls for. It is built, in
-the right place, shape and colour, and it cannot be grabbed.
-
-**Carb heat is black, not orange.** Powerplant controls are colour-coded — black throttle,
-red mixture — and inventing a third colour throws away the one cue that transfers. Carb
-heat is told from the throttle by size (24 mm vs 32 mm knob) and position, and the control
-battery asserts that difference rather than trusting it.
-
-**Load shed and alternate static are back.** They were removed on 23 Aug as panel clutter.
-The criterion is whether the experiment needs them, and it does: `ChecklistLibrary` gates
-Electrical/H2 on `LoadShed` and StaticBlock/H3 on `AlternateStaticOpen`. Keyboard K and L
-cover the desktop, but a headset has no keyboard, so without cockpit objects those drills
-were unperformable in the modality the study is actually run in.
-
-**Brakes.** The aeroplane brakes with toe pads on the rudder pedals, and those now exist:
-they carry the tread, they are on the pedals, and they tilt with applied pressure. A hand
-control is kept as well, and that is an accessibility decision rather than an oversight —
-no headset in this lab has rudder pedals and a participant in VR has no keyboard, so with
-toe brakes alone there would be no way to stop the aeroplane. It is shaped and placed as
-the thing a 172 really has within reach of the left hand: the small black parking-brake
-T-pull under the left panel edge.
-
-### Reach and visibility, both now checked automatically
-
-Two properties used to be assumed and are now asserted by the control battery:
-
-- **No two capture volumes overlap.** Checked pairwise across the whole cockpit. This
-  caught the yoke's 130 mm capture radius — chosen when the engine controls were somewhere
-  else — swallowing the carb-heat knob 64 mm away, so a hand reaching for carb heat would
-  have taken the yoke. The yoke is now 55 mm and the tightest pair has 3 mm to spare.
-- **Primary controls are inside the seated frame.** The camera is 78° vertical with a 4°
-  down-tilt, so the bottom of the frame meets the panel at **y = 0.358**. Yoke, throttle,
-  flaps and brake are all above it. The memory items (trim, fuel, the two switches) sit
-  below it deliberately: they are a glance or a keystroke away and that is where the
-  aeroplane keeps them.
-
-The second check exists because the flap lever, the brake and the switch bank were once
-placed on perfectly good panel, correctly wired, and all three were below the bottom edge
-of the frame. Every test passed while a participant could not have seen any of them.
+Capture radii are set against the **actual spacing** in this cockpit, not copied from
+the previous VR attempt. The two closest controls are 90 mm apart and the largest radius
+near them is 48 mm, so no control can be grabbed by mistake while reaching for its
+neighbour. The yoke gets the largest radius (130 mm) because it is the one control a
+pilot reaches for without looking.
 
 ---
 
