@@ -53,7 +53,9 @@ public class ViewManager : MonoBehaviour
         extCam.clearFlags = CameraClearFlags.Skybox;
         // render everything (incl. the exterior plane) EXCEPT the cockpit interior,
         // so the panel/yoke don't float inside the fuselage in chase/orbit views.
-        extCam.cullingMask = ~(1 << CockpitBuilder.CockpitLayer);
+        // Not the cockpit interior, and not the displays' symbology layers: from
+        // outside, those glyphs would otherwise hang in the air beside the aeroplane.
+        extCam.cullingMask = ~((1 << CockpitBuilder.CockpitLayer) | CockpitBuilder.DisplayOnlyMask);
         extAudio = go.AddComponent<AudioListener>();
 
         Apply();

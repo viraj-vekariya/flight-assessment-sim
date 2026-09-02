@@ -30,7 +30,9 @@ public class YokeShot : MonoBehaviour
         phys.transform.rotation = Quaternion.identity;
 
         var dc = new GameObject("YSCam").AddComponent<Camera>();
-        dc.cullingMask = ~0; dc.nearClipPlane = 0.003f; dc.fieldOfView = 45;
+        // Not the display-only layers: their symbology lives 500 m above the aeroplane
+        // and would otherwise appear in this dev shot as glyphs hanging in the sky.
+        dc.cullingMask = ~CockpitBuilder.DisplayOnlyMask; dc.nearClipPlane = 0.003f; dc.fieldOfView = 45;
 
         // ---- 1) IN-CONTEXT: pilot's eye looking down at the yoke ----
         if (cockCam != null)

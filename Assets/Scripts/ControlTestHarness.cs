@@ -90,24 +90,19 @@ public class ControlTestHarness : MonoBehaviour
         ac.ResetTo(gm.Runway.Start, gm.Runway.Rot, false, 0f);
         yield return new WaitForSecondsRealtime(0.5f);
 
+        // ── MINIMAL COCKPIT (3 Sep 2026) ─────────────────────────────────────────
+        // The cockpit now contains ONE physical control, the yoke, plus the two glass
+        // displays. Every other control was removed on request. The tests below check
+        // the two properties that actually matter after that change: that the yoke still
+        // works, and that removing the OBJECTS did not remove the INPUTS.
         yield return TestYoke();
-        yield return TestThrottle();
-        yield return TestTrim();
-        yield return TestFlaps();
-        yield return TestBrake();
-        // The spoiler lever was removed from the cockpit (a 172 has no spoilers and it
-        // served no experimental purpose). The simulation capability remains, so the
-        // test runs only if a spoiler control is actually present.
+        yield return TestOnlyYokeIsPhysical();
+        yield return TestRemovedInputsStillDriveable();
+        // The spoiler lever was removed long before this; the simulation capability
+        // remains, so the test runs only if a spoiler control is actually present.
         if (HasControl("spoiler")) yield return TestSpoiler();
-        // The four systems controls are physical again, so drive them physically — and
-        // still assert the keyboard path, because desktop sessions use it and the drill
-        // text tells the participant to.
-        yield return TestToggle("carb_heat", () => sys.CarbHeatOn);
-        // load_shed / alt_static removed from the cockpit 23 Aug 2026. The SYSTEMS remain
-        // and are still driven by K and L; there is simply no cockpit object to test.
-        yield return TestOrangeControlIndependence();
-        yield return TestFuelSelectorPhysical();
         yield return TestSystemsStillReachable();
+        yield return TestDisplaysDoNotLeakIntoTheWorld();
         yield return TestOwnershipHandback();
         yield return TestReset();
         yield return TestFrameRateIndependence();
@@ -117,6 +112,105 @@ public class ControlTestHarness : MonoBehaviour
     }
 
     // ── individual controls ───────────────────────────────────────────────────
+
+
+    /// <summary>THE COCKPIT CONTAINS EXACTLY ONE PHYSICAL CONTROL.
+    ///
+    /// Asserted rather than assumed, because "I removed the controls" is easy to believe
+    /// and easy to get half-right — a builder left in the list, or a piece of furniture
+    /// still drawn with nothing on it, would both pass unnoticed otherwise.</summary>
+    IEnumerator TestOnlyYokeIsPhysical()
+    {
+        Section("MINIMAL COCKPIT  (the yoke is the only physical control)");
+
+        int n = 0;
+        var names = new System.Text.StringBuilder();
+        foreach (var c in rig.Controls)
+        {
+            if (c == null) continue;
+            n++;
+            if (names.Length > 0) names.Append(", ");
+            names.Append(c.spec.id);
+        }
+        Check("exactly one physical control", n == 1, n + " built: " + names);
+        Check("and it is the yoke", HasControl("yoke"), "yoke=" + (HasControl("yoke") ? "present" : "MISSING"));
+
+        foreach (string gone in new[] { "throttle", "flaps", "brake", "trim", "carb_heat",
+                                        "fuel_selector", "load_shed", "alt_static" })
+            Check("no cockpit object for " + gone, !HasControl(gone),
+                  HasControl(gone) ? "STILL PRESENT" : "removed");
+        yield break;
+    }
+
+    /// <summary>REMOVING THE OBJECTS MUST NOT HAVE REMOVED THE INPUTS.
+    ///
+    /// This is the check that makes the minimal cockpit safe. The aeroplane still has a
+    /// throttle, flaps, brakes and trim; they simply have no grabbable object any more.
+    /// If any of them had stopped responding, every mission would still "pass" its own
+    /// battery — the scripted pilot drives the same code path — while a human participant
+    /// found the aeroplane unflyable.</summary>
+    IEnumerator TestRemovedInputsStillDriveable()
+    {
+        Section("REMOVED CONTROLS  (objects gone, inputs must still work)");
+        if (ctl == null) { Fail("inputs", "AircraftController missing"); yield break; }
+
+        // THROTTLE — held, because the override model expires after a grace of one frame.
+        for (int i = 0; i < 8; i++) { ctl.SetThrottle(0.75f); yield return null; }
+        Check("throttle still driveable", Mathf.Abs(ac.throttle - 0.75f) < 0.05f,
+              "phys.throttle=" + ac.throttle.ToString("F2"));
+        for (int i = 0; i < 8; i++) { ctl.SetThrottle(0f); yield return null; }
+
+        // FLAPS — detent selection, which is what the missions and the checklists use.
+        ctl.SetFlapDetent(2); yield return WaitFrames(4);
+        Check("flaps still selectable", Mathf.Abs(ctl.FlapsSelected - 1f) < 0.01f,
+              "selected=" + ctl.FlapsSelected.ToString("F2"));
+        ctl.SetFlapDetent(0); yield return WaitFrames(4);
+
+        // BRAKE.
+        for (int i = 0; i < 8; i++) { ctl.SetBrake(1f); yield return null; }
+        Check("brake still driveable", ac.brakeInput01 > 0.9f,
+              "brakeInput01=" + ac.brakeInput01.ToString("F2"));
+        for (int i = 0; i < 8; i++) { ctl.SetBrake(0f); yield return null; }
+        yield return WaitFrames(4);
+        Check("brake releases", ac.brakeInput01 < 0.05f,
+              "brakeInput01=" + ac.brakeInput01.ToString("F2"));
+
+        // TRIM.
+        for (int i = 0; i < 10; i++) { ctl.SetTrim(0.5f); yield return null; }
+        Check("trim still driveable", Mathf.Abs(ac.trim - 0.5f) < 0.06f,
+              "phys.trim=" + ac.trim.ToString("F2"));
+        for (int i = 0; i < 10; i++) { ctl.SetTrim(0f); yield return null; }
+        ctl.ClearOverrides(); yield return WaitFrames(2);
+    }
+
+    /// <summary>THE DISPLAYS' SYMBOLOGY MUST NOT BE VISIBLE TO ANY WORLD CAMERA.
+    ///
+    /// LivePFD and LiveMFD build their symbology as ordinary world objects on private
+    /// layers, parented to their own off-screen cameras. That is fine as long as every
+    /// camera that renders the world excludes those layers — and the cockpit camera did
+    /// not. Because the MFD's camera sits above the aeroplane looking down, its compass
+    /// lettering appeared as huge sheared glyphs hanging over the cabin, which read as the
+    /// moving map somehow mirrored into the roof glass.
+    ///
+    /// Checking the MASKS rather than looking for glyphs in a render makes this
+    /// deterministic and independent of where the aeroplane happens to be.</summary>
+    IEnumerator TestDisplaysDoNotLeakIntoTheWorld()
+    {
+        Section("DISPLAY LAYERS  (symbology may only be seen by its own camera)");
+
+        int mask = CockpitBuilder.DisplayOnlyMask;
+        foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+        {
+            // The displays' own cameras are the ones that SHOULD see these layers; they
+            // are identified by rendering to a texture rather than to the screen.
+            if (cam.targetTexture != null) continue;
+            bool clean = (cam.cullingMask & mask) == 0;
+            Check("world camera '" + cam.name + "' excludes the display layers", clean,
+                  "cullingMask=0x" + cam.cullingMask.ToString("X")
+                  + " display bits=0x" + (cam.cullingMask & mask).ToString("X"));
+        }
+        yield break;
+    }
 
     IEnumerator TestYoke()
     {
@@ -481,8 +575,13 @@ public class ControlTestHarness : MonoBehaviour
     {
         Section("FRAME RATE INDEPENDENCE  (30 / 60 / 90 FPS must agree)");
 
-        var c = Find("throttle");
-        if (c == null) { Fail("framerate", "no throttle control"); yield break; }
+        // Whichever smoothed control the cockpit actually has. This used to demand the
+        // throttle by name; after the cockpit was reduced to the yoke alone, the test
+        // reported "no throttle control" and stopped checking the smoothing law at all.
+        // The property under test belongs to PhysicalControl, not to any one control.
+        var c = Find("throttle") ?? Find("yoke");
+        if (c == null) { Fail("framerate", "no smoothed control to measure"); yield break; }
+        report.AppendLine("   measuring on: " + c.spec.id);
 
         int[] rates = { 30, 60, 90 };
         float[] measured = new float[rates.Length];
@@ -512,17 +611,22 @@ public class ControlTestHarness : MonoBehaviour
             // Accumulate the SAME clock the smoothing uses (Time.deltaTime), not
             // unscaledDeltaTime — captureFramerate pins deltaTime and leaves real
             // unscaled time alone, so measuring the wrong one silently tests nothing.
-            float t = 0f; int frames = 0;
+            float t = 0f; int frames = 0; float target = 0f;
             while (t < Horizon)
             {
                 c.UpdateGrab(start + dir * c.spec.travel);
+                if (frames == 0) target = c.Value;   // the step the smoothing chases
                 t += Time.deltaTime; frames++;
                 yield return null;
             }
 
             // Smoothed, NOT Value: Value is the raw hand position and steps instantly.
             measured[i] = c.Smoothed;
-            predicted[i] = 1f - Mathf.Exp(-t / c.spec.smoothingTau);
+            // Scaled by the STEP SIZE rather than assumed to be 1. A centred control, or
+            // one with a response curve, does not reach 1.0 at full travel, and hard-coding
+            // 1 would make this a test of the control's shaping instead of a test of the
+            // frame-rate independence of its smoothing.
+            predicted[i] = target * (1f - Mathf.Exp(-t / c.spec.smoothingTau));
             elapsed[i] = t;
             c.EndGrab();
 

@@ -145,7 +145,9 @@ public class MissionShots : MonoBehaviour
         }
         else
         {
-            shotCam.cullingMask = ~0;
+            // Everything EXCEPT the displays' private symbology layers, which belong to
+            // their own off-screen cameras and are nowhere near where they appear to be.
+            shotCam.cullingMask = ~CockpitBuilder.DisplayOnlyMask;
             shotCam.nearClipPlane = 0.01f;
             shotCam.fieldOfView = 55f;
         }
@@ -154,7 +156,7 @@ public class MissionShots : MonoBehaviour
         // not float in front of the aeroplane.
         var e = new GameObject("ShotCamExt");
         extCam = e.AddComponent<Camera>();
-        extCam.cullingMask = ~(1 << CockpitBuilder.CockpitLayer);
+        extCam.cullingMask = ~((1 << CockpitBuilder.CockpitLayer) | CockpitBuilder.DisplayOnlyMask);
         extCam.nearClipPlane = 0.3f;
         extCam.farClipPlane = 12000f;
         extCam.fieldOfView = 42f;

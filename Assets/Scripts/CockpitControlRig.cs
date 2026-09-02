@@ -217,42 +217,35 @@ public class CockpitControlRig : MonoBehaviour
         ctl = phys.GetComponent<AircraftController>();
         sys = phys.GetComponent<AircraftSystems>();
 
-        BuildStructure();          // furniture first, so every control lands ON something
+        // ═══════════════════════════════════════════════════════════════════════
+        // MINIMAL COCKPIT — 3 September 2026, on request.
+        // ═══════════════════════════════════════════════════════════════════════
+        //
+        // The cockpit contains exactly three things: the CONTROL YOKE, and the two glass
+        // displays (built by LivePFD and LiveMFD, not here). Nothing else is generated —
+        // no throttle, no flap lever, no brake, no trim wheel, no carburettor heat, no
+        // fuel selector, no sub-panel, no systems bay, no placards.
+        //
+        // WHAT THIS DOES NOT CHANGE
+        //   The aeroplane still has every one of those inputs. They live in
+        //   CessnaPhysics / AircraftController / AircraftSystems exactly as before, they
+        //   are still driven by the keyboard, still logged in telemetry, and still set by
+        //   ScenarioEngine at the start of each trial. Only the grabbable cockpit OBJECTS
+        //   are gone. No mission, no checklist and no telemetry column changed.
+        //
+        // THE CONSEQUENCE, STATED PLAINLY
+        //   Those inputs become KEYBOARD-ONLY. On the desktop the simulator is unchanged
+        //   and fully flyable. In a headset there is no keyboard, so a participant in VR
+        //   can move the yoke and nothing else — they cannot set power, flaps, brakes or
+        //   trim by hand, and the systems drills in the HIGH missions cannot be performed.
+        //   That is a deliberate decision recorded here, not an oversight.
+        //
+        //   The builders below are all retained and unreferenced, so restoring any single
+        //   control is one line in this list.
 
         var list = new System.Collections.Generic.List<PhysicalControl>();
         list.Add(BuildYoke());
-        list.Add(BuildThrottle());
-        list.Add(BuildFlapLever());
-        // NO SPOILER LEVER. A Cessna 172 has no spoilers, and this one served no
-        // experimental purpose: no mission and no checklist referenced it, and
-        // AircraftController held it retracted for the whole of every recorded trial.
-        // So it was an unrealistic control, in the most-looked-at part of the panel,
-        // that a participant could see and reach and that did nothing — which is
-        // precisely the "generic game control" the cockpit is supposed not to have.
-        //
-        // The simulation capability is untouched: the spoiler still exists in the flight
-        // model and is still on the X key for development, still locked out during a
-        // recorded trial, and its telemetry column still proves it stayed at zero rather
-        // than being assumed to have.
-        //
-        // The quadrant is now throttle + flaps, which is what the aeroplane has.
-        // BuildSpoilerLever() is retained below, unreferenced, because the geometry is
-        // good and a future aircraft type may want it.
-        list.Add(BuildBrakePedals());
-        list.Add(BuildTrimWheel());
-        // The four systems memory items are RESTORED as physical controls. They were taken
-        // out on 22 Aug as panel clutter, but the criterion is whether the experiment needs
-        // them, and it does: ChecklistLibrary gates real DO items on their state —
-        // Electrical/H2 on LoadShed, StaticBlock/H3 on AlternateStaticOpen, EngineFailure/H4
-        // on CarbHeatOn and Selector != Both. Keyboard H/J/K/L covers desktop, but a headset
-        // has no keyboard, so without these objects those three HIGH missions would be
-        // unperformable in VR. They are kept deliberately small and grouped into one bay.
-        list.Add(BuildCarbHeat());
-        list.Add(BuildFuelSelector());
-        // LOAD SHED and ALTERNATE STATIC removed from the cockpit (23 Aug 2026) — the two
-        // black switches on the left bay. The SYSTEMS behind them are untouched and still
-        // reachable on K and L; they simply no longer have a cockpit object, which makes
-        // H2 and H3 desktop-only. See COCKPIT_CONTROLS.md for the consequence.
+
         list.RemoveAll(c => c == null);
         Controls = list.ToArray();
 

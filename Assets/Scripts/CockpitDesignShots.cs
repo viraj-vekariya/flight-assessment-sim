@@ -44,6 +44,14 @@ public class CockpitDesignShots : MonoBehaviour
     IEnumerator Start()
     {
         dir = Path.Combine(Application.persistentDataPath, "CockpitDesign");
+        // WIPE FIRST. This folder is a cache of whatever the tool last wrote, and shot
+        // lists change between builds — so a file from an older run sits there looking
+        // exactly like a current result. That is not hypothetical: a stale 00_view_up.png
+        // from a previous cockpit build was read as evidence that a fix had not worked.
+        if (Directory.Exists(dir))
+        {
+            foreach (var f in Directory.GetFiles(dir)) { try { File.Delete(f); } catch { } }
+        }
         Directory.CreateDirectory(dir);
 
         float t0 = Time.realtimeSinceStartup;
@@ -70,6 +78,19 @@ public class CockpitDesignShots : MonoBehaviour
 
         // ── the view the participant actually gets ────────────────────────────────
         yield return Shot(Vector3.zero, Vector3.zero, -1f, "00_pilot_view.png");   // the REAL pilot view
+
+        // LOOK UP AND AROUND. These exist because of a specific defect: the two glass
+        // displays build their symbology as world objects on private layers, parented to
+        // their own off-screen cameras, and the MFD's camera sits 500 m ABOVE the
+        // aeroplane. Any world camera that fails to cull those layers therefore shows the
+        // moving map's compass letters and data readouts hanging in the sky — mirrored,
+        // because they are seen from behind. No forward-facing shot can catch that, which
+        // is why it survived every previous render pass.
+        yield return Shot(Vector3.zero, new Vector3(-35f, 0f, 0f), -1f, "00_view_up.png");
+        yield return Shot(Vector3.zero, new Vector3(-70f, 0f, 0f), -1f, "00_view_straight_up.png");
+        yield return Shot(Vector3.zero, new Vector3(40f, 0f, 0f), -1f, "00_view_down.png");
+        yield return Shot(Vector3.zero, new Vector3(0f, -60f, 0f), -1f, "00_view_left.png");
+        yield return Shot(Vector3.zero, new Vector3(0f, 60f, 0f), -1f, "00_view_right.png");
 
         // Looking down-right at the quadrant, which is where a pilot's eye goes when
         // reaching for power.
@@ -106,6 +127,7 @@ public class CockpitDesignShots : MonoBehaviour
         yield return Shot(Vector3.zero, new Vector3(16f, 11f, 0f), 22f, "04_mfd.png");
 
         IdentifyRenderers();
+        DumpDisplayLeak();
         Debug.Log("[DESIGN] wrote shots to " + dir);
         ControlCheckMode.Exit();
         Done();
@@ -169,6 +191,90 @@ public class CockpitDesignShots : MonoBehaviour
         foreach (var r in rows) sb.AppendLine(r);
         File.WriteAllText(System.IO.Path.Combine(dir, "pilot_view_occupancy.txt"), sb.ToString());
         Debug.Log("[DESIGN]   wrote pilot_view_occupancy.txt (" + rows.Count + " renderers)");
+    }
+
+
+    /// <summary>Everything needed to explain why display symbology is visible in the
+    /// world: every camera and its mask, and every renderer sitting on a display-only
+    /// layer, with where it actually is.</summary>
+    void DumpDisplayLeak()
+    {
+        var sb = new System.Text.StringBuilder();
+        int mask = CockpitBuilder.DisplayOnlyMask;
+        sb.AppendLine("DISPLAY-ONLY LAYER MASK = 0x" + mask.ToString("X") + "  (layers 12, 13, 14)");
+        sb.AppendLine();
+        sb.AppendLine("CAMERAS");
+        foreach (var cam in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            sb.AppendLine(string.Format(
+                "  {0,-18} enabled={1,-5} target={2,-6} depth={3,6:0.0} mask=0x{4:X8} seesDisplay={5} pos={6}",
+                cam.name, cam.enabled, cam.targetTexture != null ? "RT" : "SCREEN",
+                cam.depth, cam.cullingMask, (cam.cullingMask & mask) != 0 ? "YES" : "no",
+                cam.transform.position.ToString("0.00")));
+
+        sb.AppendLine();
+        sb.AppendLine("RENDERERS ON DISPLAY-ONLY LAYERS");
+        int n = 0;
+        foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            if (((1 << r.gameObject.layer) & mask) == 0) continue;
+            n++;
+            if (n <= 40)
+                sb.AppendLine(string.Format("  layer {0,2}  {1,-16} parent={2,-16} pos={3}",
+                    r.gameObject.layer, r.transform.name,
+                    r.transform.parent != null ? r.transform.parent.name : "(root)",
+                    r.transform.position.ToString("0.00")));
+        }
+        sb.AppendLine("  total on display layers: " + n);
+
+        sb.AppendLine();
+        sb.AppendLine("SYMBOLOGY-SHAPED RENDERERS THAT ARE *NOT* ON A DISPLAY LAYER");
+        foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+        {
+            if (((1 << r.gameObject.layer) & mask) != 0) continue;
+            string nm = r.transform.name;
+            if (nm != "Data" && nm != "MapSymbol" && nm != "RingSeg" && nm != "Label"
+                && nm != "Dia" && !nm.StartsWith("Wpt") && !nm.StartsWith("Leg")) continue;
+            sb.AppendLine(string.Format("  layer {0,2}  {1,-16} parent={2,-16} pos={3}",
+                r.gameObject.layer, nm,
+                r.transform.parent != null ? r.transform.parent.name : "(root)",
+                r.transform.position.ToString("0.00")));
+        }
+
+        // What sits in the strip BETWEEN the two displays — the moulded radio/avionics
+        // stack. Named here so it can be hidden by node rather than guessed at.
+        sb.AppendLine();
+        sb.AppendLine("GLB NODES IN THE PANEL STRIP BETWEEN THE DISPLAYS");
+        sb.AppendLine("  (model-local box x -0.040..0.012, y 0.440..0.540, z 0.72..0.82)");
+        var holder = GameObject.Find("RealCockpitModel");
+        if (holder != null)
+        {
+            Transform hr = holder.transform;
+            foreach (var r in hr.GetComponentsInChildren<Renderer>(true))
+            {
+                var mf = r.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                Bounds mb = mf.sharedMesh.bounds;
+                Vector3 lo = new Vector3(9e9f, 9e9f, 9e9f), hi = -lo;
+                for (int i = 0; i < 8; i++)
+                {
+                    var cr = new Vector3((i & 1) == 0 ? mb.min.x : mb.max.x,
+                                         (i & 2) == 0 ? mb.min.y : mb.max.y,
+                                         (i & 4) == 0 ? mb.min.z : mb.max.z);
+                    Vector3 lp = hr.InverseTransformPoint(r.transform.TransformPoint(cr));
+                    lo = Vector3.Min(lo, lp); hi = Vector3.Max(hi, lp);
+                }
+                bool hit = hi.x > -0.040f && lo.x < 0.012f
+                        && hi.y > 0.440f && lo.y < 0.540f
+                        && hi.z > 0.72f  && lo.z < 0.82f;
+                if (!hit) continue;
+                sb.AppendLine(string.Format("  {0,-14} enabled={1,-5} x[{2,6:0.000},{3,6:0.000}] y[{4,6:0.000},{5,6:0.000}] z[{6,6:0.000},{7,6:0.000}]",
+                    r.transform.name, r.enabled, lo.x, hi.x, lo.y, hi.y, lo.z, hi.z));
+            }
+        }
+        else sb.AppendLine("  (RealCockpitModel not found)");
+
+        File.WriteAllText(Path.Combine(dir, "display_leak.txt"), sb.ToString());
+        Debug.Log("[DESIGN]   wrote display_leak.txt");
     }
 
     static string NodePath(Transform t)

@@ -53,6 +53,12 @@ public class RealCockpit : MonoBehaviour
                       //   below the cabin floor and on the cockpit layer, so hiding it changes nothing
         "Object_17",  // REVERT_CANDIDATE: rudder bar — wide floor element spanning both sides; check in-sim and remove if it exposes raw floor geometry
         "Object_60",  // center console
+        // MINIMAL COCKPIT (3 Sep 2026): the moulded radio / avionics button stack in the
+        // strip between the two displays. Three separate nodes, all at x -0.016..-0.008
+        // and y 0.472..0.519 — i.e. exactly the gap between the PFD (ends x -0.028) and
+        // the MFD (starts x +0.004) — so hiding them removes the buttons and leaves the
+        // panel, the bezel (Object_83) and both displays untouched.
+        "Object_84", "Object_85", "Object_86",
         "Object_64",  // rear seats
     };
     // The seat BODY (cushion + back + headrest) is a single TWIN mesh spanning both seats,

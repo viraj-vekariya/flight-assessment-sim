@@ -21,6 +21,35 @@ public static class CockpitBuilder
     // the external chase/orbit camera culls it (so the panel never floats in view).
     public const int CockpitLayer = 11;
 
+    // ── LAYERS THAT BELONG TO THE TWO GLASS DISPLAYS AND TO NOTHING ELSE ──────────
+    //
+    // LivePFD and LiveMFD each build their symbology — the attitude ball, the compass
+    // rose and its N/NE/E letters, the route, the data readouts — as ordinary world
+    // objects on a private layer, parented to their own off-screen camera, and each of
+    // those cameras renders only its own layer into a RenderTexture. That part is sound.
+    //
+    // What was missing is the other half of the contract: every camera that renders the
+    // WORLD has to exclude those layers. The cockpit camera's mask was
+    // `~(1 << ExteriorLayer)` — everything except the aeroplane's exterior — so it also
+    // drew the displays' symbology directly into the pilot's view. The MFD's camera sits
+    // above the aircraft looking down, and its symbology is parented to it, so the
+    // compass letters appeared as huge sheared glyphs hanging above the cabin: the "map
+    // mirrored in the glass, up in the roof". Nothing was mirrored and nothing was in the
+    // glass; it was the map's own lettering, floating in the sky, seen through it.
+    //
+    // These constants mirror the layer numbers chosen inside LivePFD (13) and LiveMFD
+    // (14), plus 12, which LiveMFD already excludes as reserved. They are declared here
+    // rather than imported from those files so that fixing the cameras needs no change to
+    // the displays themselves.
+    public const int ReservedDisplayLayer = 12;
+    public const int PfdSymbolLayer       = 13;
+    public const int MfdSymbolLayer       = 14;
+
+    /// <summary>Bit mask of the layers only the displays' own off-screen cameras may
+    /// render. Every world camera must exclude it.</summary>
+    public const int DisplayOnlyMask =
+        (1 << ReservedDisplayLayer) | (1 << PfdSymbolLayer) | (1 << MfdSymbolLayer);
+
     const float PanelZ = 1.3f;
     const float RowTop = 0.30f;   // lowered so the panel top clears the forward view
     const float RowBot = 0.06f;
@@ -385,7 +414,10 @@ public static class CockpitBuilder
         cam.nearClipPlane = 0.05f;
         cam.farClipPlane = 15000f;   // big world: see the distant mountain ring
         cam.clearFlags = CameraClearFlags.Skybox;
-        cam.cullingMask = ~(1 << AircraftBuilder.ExteriorLayer); // don't draw the plane's exterior
+        // Not the exterior, and NOT the two displays' symbology layers — see
+        // DisplayOnlyMask. Omitting the second half is what put the moving map's
+        // compass lettering in the sky above the cabin.
+        cam.cullingMask = ~((1 << AircraftBuilder.ExteriorLayer) | DisplayOnlyMask);
         camGo.AddComponent<AudioListener>();
         camGo.AddComponent<CockpitCamera>();
     }
