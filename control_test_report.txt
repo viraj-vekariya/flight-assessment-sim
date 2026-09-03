@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-03 05:17:58
+generated 2026-09-03 05:55:51
 unity 6000.0.77f1
 
 controls built: 1
@@ -43,8 +43,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
    OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
+   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
 
 ── CONTROL OWNERSHIP  (the override latch regression)
    OK    a single write takes ownership   [PitchOverridden=true]

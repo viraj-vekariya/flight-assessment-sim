@@ -1,6 +1,6 @@
 WIND MODEL TEST
 ===============
-generated 2026-09-03 05:26:22
+generated 2026-09-03 06:04:19
 unity 6000.0.77f1
 
 -- model arithmetic --
@@ -52,7 +52,7 @@ cockpit rig  : 1 controls
 -- crosswind produces the predicted drift --
    airspeed 59.9 m/s, wind 11.0 m/s, drift 10.57° (predicted 10.39°)
    ok   crosswind from the left drifts the track right
-   ok   drift angle matches atan(Vw/Vac)  (got 10.5670, want 10.3897 ±3.5000)
+   ok   drift angle matches atan(Vw/Vac)  (got 10.5669, want 10.3897 ±3.5000)
    ok   crosswind from the right drifts the track left
 
 -- shear: the wind the aeroplane is in changes with height --
@@ -62,20 +62,20 @@ cockpit rig  : 1 controls
    ok   the discrete shear layer changes the wind across it
 
 -- ground: the nose weathervanes into the crosswind --
-      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 3806 grounded 100% peak gs 52.2 m/s crashed=no
+      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 2726 grounded 100% peak gs 52.2 m/s crashed=no
    crosswind from the right, no rudder: heading change +27.49°
    ok   nose swings right into a right crosswind
-      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 3912 grounded 100% peak gs 10.1 m/s crashed=no
+      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 2311 grounded 100% peak gs 10.1 m/s crashed=no
    crosswind from the left,  no rudder: heading change -27.49°
    ok   nose swings left into a left crosswind
-      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 4074 grounded 100% peak gs 10.1 m/s crashed=no
+      [roll diag] mean|yawInput|=0.000 yawOvr 100% meanThr 1.00 state Flying ctl ok frames 3434 grounded 100% peak gs 10.1 m/s crashed=no
    calm, no rudder:                     heading change +0.00°
    ok   the roll tracks straight in calm air  (got 0.0000, want 0.0000 ±1.0000)
 
 -- rudder authority against the crosswind --
-   15 kt crosswind, rudder holding heading: max lateral deviation 0.71 m
+   15 kt crosswind, rudder holding heading: max lateral deviation 0.70 m
    ok   the centreline is holdable at the demonstrated crosswind (< 15 m)
-   39 kt crosswind, rudder holding heading: max lateral deviation 2.79 m
+   39 kt crosswind, rudder holding heading: max lateral deviation 2.80 m
    ok   a grossly out-of-limits crosswind costs materially more deviation
 
 -- reset --

@@ -103,3 +103,46 @@ ever have caught a defect that lives above the cabin.
 | Cockpit control battery | **0 problems** — 1 control built (the yoke) |
 | Mission bank (quick, 12) | **0 problems**, 42-mission bank intact, design checks OK |
 | Wind battery | **46 checks, 0 problems** |
+
+---
+
+## 6. Follow-ups, 3 September 2026
+
+### The "camera on the aeroplane" and the "sun on the runway" were Editor gizmos
+
+Three icons were reported: a loudspeaker and a cloud stuck to the aeroplane in the
+external view, and a sun-like starburst floating in the cockpit. None of them is an object
+in the scene, and nothing in the simulation creates them. They are Unity's built-in
+**gizmo icons**, drawn by the Editor on top of everything with no depth test:
+
+| Icon | Component it marks | Where |
+|---|---|---|
+| Loudspeaker | `AudioSource` | on the aeroplane (engine / wind / ground audio) |
+| Cloud | `WindZone` | on the aeroplane |
+| Starburst loudspeaker ("the sun") | `AudioListener` | at the cockpit camera |
+
+**They have never appeared in a build and never will** — they exist only in the Editor's
+Game view, and only while its Gizmos toggle is on. Deleting scene objects would not have
+removed them.
+
+`Assets/Editor/GizmoIcons.cs` now disables the icons themselves through
+`UnityEditor.AnnotationUtility`, on every editor load, so they stay gone regardless of the
+Gizmos toggle. Verified: *disabled 79 gizmo icons*. Two menu items under
+**Tools → Experiment** hide or restore them. The file lives in an Editor folder, so it is
+never compiled into a player and cannot affect the build. Every reflection call is guarded:
+if a future Unity renames the internal API, it logs once and does nothing.
+
+### The map was lightened
+
+The MFD's dim overlay was 78% opaque over a very dark navy. At dusk, with already-dark
+terrain beneath it, that left the map close to black and the ground on it unreadable. It is
+now **48% over a slightly lighter, less saturated tone** (`LiveMFD`, the single
+`AddTransparentQuad` call).
+
+The reason the overlay exists is preserved: the display is still darker than the symbology
+drawn in front of it, so the compass, the route and the readouts remain the brightest
+things on screen. That ordering is what makes it read as an instrument rather than a game
+minimap — only the amount of dimming changed, not the design.
+
+This is the one change made to a display. It was explicitly requested, and it is confined
+to the overlay's colour and alpha: no geometry, no layout, no symbology, no code path.

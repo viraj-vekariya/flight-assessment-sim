@@ -140,9 +140,17 @@ public class LiveMFD : MonoBehaviour
         // survived, so the fault looked like a font-colour problem rather than a
         // depth-ordering one. The overlay belongs BEHIND the symbols and in front of the
         // world: z = 4.
+        // LIGHTENED 3 Sep 2026, on request. The overlay was 78% opaque over a very dark
+        // navy, which at dusk — when the terrain it sits on is already dark — left the map
+        // almost black and the ground on it unreadable. It is now 48% over a slightly
+        // lighter, less saturated tone, which brightens the terrain while keeping the
+        // display darker than the symbology drawn in front of it. That ordering is the
+        // point of the overlay and is preserved: the numbers and the compass are still the
+        // brightest things on the screen, which is what makes it read as an instrument
+        // rather than as a game minimap.
         AddTransparentQuad(symRoot, new Vector3(0f, 0f, 4.0f),
                            new Vector3(halfWidth * 2.4f, mapSize * 2.4f, 1f),
-                           new Color(0.02f, 0.05f, 0.08f, 0.78f), SymbolLayer);
+                           new Color(0.06f, 0.10f, 0.13f, 0.48f), SymbolLayer);
 
         // ---- ROUTE LAYER ----
         // Legs and waypoint marks live in MAP-CAMERA-LOCAL space and are repositioned
