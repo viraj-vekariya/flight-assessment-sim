@@ -69,7 +69,34 @@ public class CessnaPhysics : MonoBehaviour
     /// It applies ON THE GROUND TOO, and that is the point: it is what makes a
     /// crosswind take-off roll require rudder. Before this term existed a 15 kt
     /// crosswind produced no yawing tendency at all.</summary>
-    public float finVolume = 17f;
+    // VERTICAL-FIN YAW STIFFNESS, in cubic metres.
+    //
+    // The term below is applied as  torque = q * sin(beta) * finVolume,  so finVolume has
+    // the units of S * b and is exactly the aeroplane's directional stability derivative
+    // scaled by its own geometry:
+    //
+    //     finVolume = wingArea * span * Cn_beta = 16.2 * 11.0 * Cn_beta
+    //
+    // A Cessna 172's Cn_beta is about 0.069 per radian (sources put it in 0.065-0.075),
+    // which gives 12.2. It was 17, i.e. Cn_beta = 0.095 — roughly 40% stiffer than the real
+    // aeroplane, which made it hold a turn almost perfectly coordinated with no rudder at
+    // all and damped out sideslip faster than a 172 does. Derived, not tuned by feel.
+    public float finVolume = 12.2f;
+
+    // DIHEDRAL EFFECT — roll due to sideslip, in cubic metres, same construction as
+    // finVolume above:
+    //
+    //     dihedralVolume = wingArea * span * |Cl_beta| = 16.2 * 11.0 * 0.089 = 15.9
+    //
+    // A Cessna 172 is a HIGH-WING aeroplane, so its Cl_beta is strongly negative (about
+    // -0.089 per radian): sideslip rolls it AWAY from the slip. Until now the model had no
+    // roll-from-sideslip term at all, which is a real omission rather than a simplification.
+    // Without it:
+    //   * a slip does not need opposite aileron, so it does not feel like a slip;
+    //   * a crosswind take-off needs no wing-low technique;
+    //   * there is no spiral mode and no Dutch roll — the two lateral modes an aeroplane has.
+    // Set to 0 to fly without it.
+    public float dihedralVolume = 15.9f;
 
     [Header("Aerodynamic rate damping")]
     // The tail/wings resist angular RATE, so a held control input settles at a steady rate
@@ -400,8 +427,23 @@ public class CessnaPhysics : MonoBehaviour
             // Sign: localVel.x > 0 means the relative wind comes from the RIGHT, and the
             // nose must swing right (positive yaw) to point into it.
             if (Mathf.Abs(localVel.x) > 0.01f)
-                rb.AddRelativeTorque(0f, 0.5f * airDensity * speed * localVel.x * finVolume, 0f,
-                                     ForceMode.Force);
+            {
+                float betaTerm = 0.5f * airDensity * speed * localVel.x;   // = q * sin(beta)
+                rb.AddRelativeTorque(0f, betaTerm * finVolume, 0f, ForceMode.Force);
+
+                // DIHEDRAL EFFECT. localVel.x > 0 is a slip to the RIGHT, so the relative
+                // wind comes from the right, the right wing meets it at a higher effective
+                // incidence, and the aeroplane rolls LEFT — away from the slip. In Unity a
+                // POSITIVE torque about local +Z takes +X (the right wing) toward +Y (up),
+                // which is a roll to the left, so the sign is positive here while the
+                // aileron term a few lines above is negated.
+                //
+                // This is what couples the lateral axes: it gives the aeroplane a spiral
+                // mode and a Dutch roll, makes a slip require opposite aileron, and makes a
+                // crosswind take-off need the upwind wing held down.
+                if (dihedralVolume != 0f)
+                    rb.AddRelativeTorque(0f, 0f, betaTerm * dihedralVolume, ForceMode.Force);
+            }
 
             // Static stability: align the nose toward the velocity vector. In a
             // stall this pulls the nose DOWN toward the airflow, so the aircraft

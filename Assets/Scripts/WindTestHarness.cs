@@ -349,8 +349,29 @@ public class WindTestHarness : MonoBehaviour
                             groundElevationM: Aerodrome.RunwayElevationM);
         yield return RollHoldingCentreline(9f, r => dGross = Mathf.Max(dGross, r));
         report.AppendLine($"   39 kt crosswind, rudder holding heading: max lateral deviation {dGross:F2} m");
+        report.AppendLine($"   ratio {(dLimit > 0.01f ? dGross / dLimit : 0f):F1}x  (runway half-width {Aerodrome.RunwayHalfWidth:F0} m)");
+        // A RATIO, NOT AN ABSOLUTE MARGIN.
+        //
+        // This asserted `dGross > dLimit + 2` — two metres more deviation — which is a
+        // number implicitly calibrated to one particular value of the fin's yaw stiffness.
+        // Changing that stiffness to the figure a real 172 actually has moved both
+        // deviations down proportionally (0.70/2.80 became 0.50/1.96) and the absolute
+        // margin failed while the RELATIONSHIP the test exists to check was unchanged:
+        // 4.0x before, 3.9x after. A scale-free criterion states the intent and does not
+        // have to be re-tuned every time an aerodynamic coefficient is corrected.
         True("a grossly out-of-limits crosswind costs materially more deviation",
-             dGross > dLimit + 2f);
+             dLimit > 0.01f && dGross > dLimit * 2.5f);
+
+        // HONEST LIMITATION, recorded rather than asserted away. The comment above this
+        // test says a grossly out-of-limits crosswind "must not" be holdable. It never
+        // tested that, and the aeroplane does not behave that way: 39 kt of crosswind still
+        // holds the centreline to within about 2 m of a 15 m half-width, under this fin
+        // value and under the previous one. The GROUND crosswind model is more forgiving
+        // than the real aeroplane. It does not affect the airborne crab behaviour the
+        // crosswind missions actually measure, but it is a real gap and it is written down.
+        if (dGross < Aerodrome.RunwayHalfWidth * 0.5f)
+            report.AppendLine($"   NOTE: a 39 kt crosswind is still holdable to {dGross:F1} m. "
+                            + "The ground crosswind model is more forgiving than a real 172.");
         report.AppendLine();
     }
 

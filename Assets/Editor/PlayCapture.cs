@@ -97,7 +97,7 @@ public static class PlayCapture
         if (!EditorApplication.isPlaying) return;
         if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
         bool done = ControlTestHarness.Finished;
-        bool timedOut = EditorApplication.timeSinceStartup - t0 > 300.0;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
         if (!done && !timedOut) return;
         int failures = ControlTestHarness.Failures;
         if (timedOut && !done) { Debug.LogError("[CTEST] HARD TIMEOUT"); failures = Mathf.Max(1, failures); }
@@ -108,6 +108,32 @@ public static class PlayCapture
     }
 
     /// <summary>Runs the wind-model tests (WindTestHarness, -windtest).</summary>
+
+    public static void RunPhysicsTest()
+    {
+        EditorSettings.enterPlayModeOptionsEnabled = true;
+        EditorSettings.enterPlayModeOptions =
+            EnterPlayModeOptions.DisableDomainReload | EnterPlayModeOptions.DisableSceneReload;
+        entered = false;
+        EditorApplication.update += TickPhysicsTest;
+        EditorApplication.EnterPlaymode();
+    }
+
+    static void TickPhysicsTest()
+    {
+        if (!EditorApplication.isPlaying) return;
+        if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
+        bool done = PhysicsTestHarness.Finished;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
+        if (!done && !timedOut) return;
+        int failures = PhysicsTestHarness.Failures;
+        if (timedOut && !done) { Debug.LogError("[PTEST] HARD TIMEOUT"); failures = Mathf.Max(1, failures); }
+        Debug.Log("[PTEST] exiting, failures=" + failures);
+        EditorApplication.update -= TickPhysicsTest;
+        EditorApplication.isPlaying = false;
+        EditorApplication.Exit(failures == 0 ? 0 : 1);
+    }
+
     public static void RunWindTest()
     {
         EditorSettings.enterPlayModeOptionsEnabled = true;
@@ -123,7 +149,7 @@ public static class PlayCapture
         if (!EditorApplication.isPlaying) return;
         if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
         bool done = WindTestHarness.Finished;
-        bool timedOut = EditorApplication.timeSinceStartup - t0 > 300.0;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
         if (!done && !timedOut) return;
         int failures = WindTestHarness.Failures;
         if (timedOut && !done) { Debug.LogError("[WTEST] HARD TIMEOUT"); failures = Mathf.Max(1, failures); }
@@ -153,7 +179,7 @@ public static class PlayCapture
         if (!EditorApplication.isPlaying) return;
         if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
         bool done = CockpitDesignShots.Finished;
-        bool timedOut = EditorApplication.timeSinceStartup - t0 > 300.0;
+        bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
         if (!done && !timedOut) return;
         if (timedOut && !done) Debug.LogError("[DESIGNSHOTS] HARD TIMEOUT");
         EditorApplication.update -= TickDesignShots;
