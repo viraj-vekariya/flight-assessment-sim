@@ -242,9 +242,33 @@ public class CockpitControlRig : MonoBehaviour
         //
         //   The builders below are all retained and unreferenced, so restoring any single
         //   control is one line in this list.
+        //
+        // ═══════════════════════════════════════════════════════════════════════
+        // AMENDED 6 September 2026 — THE THROTTLE IS BACK. Nothing else is.
+        // ═══════════════════════════════════════════════════════════════════════
+        //
+        // The cockpit now contains the YOKE, the THROTTLE, and the two glass displays.
+        // Everything in the paragraphs above still stands for every OTHER control: flaps,
+        // brake, trim, carburettor heat and the fuel selector remain keyboard-only, and a
+        // participant in a headset still cannot perform the HIGH missions' systems drills.
+        //
+        // WHY THE THROTTLE AND NOT THE REST
+        //   Power is the one input that is set continuously through every phase of every
+        //   mission — take-off, climb, cruise, descent, go-around — where the others are
+        //   set a handful of times at known moments. Restoring it is what makes the
+        //   aeroplane flyable by hand; restoring the others would rebuild the cluttered
+        //   panel that was deliberately removed.
+        //
+        // NO NEW FURNITURE
+        //   BuildStructure() is deliberately NOT called. It would draw the sub-panel, its
+        //   lip and the systems bay — backing plates for controls that no longer exist.
+        //   BuildQuadrantHousing() IS called, but it builds no geometry at all: it is a
+        //   naming root with no renderer, and exists only so the throttle has a parent.
 
         var list = new System.Collections.Generic.List<PhysicalControl>();
+        BuildQuadrantHousing();
         list.Add(BuildYoke());
+        list.Add(BuildThrottle());
 
         list.RemoveAll(c => c == null);
         Controls = list.ToArray();
@@ -452,7 +476,26 @@ public class CockpitControlRig : MonoBehaviour
             // percent of full deflection rather than a few tens of percent.
             travel = 0.16f, secondaryTravel = 0.18f,
             centred = true,
-            captureRadius = 0.13f,      // the biggest control, and the one you reach for blind
+            // 65 mm, REDUCED FROM 130 mm when the throttle came back. Measured, not guessed.
+            //
+            // CockpitInteractorMouse picks the eligible control NEAREST ALONG THE RAY, and
+            // the yoke sits 45 mm closer to the pilot than the panel. A mouse ray aimed at
+            // the throttle knob passes 93 mm from the yoke's centre — inside a 130 mm
+            // capture sphere — so the yoke was selected instead and the throttle, though
+            // built, visible and correctly wired, could not be grabbed with a mouse at all.
+            // ControlTestHarness.ThrottleIsWhatTheMouseGrabs is what caught it and is what
+            // will catch it again.
+            //
+            // 65 mm keeps a 28 mm margin against that worst case (93 mm, at idle; the
+            // margin only grows as power comes up) and still leaves the yoke by far the
+            // largest target in the cockpit: at the 185 mm the hub sits from the eye, 65 mm
+            // subtends about 19 deg, roughly a quarter of the frame's width.
+            //
+            // VR was never affected — CockpitInteractorVR picks the control NEAREST THE
+            // HAND, and a hand on the knob is 0 mm from the throttle against 140 mm from
+            // the yoke. This is a mouse-only defect, which is exactly why aiming, and not
+            // just grabbing, has to be tested.
+            captureRadius = 0.065f,
             smoothingTau = 0.045f,
             // Slight softening around neutral so small hand jitter is not full-scale
             // aileron, without making large deflections feel dead.
@@ -476,7 +519,28 @@ public class CockpitControlRig : MonoBehaviour
         c.transform.SetParent(quadrant, true);
 
         SlideMount(c.transform);
-        var h = SlideHandle(c.transform, startAtTop: false);
+
+        // THE CARRIAGE MUST REST AT LOCAL ZERO. This is not a style choice.
+        //
+        // PhysicalControl captures its visual's rest position in Awake(), and Unity runs
+        // Awake() at AddComponent — which happens inside Make(), BEFORE spec.visual is
+        // assigned. visualBase is therefore ALWAYS Vector3.zero, whatever the carriage's
+        // real rest position is, and UpdateVisual drives the handle from
+        //     zero  ->  zero + up * travel
+        // i.e. from the CENTRE of the channel to 22 mm PAST the top end stop, instead of
+        // from stop to stop.
+        //
+        // Putting the -22 mm offset on a PARENT and leaving the carriage itself at local
+        // zero makes the animation correct for either value of visualBase, and keeps the
+        // repair in this file rather than in PhysicalControl, which several other things
+        // depend on. The underlying Awake() bug is recorded here because it will bite the
+        // next control that gets restored with a translating visual.
+        var handleBase = new GameObject("HandleBase").transform;
+        handleBase.SetParent(c.transform, false);
+        handleBase.localPosition = new Vector3(0f, -SlideTravel * 0.5f, 0f);
+
+        var h = SlideHandle(handleBase, startAtTop: false);
+        h.localPosition = Vector3.zero;      // the offset lives on handleBase, see above
 
         // Ball grip on a short neck. The neck keeps the ball off the carriage so a hand
         // (or a VR controller) has something to close around.
@@ -485,8 +549,12 @@ public class CockpitControlRig : MonoBehaviour
         knob.localScale = new Vector3(0.024f, 0.024f, 0.019f);   // slightly flattened, not a gearstick
         Gloss(knob, 0.30f);
 
-        Label(c.transform, new Vector3(0f, SlideTravel * 0.5f + 0.003f, -0.006f),
-              "THROTTLE", PlacardText, Placard);
+        // NO PLACARD. Labels were removed from this cockpit on 3 September and the brief
+        // for restoring the throttle was "nothing else". The ball grip is the only
+        // spherical control in the cabin and the only thing on the lower panel, so there
+        // is nothing it can be confused with. Restoring the legend is one line:
+        //   Label(c.transform, new Vector3(0f, SlideTravel * 0.5f + 0.003f, -0.006f),
+        //         "THROTTLE", PlacardText, Placard);
 
         c.spec = new ControlSpec
         {
@@ -494,7 +562,15 @@ public class CockpitControlRig : MonoBehaviour
             axis = Vector3.up,          // slide up = more power
             travel = SlideTravel,
             centred = false,
-            captureRadius = 0.020f,   // < half the 45 mm spacing     // well under half the 48 mm gap to the next control
+            // 45 mm. The capture sphere is centred on the CONTROL — the middle of the
+            // channel — but what the pilot aims at is the KNOB, which is 22 mm away at
+            // either end of travel and is itself 12 mm in radius. The old 20 mm radius was
+            // sized against neighbouring levers that no longer exist, and left the visible
+            // ball sitting on the very edge of its own grab volume: the measured ray
+            // distance was 18 mm at idle and 20 mm at full power, against a 20 mm radius.
+            // 45 mm covers the whole ball at both stops. It cannot steal the yoke, because
+            // the yoke is nearer along the ray and wins whenever both are eligible.
+            captureRadius = 0.045f,
             smoothingTau = 0.035f,
             visual = h, visualIsRotation = false,
             visualAxis = Vector3.up, visualTravel = SlideTravel,

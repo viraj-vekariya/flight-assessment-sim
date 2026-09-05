@@ -90,12 +90,16 @@ public class ControlTestHarness : MonoBehaviour
         ac.ResetTo(gm.Runway.Start, gm.Runway.Rot, false, 0f);
         yield return new WaitForSecondsRealtime(0.5f);
 
-        // ── MINIMAL COCKPIT (3 Sep 2026) ─────────────────────────────────────────
-        // The cockpit now contains ONE physical control, the yoke, plus the two glass
-        // displays. Every other control was removed on request. The tests below check
-        // the two properties that actually matter after that change: that the yoke still
-        // works, and that removing the OBJECTS did not remove the INPUTS.
+        // ── MINIMAL COCKPIT (3 Sep 2026, amended 6 Sep) ──────────────────────────
+        // The cockpit contains TWO physical controls — the yoke and the throttle — plus
+        // the two glass displays. Every other control was removed on request. The tests
+        // below check the properties that actually matter after that change: that both
+        // controls still work, and that removing the OBJECTS did not remove the INPUTS.
         yield return TestYoke();
+        // The throttle was restored on 6 Sep. Gated the same way the spoiler is, so this
+        // battery follows the cockpit rather than dictating it: if the throttle object is
+        // removed again the section stands down instead of reporting a regression.
+        if (HasControl("throttle")) yield return TestThrottle();
         yield return TestOnlyYokeIsPhysical();
         yield return TestRemovedInputsStillDriveable();
         // The spoiler lever was removed long before this; the simulation capability
@@ -114,14 +118,19 @@ public class ControlTestHarness : MonoBehaviour
     // ── individual controls ───────────────────────────────────────────────────
 
 
-    /// <summary>THE COCKPIT CONTAINS EXACTLY ONE PHYSICAL CONTROL.
+    /// <summary>THE COCKPIT CONTAINS EXACTLY TWO PHYSICAL CONTROLS: YOKE AND THROTTLE.
     ///
     /// Asserted rather than assumed, because "I removed the controls" is easy to believe
     /// and easy to get half-right — a builder left in the list, or a piece of furniture
-    /// still drawn with nothing on it, would both pass unnoticed otherwise.</summary>
+    /// still drawn with nothing on it, would both pass unnoticed otherwise.
+    ///
+    /// The count is the point. Restoring the throttle on 6 September was meant to add ONE
+    /// control; if a second one came back with it — because a shared builder was called,
+    /// or because BuildStructure() was switched on to get the mounting — this is the check
+    /// that says so. The method keeps its name so the history stays greppable.</summary>
     IEnumerator TestOnlyYokeIsPhysical()
     {
-        Section("MINIMAL COCKPIT  (the yoke is the only physical control)");
+        Section("MINIMAL COCKPIT  (yoke + throttle are the only physical controls)");
 
         int n = 0;
         var names = new System.Text.StringBuilder();
@@ -132,10 +141,11 @@ public class ControlTestHarness : MonoBehaviour
             if (names.Length > 0) names.Append(", ");
             names.Append(c.spec.id);
         }
-        Check("exactly one physical control", n == 1, n + " built: " + names);
-        Check("and it is the yoke", HasControl("yoke"), "yoke=" + (HasControl("yoke") ? "present" : "MISSING"));
+        Check("exactly two physical controls", n == 2, n + " built: " + names);
+        Check("the yoke is present", HasControl("yoke"), "yoke=" + (HasControl("yoke") ? "present" : "MISSING"));
+        Check("the throttle is present", HasControl("throttle"), "throttle=" + (HasControl("throttle") ? "present" : "MISSING"));
 
-        foreach (string gone in new[] { "throttle", "flaps", "brake", "trim", "carb_heat",
+        foreach (string gone in new[] { "flaps", "brake", "trim", "carb_heat",
                                         "fuel_selector", "load_shed", "alt_static" })
             Check("no cockpit object for " + gone, !HasControl(gone),
                   HasControl(gone) ? "STILL PRESENT" : "removed");
@@ -273,6 +283,111 @@ public class ControlTestHarness : MonoBehaviour
         yield return WaitFrames(8);
         Check("push forward increases power", ac.Throttle01 > before, before.ToString("F2") + " -> " + ac.Throttle01.ToString("F2"));
         c.EndGrab(); yield return WaitFrames(2);
+
+        // ── THE HANDLE'S POSITION IS THE THROTTLE, WHOEVER MOVED IT ──────────────
+        //
+        // The requirement is not just "grabbing the lever sets power" — it is that the
+        // lever SHOWS the power, including when the KEYBOARD set it. PhysicalControl does
+        // that by mirroring phys.Throttle01 whenever the control is not in the pilot's
+        // hand, but nothing asserted it, so a lever that silently stopped following would
+        // have passed every check above: it would still work perfectly when grabbed, and
+        // simply lie about the aeroplane the rest of the time.
+        //
+        // Driven through AircraftController, which is the keyboard's own path, and the
+        // control is deliberately NOT grabbed. Held for several frames because the
+        // override expires after a grace of one rendered frame.
+        for (int i = 0; i < 10; i++) { ctl.SetThrottle(0.65f); yield return null; }
+        yield return WaitSeconds(0.25f);                       // let the smoothing settle
+        Check("the handle follows the keyboard, ungrabbed",
+              !c.Grabbed && Mathf.Abs(c.Smoothed - 0.65f) < 0.05f,
+              "grabbed=" + c.Grabbed + " handle=" + c.Smoothed.ToString("F2")
+              + " phys.throttle=" + ac.Throttle01.ToString("F2"));
+
+        // And the GEOMETRY moved with it — not just the number. spec.visual is the
+        // carriage; its offset along the channel must equal value x travel. This is what
+        // catches the visualBase-captured-in-Awake bug, which puts the handle at the
+        // centre of the channel at idle and past the end stop at full power.
+        if (c.spec.visual != null)
+        {
+            float y = c.spec.visual.localPosition.y;
+            float want = c.Smoothed * c.spec.visualTravel;
+            Check("the handle GEOMETRY sits at value x travel",
+                  Mathf.Abs(y - want) < 0.002f,
+                  "handle y=" + (y * 1000f).ToString("F1") + " mm, expected "
+                  + (want * 1000f).ToString("F1") + " mm");
+            // Rest must be the BOTTOM of the channel, not its middle.
+            for (int i = 0; i < 10; i++) { ctl.SetThrottle(0f); yield return null; }
+            yield return WaitSeconds(0.25f);
+            Check("idle parks the handle at the bottom of its channel",
+                  Mathf.Abs(c.spec.visual.localPosition.y) < 0.002f,
+                  "handle y=" + (c.spec.visual.localPosition.y * 1000f).ToString("F1") + " mm from rest");
+        }
+        ctl.ClearOverrides(); yield return WaitFrames(2);
+
+        yield return ThrottleIsWhatTheMouseGrabs(c);
+    }
+
+    /// <summary>AIMING AT THE THROTTLE MUST GRAB THE THROTTLE.
+    ///
+    /// CockpitInteractorMouse.Nearest picks the control whose centre the mouse ray passes
+    /// within captureRadius of, and among those the one NEAREST ALONG THE RAY. The yoke
+    /// has a 130 mm capture radius and sits closer to the pilot than the panel, so it can
+    /// shadow anything mounted behind it — this is the same class of defect that once let
+    /// the yoke swallow a plunger 64 mm away.
+    ///
+    /// The second trap is subtler: the capture sphere is centred on the CONTROL, which is
+    /// the middle of the channel, while the thing the pilot aims at is the KNOB, which at
+    /// idle sits at the bottom of the travel. A capture radius smaller than half the travel
+    /// leaves the visible knob outside its own grab volume.
+    ///
+    /// Both are checked at both ends of travel, by reproducing the interactor's documented
+    /// selection rule against the real cockpit camera.</summary>
+    IEnumerator ThrottleIsWhatTheMouseGrabs(PhysicalControl c)
+    {
+        Section("THROTTLE REACH  (the mouse must resolve to the knob, not the yoke)");
+
+        Camera cam = null;
+        foreach (var k in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            if (k.targetTexture == null && k.name == "CockpitCamera") cam = k;
+        if (cam == null) { Fail("throttle reach", "no CockpitCamera to aim with"); yield break; }
+        if (c.spec.visual == null) { Fail("throttle reach", "throttle has no visual to aim at"); yield break; }
+
+        foreach (float where in new[] { 0f, 1f })
+        {
+            for (int i = 0; i < 10; i++) { ctl.SetThrottle(where); yield return null; }
+            yield return WaitSeconds(0.25f);
+
+            // Aim at the KNOB — the sphere the pilot can actually see and click.
+            Vector3 knob = c.spec.visual.position;
+            Ray ray = cam.ScreenPointToRay(cam.WorldToScreenPoint(knob));
+
+            // CockpitInteractorMouse.Nearest, minus the reach clamp (which only rejects
+            // controls further than arm's length and cannot change the winner here).
+            PhysicalControl best = null; float bestT = float.MaxValue;
+            var seen = new System.Text.StringBuilder();
+            foreach (var k in rig.Controls)
+            {
+                if (k == null) continue;
+                Vector3 toC = k.transform.position - ray.origin;
+                float t = Vector3.Dot(toC, ray.direction);
+                if (t < 0f) continue;
+                float dist = Vector3.Distance(ray.GetPoint(t), k.transform.position);
+                // Every control's geometry against this ray, so the margin is a MEASURED
+                // number in the report rather than something inferred from the verdict.
+                if (seen.Length > 0) seen.Append("; ");
+                seen.Append(k.spec.id + " ray-dist=" + (dist * 1000f).ToString("F0")
+                            + "mm radius=" + (k.spec.captureRadius * 1000f).ToString("F0")
+                            + "mm range=" + (t * 1000f).ToString("F0") + "mm"
+                            + (dist <= k.spec.captureRadius ? " ELIGIBLE" : ""));
+                if (dist > k.spec.captureRadius) continue;
+                if (t < bestT) { bestT = t; best = k; }
+            }
+
+            string at = where < 0.5f ? "idle" : "full power";
+            Check("aiming at the knob at " + at + " selects the throttle", best == c,
+                  "selected=" + (best == null ? "NOTHING" : best.spec.id) + " | " + seen);
+        }
+        ctl.ClearOverrides(); yield return WaitFrames(2);
     }
 
     IEnumerator TestTrim()
