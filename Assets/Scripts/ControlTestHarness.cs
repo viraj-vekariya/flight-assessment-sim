@@ -105,6 +105,7 @@ public class ControlTestHarness : MonoBehaviour
         // The spoiler lever was removed long before this; the simulation capability
         // remains, so the test runs only if a spoiler control is actually present.
         if (HasControl("spoiler")) yield return TestSpoiler();
+        yield return TestRudderPedalsFollowTheRudder();
         yield return TestSystemsStillReachable();
         yield return TestDisplaysDoNotLeakIntoTheWorld();
         yield return TestOwnershipHandback();
@@ -150,6 +151,198 @@ public class ControlTestHarness : MonoBehaviour
             Check("no cockpit object for " + gone, !HasControl(gone),
                   HasControl(gone) ? "STILL PRESENT" : "removed");
         yield break;
+    }
+
+    /// <summary>THE RUDDER PEDALS MUST MOVE WITH THE RUDDER, THE RIGHT WAY, AND NOT
+    /// THROUGH THE AEROPLANE.
+    ///
+    /// Q/E had no cockpit feedback at all until now. The pedals are the model's own twin
+    /// mesh cut in two and translated differentially, which is checked here on four counts,
+    /// each of which has a specific way of going wrong:
+    ///
+    ///   THEY EXIST — the split silently produces nothing if the mesh is not readable or
+    ///   the centreline gap is not where it was measured, and RealCockpit deliberately
+    ///   degrades to static pedals rather than failing loudly.
+    ///
+    ///   THEY MOVE OPPOSITE WAYS — a rudder bar is differential. Both pedals moving
+    ///   together would mean the sign was applied once instead of twice.
+    ///
+    ///   THE DIRECTION IS RIGHT — right rudder must push the RIGHT pedal away from the
+    ///   pilot. Asserted against the yaw the aeroplane actually produces, not against an
+    ///   assumed sign convention.
+    ///
+    ///   THEY CLEAR THE AEROPLANE — the historic failure here was hinging on Object_52's
+    ///   node origin, which sits at the model datum about 280 mm below and 780 mm behind
+    ///   the pedal faces, and threw a pedal through the cabin floor. Translation removes
+    ///   the pivot, but the pedals still travel toward a firewall whose bounding box they
+    ///   already overlap at rest, so the clearance is measured against drawn triangles at
+    ///   both extremes.</summary>
+    IEnumerator TestRudderPedalsFollowTheRudder()
+    {
+        Section("RUDDER PEDALS  (Q/E must show in the cockpit)");
+
+        Transform model = null;
+        foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+            if (t.name == "RealCockpitModel") model = t;
+        if (model == null) { Fail("pedals", "RealCockpitModel not found"); yield break; }
+
+        Transform left = null, right = null, coL = null, coR = null;
+        foreach (var t in model.GetComponentsInChildren<Transform>(true))
+        {
+            if (t.name == "PedalPilotLeft")    left  = t;
+            if (t.name == "PedalPilotRight")   right = t;
+            if (t.name == "PedalCopilotLeft")  coL   = t;
+            if (t.name == "PedalCopilotRight") coR   = t;
+        }
+        // FOUR, not two. Object_52 holds both footwells' pairs, so a cut at the centreline
+        // alone yields one PAIR per side and moves both of the pilot's pedals together —
+        // which is not a rudder at all. Asserted because the first build did exactly that
+        // and every other check in this section still passed.
+        Check("all four pedals were built from the twin mesh",
+              left != null && right != null && coL != null && coR != null,
+              "pilot L=" + (left == null ? "MISSING" : "ok")
+              + " pilot R=" + (right == null ? "MISSING" : "ok")
+              + " copilot L=" + (coL == null ? "MISSING" : "ok")
+              + " copilot R=" + (coR == null ? "MISSING" : "ok"));
+        if (left == null || right == null) yield break;
+
+        var lr = left.GetComponent<Renderer>();
+        var rr = right.GetComponent<Renderer>();
+        // A single pedal pad, not a pair. The pilot's whole footwell group is 75 mm wide,
+        // so anything near that width means the pair was never divided.
+        float lw = lr == null ? 0f : lr.bounds.size.x, rw = rr == null ? 0f : rr.bounds.size.x;
+        Check("each pedal is ONE pad, not a whole pair",
+              lw > 0.010f && lw < 0.055f && rw > 0.010f && rw < 0.055f,
+              "pilot left " + (lw * 1000f).ToString("F0") + " mm wide, right "
+              + (rw * 1000f).ToString("F0") + " mm (the whole pair is 75 mm)");
+        float lxc = model.InverseTransformPoint(lr.bounds.center).x;
+        float rxc = model.InverseTransformPoint(rr.bounds.center).x;
+        Check("the pilot's two pedals sit side by side in HIS footwell, right outboard of left",
+              lxc < 0f && rxc < 0f && rxc > lxc,
+              "left x=" + lxc.ToString("F3") + "  right x=" + rxc.ToString("F3")
+              + " (both must be negative — the pilot's side — and right must be the larger)");
+
+        Vector3 lRest = left.localPosition, rRest = right.localPosition;
+
+        // ---- RIGHT rudder ------------------------------------------------------
+        // HELD, not set and then waited on. AircraftController's override expires after a
+        // grace of one rendered frame, so a settle that stops writing lets yawInput fall
+        // straight back to zero — which is exactly what the first run of this test measured,
+        // and it read as "the pedals do not move" rather than "the test let go".
+        yield return HoldYaw(1f, 0.4f);
+        float yawSign = Mathf.Sign(ac.yawInput);
+        float rFwd = (right.localPosition - rRest).z;
+        float lFwd = (left.localPosition  - lRest).z;
+
+        Check("full right rudder actually reaches the aeroplane", ac.yawInput > 0.9f,
+              "yawInput=" + ac.yawInput.ToString("F2"));
+        Check("the pedals move at all with right rudder",
+              Mathf.Abs(rFwd) > 0.001f, "right pedal moved " + (rFwd * 1000f).ToString("F1") + " mm");
+        Check("the pedals move in OPPOSITE directions", rFwd * lFwd < 0f,
+              "right " + (rFwd * 1000f).ToString("F1") + " mm, left " + (lFwd * 1000f).ToString("F1") + " mm");
+        Check("right rudder pushes the RIGHT pedal forward, away from the pilot",
+              rFwd * yawSign > 0f,
+              "right pedal " + (rFwd * 1000f).ToString("F1") + " mm along +Z (+Z is toward the panel)");
+        float travel = Mathf.Abs(rFwd);
+        Check("the throw is a believable pedal movement (8-40 mm at model scale)",
+              travel > 0.008f && travel < 0.040f,
+              (travel * 1000f).ToString("F1") + " mm, about "
+              + (travel * 1000f / 0.352f).ToString("F0") + " mm at life size");
+
+        // ---- clearance at BOTH extremes ----------------------------------------
+        foreach (float rud in new[] { 1f, -1f })
+        {
+            yield return HoldYaw(rud, 0.4f);
+
+            string at = rud > 0f ? "full right rudder" : "full left rudder";
+            // The pilot's pair only. The co-pilot's mirror them exactly, so testing all
+            // four would double a slow check to prove the same thing twice.
+            foreach (var pedal in new[] { left, right })
+            {
+                float best = float.MaxValue; string who = "nothing"; int tris = 0;
+                var pm = pedal.GetComponent<MeshFilter>();
+                if (pm == null || pm.sharedMesh == null || !pm.sharedMesh.isReadable) continue;
+                var pv = pm.sharedMesh.vertices; var pi = pm.sharedMesh.triangles;
+
+                foreach (var mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+                {
+                    if (mf.sharedMesh == null || !mf.sharedMesh.isReadable) continue;
+                    if (mf.transform == left || mf.transform == right) continue;
+                    if (mf.gameObject.layer == AircraftBuilder.ExteriorLayer) continue;
+                    var orr = mf.GetComponent<Renderer>();
+                    if (orr == null || !orr.enabled) continue;
+                    if ((orr.bounds.ClosestPoint(pedal.GetComponent<Renderer>().bounds.center)
+                         - pedal.GetComponent<Renderer>().bounds.center).magnitude > 0.12f) continue;
+
+                    var ov = mf.sharedMesh.vertices; var oi = mf.sharedMesh.triangles;
+                    var oxf = mf.transform;
+                    // Every pedal VERTEX against every nearby triangle. The pedal is a
+                    // 168-triangle pad, so this stays cheap even against the fuselage.
+                    for (int a = 0; a < pi.Length; a += 3)
+                    {
+                        Vector3 pp = pedal.TransformPoint(pv[pi[a]]);
+                        for (int b = 0; b + 2 < oi.Length; b += 3)
+                        {
+                            float d = Vector3.Distance(pp, ClosestOnTriangle(pp,
+                                oxf.TransformPoint(ov[oi[b]]),
+                                oxf.TransformPoint(ov[oi[b + 1]]),
+                                oxf.TransformPoint(ov[oi[b + 2]])));
+                            tris++;
+                            if (d < best) { best = d; who = mf.name; }
+                        }
+                    }
+                }
+                Check(pedal.name + " examined real geometry at " + at, tris > 0, tris + " vertex/triangle pairs");
+                // Touching is fine — the pedal is bolted to the floor structure. Passing
+                // THROUGH is not, so this asks that the nearest thing is not deeply
+                // interpenetrating, using the pedal's own 36 mm height as the yardstick.
+                Check(pedal.name + " does not bury itself in the aeroplane at " + at,
+                      best < 0.5f, "nearest drawn geometry is " + (best * 1000f).ToString("F1")
+                      + " mm away (" + who + ")");
+            }
+        }
+
+        yield return HoldYaw(0f, 0.5f);
+        Check("the co-pilot's pedals are linked to the pilot's",
+              coR == null || coL == null
+              || Mathf.Abs((coR.localPosition - coL.localPosition).z
+                         - (right.localPosition - left.localPosition).z) < 0.001f,
+              "dual controls move together");
+        yield return HoldYaw(0f, 0.5f);
+        Check("the pedals return to rest when the rudder is released",
+              (left.localPosition - lRest).magnitude < 0.002f
+              && (right.localPosition - rRest).magnitude < 0.002f,
+              "left off-rest " + ((left.localPosition - lRest).magnitude * 1000f).ToString("F2")
+              + " mm, right " + ((right.localPosition - rRest).magnitude * 1000f).ToString("F2") + " mm");
+
+        // Where they sit in the pilot's default view, reported rather than asserted: the
+        // pedals are meant to be looked DOWN at, as they are in a real cockpit.
+        Camera eye = null;
+        foreach (var k in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            if (k.targetTexture == null && k.name == "CockpitCamera") eye = k;
+        if (eye != null)
+        {
+            var b = right.GetComponent<Renderer>().bounds;
+            float lo = 9f, hi = -9f;
+            foreach (var corner in Corners(b))
+            {
+                Vector3 vp = eye.WorldToViewportPoint(corner);
+                lo = Mathf.Min(lo, vp.y); hi = Mathf.Max(hi, vp.y);
+            }
+            report.AppendLine("   pedals in the pilot's DEFAULT view: viewport y "
+                            + lo.ToString("F2") + " .. " + hi.ToString("F2")
+                            + (hi < 0f ? "  (BELOW the frame — visible only when looking down)"
+                                       : "  (in frame)"));
+        }
+        ctl.ClearOverrides(); yield return WaitFrames(2);
+    }
+
+    /// <summary>Hold a rudder deflection for real time, rewriting it every frame so the
+    /// one-frame override grace never lapses.</summary>
+    IEnumerator HoldYaw(float amount, float seconds)
+    {
+        float t = 0f;
+        while (t < seconds) { ctl.SetYaw(amount); t += Time.unscaledDeltaTime; yield return null; }
     }
 
     /// <summary>REMOVING THE OBJECTS MUST NOT HAVE REMOVED THE INPUTS.
@@ -825,6 +1018,47 @@ public class ControlTestHarness : MonoBehaviour
     {
         float t = 0f;
         while (t < s) { t += Time.unscaledDeltaTime; yield return null; }
+    }
+
+    static System.Collections.Generic.IEnumerable<Vector3> Corners(Bounds b)
+    {
+        Vector3 m = b.min, x = b.max;
+        yield return new Vector3(m.x, m.y, m.z); yield return new Vector3(x.x, m.y, m.z);
+        yield return new Vector3(m.x, x.y, m.z); yield return new Vector3(x.x, x.y, m.z);
+        yield return new Vector3(m.x, m.y, x.z); yield return new Vector3(x.x, m.y, x.z);
+        yield return new Vector3(m.x, x.y, x.z); yield return new Vector3(x.x, x.y, x.z);
+    }
+
+    /// <summary>Closest point on a triangle to a point — Ericson, Real-Time Collision
+    /// Detection, 5.1.5. Used instead of a bounds test because the things a cockpit control
+    /// can foul are large flat panels, whose bounds say nothing useful about where they
+    /// actually are.</summary>
+    static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    {
+        Vector3 ab = b - a, ac = c - a, ap = p - a;
+        float d1 = Vector3.Dot(ab, ap), d2 = Vector3.Dot(ac, ap);
+        if (d1 <= 0f && d2 <= 0f) return a;
+
+        Vector3 bp = p - b;
+        float d3 = Vector3.Dot(ab, bp), d4 = Vector3.Dot(ac, bp);
+        if (d3 >= 0f && d4 <= d3) return b;
+
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0f && d1 >= 0f && d3 <= 0f) return a + ab * (d1 / (d1 - d3));
+
+        Vector3 cp = p - c;
+        float d5 = Vector3.Dot(ab, cp), d6 = Vector3.Dot(ac, cp);
+        if (d6 >= 0f && d5 <= d6) return c;
+
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0f && d2 >= 0f && d6 <= 0f) return a + ac * (d2 / (d2 - d6));
+
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0f && (d4 - d3) >= 0f && (d5 - d6) >= 0f)
+            return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+
+        float denom = 1f / (va + vb + vc);
+        return a + ab * (vb * denom) + ac * (vc * denom);
     }
 
     PhysicalControl Find(string id)

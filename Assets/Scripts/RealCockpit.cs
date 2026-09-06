@@ -94,6 +94,46 @@ public class RealCockpit : MonoBehaviour
     public string[] propNodes = { "Object_39", "Object_40", "Object_30" };
     public float propSpinMax = 2200f;   // deg/sec at full throttle
 
+    // ---- the model's OWN rudder pedals, made dynamic --------------------------------
+    // Q/E had NO cockpit feedback at all: the aeroplane yawed and rolled and nothing in
+    // the cabin moved. The model already has the pedals, so they are driven rather than
+    // drawn — same rule as the yoke, one-way from the live input, so they cannot disagree
+    // with what the aeroplane is doing.
+    //
+    // MEASURED GEOMETRY (drawn triangles, model-local): Object_52 is ONE mesh holding BOTH
+    // pedals, x -0.127..0.127, y 0.270..0.306, z 0.755..0.801, and its vertices split
+    // cleanly about x = 0 — 504 either side and NOTHING within 20 mm of the centreline.
+    // So it cuts in two exactly like the yoke and seat twin meshes. Each half is one
+    // ~75 mm pedal, centred near x -0.09 and +0.09; the pilot's eye is on the centreline
+    // (0, 0.58, 0.52), so those are this cockpit's left and right rudder pedals.
+    //
+    // THEY TRANSLATE, THEY DO NOT ROTATE. That is what rudder pedals do — the rudder bar
+    // slides them fore and aft — and it also sidesteps the trap that broke this before:
+    // Object_52's node origin is at the MODEL DATUM (localPosition exactly zero, because
+    // glTF bakes the geometry into the vertices), roughly 280 mm below and 780 mm behind
+    // the pedal faces. Hinging on that origin swung a pedal through the cabin floor. A
+    // translation has no pivot to place, so there is nothing to get wrong.
+    public string pedalTwinNode = "Object_52";
+    /// <summary>Fore/aft movement of each pedal at full rudder, metres. The GLB is about
+    /// a third of life size, so 18 mm here is roughly 50 mm of real pedal throw.</summary>
+    public float pedalTravel = 0.018f;
+    public float pedalSmooth = 12f;
+    /// <summary>+1 means right rudder pushes the RIGHT pedal forward, away from the pilot.
+    /// Verified in the control battery rather than assumed.</summary>
+    public float pedalSign = 1f;
+
+    // FOUR pedals, not two. Object_52 holds the pilot's pair AND the co-pilot's pair:
+    // x -0.130..-0.055 and x +0.055..+0.130, with a 110 mm gap at the centreline. Splitting
+    // only at x = 0 gives one PAIR either side, so both of the pilot's pedals move together
+    // and neither of them is a rudder pedal. The render is what showed this — two pads in
+    // each footwell, not one.
+    //
+    // Dual controls are mechanically linked, so the co-pilot's pedals move with the
+    // pilot's: right rudder drives BOTH right-hand pedals forward.
+    Transform pedalPilotL, pedalPilotR, pedalCopilotL, pedalCopilotR;
+    Vector3 basePilotL, basePilotR, baseCopilotL, baseCopilotR;
+    float curPedal;
+
     Transform yokeRoot;      // on the column axis; slides along it with pitch
     Transform yokeVisual;    // holds the wheel mesh; twists about the column with roll
     Transform yokeShaft;     // the column hub, anchored in the panel, stretched to the wheel
@@ -147,6 +187,7 @@ public class RealCockpit : MonoBehaviour
         // Yoke: the model's OWN wheel — kept exactly as Blender has it, just cut to one,
         // centred in front of the pilot, and driven by the live controls.
         RigYoke(holder.transform);
+        RigPedals(holder.transform);
 
         // Spin the propeller (front fan) with throttle.
         RigProp(holder.transform);
@@ -224,6 +265,157 @@ public class RealCockpit : MonoBehaviour
     //       Object_94 (the column hub, riding along behind the wheel's boss)
     // With yokeShaftStretch the hub instead stays anchored in the panel, under its own
     // YokeShaft node, and stretches along the column to reach the wheel.
+    /// <summary>Cut the twin pedal mesh in two and drive each half from the rudder input.
+    ///
+    /// The original node's renderer is switched off rather than destroyed, so if the split
+    /// ever fails the pedals are still drawn — the cockpit degrades to the static geometry
+    /// it had before instead of losing its pedals entirely.</summary>
+    void RigPedals(Transform model)
+    {
+        var node = FindDeep(model, pedalTwinNode);
+        if (node == null)
+        {
+            Debug.LogWarning("[RealCockpit] " + pedalTwinNode + " (rudder pedals) not found — "
+                           + "the rudder will have no cockpit feedback.");
+            return;
+        }
+
+        // WHERE TO CUT, measured from the mesh rather than typed in. Each footwell's pair
+        // is divided at the midpoint of that pair's own x extent, so a model revision that
+        // moves the pedals still splits them in the right place instead of silently
+        // slicing one pad in half.
+        if (!PedalSplits(model, node, out float lCut, out float rCut))
+        {
+            Debug.LogWarning("[RealCockpit] could not measure the pedal groups in "
+                           + pedalTwinNode + " — leaving the pedals static.");
+            return;
+        }
+
+        pedalPilotL   = SplitPedal(model, node, cx => cx <  lCut,             "PedalPilotLeft");
+        pedalPilotR   = SplitPedal(model, node, cx => cx >= lCut && cx < 0f,  "PedalPilotRight");
+        pedalCopilotL = SplitPedal(model, node, cx => cx >= 0f && cx < rCut,  "PedalCopilotLeft");
+        pedalCopilotR = SplitPedal(model, node, cx => cx >= rCut,             "PedalCopilotRight");
+        if (pedalPilotL == null || pedalPilotR == null || pedalCopilotL == null || pedalCopilotR == null)
+        {
+            Debug.LogWarning("[RealCockpit] could not split " + pedalTwinNode
+                           + " into four pedals — leaving them static.");
+            return;
+        }
+
+        var r = node.GetComponent<Renderer>();
+        if (r != null) r.enabled = false;      // the four pads replace it
+
+        basePilotL   = pedalPilotL.localPosition;
+        basePilotR   = pedalPilotR.localPosition;
+        baseCopilotL = pedalCopilotL.localPosition;
+        baseCopilotR = pedalCopilotR.localPosition;
+        foreach (var t in new[] { pedalPilotL, pedalPilotR, pedalCopilotL, pedalCopilotR })
+            SetLayer(t, CockpitBuilder.CockpitLayer);
+
+        Debug.Log("[RealCockpit] rudder pedals rigged: " + pedalTwinNode
+                + " cut into 4 at x=" + lCut.ToString("F4") + ", 0, " + rCut.ToString("F4")
+                + "; +-" + (pedalTravel * 1000f).ToString("F0") + " mm of travel.");
+    }
+
+    /// <summary>Find the x at which each footwell's pedal PAIR divides: the midpoint of
+    /// that pair's own extent, measured from the drawn triangles.</summary>
+    bool PedalSplits(Transform model, Transform node, out float leftCut, out float rightCut)
+    {
+        leftCut = rightCut = 0f;
+        var mf = node.GetComponent<MeshFilter>();
+        if (mf == null || mf.sharedMesh == null) return false;
+        var verts = mf.sharedMesh.vertices;
+        var tris  = mf.sharedMesh.triangles;
+        if (tris.Length == 0) return false;
+
+        float lMin = 9f, lMax = -9f, rMin = 9f, rMax = -9f;
+        for (int i = 0; i < tris.Length; i += 3)
+        {
+            float cx = 0f;
+            for (int k = 0; k < 3; k++)
+                cx += model.InverseTransformPoint(node.TransformPoint(verts[tris[i + k]])).x;
+            cx /= 3f;
+            if (cx < 0f) { lMin = Mathf.Min(lMin, cx); lMax = Mathf.Max(lMax, cx); }
+            else         { rMin = Mathf.Min(rMin, cx); rMax = Mathf.Max(rMax, cx); }
+        }
+        if (lMax < lMin || rMax < rMin) return false;
+        leftCut  = (lMin + lMax) * 0.5f;
+        rightCut = (rMin + rMax) * 0.5f;
+        return true;
+    }
+
+    /// <summary>One pedal as its own object, keeping the triangles whose centroid satisfies
+    /// <paramref name="keep"/>. The same cut KeepHalf makes, but it BUILDS a new object
+    /// instead of editing in place, because all four pedals are needed and they have to
+    /// move independently.</summary>
+    Transform SplitPedal(Transform model, Transform node, System.Func<float, bool> keep, string name)
+    {
+        var srcMf = node.GetComponent<MeshFilter>();
+        var srcMr = node.GetComponent<MeshRenderer>();
+        if (srcMf == null || srcMf.sharedMesh == null) return null;
+
+        var src = srcMf.sharedMesh;
+        var verts = src.vertices;
+        var tris  = src.triangles;
+        var lx = new float[verts.Length];
+        for (int i = 0; i < verts.Length; i++)
+            lx[i] = model.InverseTransformPoint(node.TransformPoint(verts[i])).x;
+
+        // COMPACT the halves — keep only the vertices the kept triangles actually use.
+        //
+        // Filtering triangles alone and leaving the vertex array whole is the obvious way
+        // to do this and it is subtly wrong: Mesh.RecalculateBounds works from VERTICES,
+        // not from triangles, so each half would report the bounds of the WHOLE twin mesh.
+        // Every consumer of those bounds then lies — frustum culling, the reach and
+        // clearance tests, anything asking where the pedal is. This project has already
+        // been burnt once by reading bounds that spanned triangles that had been removed.
+        var srcN = src.normals; var srcU = src.uv;
+        bool hasN = srcN != null && srcN.Length == verts.Length;
+        bool hasU = srcU != null && srcU.Length == verts.Length;
+
+        var remap = new Dictionary<int, int>();
+        var nv = new List<Vector3>(); var nn = new List<Vector3>(); var nu = new List<Vector2>();
+        var newTris = new List<int>(tris.Length);
+        for (int i = 0; i < tris.Length; i += 3)
+        {
+            float cx = (lx[tris[i]] + lx[tris[i + 1]] + lx[tris[i + 2]]) / 3f;
+            if (!keep(cx)) continue;
+            for (int k = 0; k < 3; k++)
+            {
+                int vi = tris[i + k];
+                if (!remap.TryGetValue(vi, out int mapped))
+                {
+                    mapped = nv.Count;
+                    remap[vi] = mapped;
+                    nv.Add(verts[vi]);
+                    if (hasN) nn.Add(srcN[vi]);
+                    if (hasU) nu.Add(srcU[vi]);
+                }
+                newTris.Add(mapped);
+            }
+        }
+        if (newTris.Count == 0) return null;
+
+        var mesh = new Mesh { name = name + "Mesh" };
+        mesh.SetVertices(nv);
+        if (hasN) mesh.SetNormals(nn);
+        if (hasU) mesh.SetUVs(0, nu);
+        mesh.SetTriangles(newTris, 0);
+        if (!hasN) mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+
+        var go = new GameObject(name);
+        go.transform.SetParent(node.parent, false);
+        go.transform.localPosition = node.localPosition;
+        go.transform.localRotation = node.localRotation;
+        go.transform.localScale    = node.localScale;
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+        var mr = go.AddComponent<MeshRenderer>();
+        if (srcMr != null) mr.sharedMaterials = srcMr.sharedMaterials;
+        go.layer = node.gameObject.layer;
+        return go.transform;
+    }
+
     void RigYoke(Transform model)
     {
         var wheel = FindDeep(model, yokeTwinNode);
@@ -419,6 +611,23 @@ public class RealCockpit : MonoBehaviour
             yokeRoot.localPosition = yokeRootBasePos + Vector3.forward * curTravel;
             if (yokeShaft != null)   // shaft grows aft out of the panel as the wheel comes back
                 yokeShaft.localScale = new Vector3(1f, 1f, Mathf.Clamp((shaftLen - curTravel) / shaftLen, 0.05f, 5f));
+        }
+
+        if (pedalPilotL != null && pedalPilotR != null)
+        {
+            // RUDDER -> the pedals slide fore and aft, differentially, exactly as a rudder
+            // bar moves them: right rudder pushes the RIGHT pedal away from the pilot (+Z
+            // is toward the panel) and brings the LEFT one back. Eased on the same
+            // frame-rate-independent law as the yoke, and self-centring because yawInput
+            // returns to zero when the key is released.
+            float kp = 1f - Mathf.Exp(-pedalSmooth * Time.deltaTime);
+            curPedal = Mathf.Lerp(curPedal, Mathf.Clamp(phys.yawInput, -1f, 1f), kp);
+            float d = pedalSign * curPedal * pedalTravel;
+            pedalPilotR.localPosition   = basePilotR   + Vector3.forward * d;
+            pedalPilotL.localPosition   = basePilotL   - Vector3.forward * d;
+            // Dual controls are linked, so the other seat's pedals go with them.
+            if (pedalCopilotR != null) pedalCopilotR.localPosition = baseCopilotR + Vector3.forward * d;
+            if (pedalCopilotL != null) pedalCopilotL.localPosition = baseCopilotL - Vector3.forward * d;
         }
 
         if (propPivot != null)   // spin the front fan with throttle
