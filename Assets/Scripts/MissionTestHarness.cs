@@ -27,7 +27,7 @@
 //
 // WHAT IT DOES NOT TEST
 //   Anything that needs a human: whether the missions FEEL like the workload class
-//   they are labelled, whether the startle startles, whether the TLX separates the
+//   they are labelled, whether the startle startles, whether the classes separate the
 //   conditions. Those are empirical questions for the participants, not for a test.
 
 using System.Collections.Generic;
@@ -67,7 +67,7 @@ public class MissionTestHarness : MonoBehaviour
     public static bool Finished { get; private set; }
     public static int Failures { get; private set; }
 
-    enum Stage { Wait, Fly, Rate, Check, Done }
+    enum Stage { Wait, Fly, Check, Done }
 
     Stage stage = Stage.Wait;
     GameManager gm;
@@ -499,7 +499,6 @@ public class MissionTestHarness : MonoBehaviour
         switch (stage)
         {
             case Stage.Fly: FlyTick(); break;
-            case Stage.Rate: RateTick(); break;
             case Stage.Check: CheckTick(); break;
         }
     }
@@ -552,28 +551,12 @@ public class MissionTestHarness : MonoBehaviour
 
     void AfterFlight()
     {
-        // The trial folder is captured BEFORE the questionnaire, because submitting
-        // closes the logger and clears the engine's current trial.
+        // The post-trial NASA-TLX questionnaire used to sit here, and the harness filled
+        // it in with synthetic values to exercise the write path. Both are gone: the
+        // trial's files are now closed by ScenarioEngine.CloseTrial() the moment the
+        // trial ends, so validation can start as soon as the handles flush (CheckTick
+        // waits 0.5 s for exactly that).
         if (!string.IsNullOrEmpty(eng.Experiment.TrialDir)) currentDir = eng.Experiment.TrialDir;
-        stage = Stage.Rate; stageT = 0f;
-    }
-
-    void RateTick()
-    {
-        if (!gm.WorkloadQuestionnaireActive)
-        {
-            // Some paths (abort) skip the questionnaire; just move on.
-            if (stageT > 4f) { stage = Stage.Check; stageT = 0f; }
-            return;
-        }
-        // Submit a filled-in response. These are SYNTHETIC values that exist only to
-        // exercise the write path — they are written into a TEST01 participant folder
-        // which must never be mixed with real data.
-        gm.SubmitWorkloadRating(new WorkloadRating
-        {
-            MentalDemand = 45, PhysicalDemand = 30, TemporalDemand = 40,
-            Performance = 35, Effort = 50, Frustration = 25, Bedford = 4
-        });
         stage = Stage.Check; stageT = 0f;
     }
 
@@ -864,12 +847,10 @@ public class MissionTestHarness : MonoBehaviour
         string tel = Path.Combine(dir, "telemetry.csv");
         string evp = Path.Combine(dir, "events.csv");
         string meta = Path.Combine(dir, "metadata.json");
-        string tlx = Path.Combine(dir, "nasa_tlx.json");
         string sync = Path.Combine(dir, "eeg", "sync.json");
 
         foreach (var f in new[] { tel, evp, meta, sync })
             if (!File.Exists(f)) Problem(id, "missing file " + Path.GetFileName(f));
-        if (!File.Exists(tlx)) Problem(id, "nasa_tlx.json was not written");
 
         if (!File.Exists(tel) || !File.Exists(evp)) return;
 
@@ -918,10 +899,6 @@ public class MissionTestHarness : MonoBehaviour
 
         foreach (var need in m.RequiredMarkers)
             if (!seen.ContainsKey(need)) Problem(id, "required marker missing: " + need);
-
-        // TLX markers must bracket the questionnaire and be inside the same file.
-        if (!seen.ContainsKey(EventMarkers.TlxStart)) Problem(id, "TLX_START missing");
-        if (!seen.ContainsKey(EventMarkers.TlxSubmit)) Problem(id, "TLX_SUBMIT missing");
 
         // A mission that arms a failure must ALSO show the pilot-perceptible cue,
         // or the epoch the EEG analysis needs does not exist.
@@ -1000,8 +977,8 @@ public class MissionTestHarness : MonoBehaviour
         if (problems.Count == 0) report.AppendLine("  (none)");
         report.AppendLine();
         report.AppendLine("Data written under: " + ExperimentLogger.ExperimentRoot);
-        report.AppendLine("NOTE: this battery runs as participant TEST01. Its folders contain SYNTHETIC");
-        report.AppendLine("NASA-TLX values submitted by the harness and must never be analysed as data.");
+        report.AppendLine("NOTE: this battery runs as participant TEST01. Its folders are synthetic");
+        report.AppendLine("and must never be analysed as data.");
 
         // Write to BOTH persistentDataPath and the project root. The project root is
         // where the control and wind batteries write and where the documentation tells a

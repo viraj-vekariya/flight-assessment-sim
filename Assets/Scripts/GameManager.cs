@@ -45,11 +45,12 @@ public class GameManager : MonoBehaviour
     readonly System.Collections.Generic.Queue<System.Action> experimentQueue =
         new System.Collections.Generic.Queue<System.Action>();
 
-    // Phase 5 — mental-workload self-report (NASA-TLX RTLX + BEDFORD), asked after
-    // every scenario trial, before the score breakdown is shown (blind to the score).
-    public bool WorkloadQuestionnaireActive { get; private set; }
-    public int WorkloadQuestionnaireToken { get; private set; }   // bumped each time -> UI resets its sliders
-    public System.Collections.Generic.List<WorkloadRating> SessionWorkload { get; } = new System.Collections.Generic.List<WorkloadRating>();
+    // The post-trial NASA-TLX / BEDFORD self-report was REMOVED from this project. It
+    // sat between the end of every trial and the score breakdown, and filling it in
+    // twelve times per session cost more than it returned here. The trial's files are
+    // now closed directly by ScenarioEngine.CloseTrial() at the moment the trial ends.
+    // The PREDICTED workload model (WorkloadModel/PLI, MissionSpec.Expected) is a
+    // separate thing and is untouched.
 
     RunwayInfo runway;
     public RunwayInfo Runway => runway;
@@ -168,7 +169,7 @@ public class GameManager : MonoBehaviour
 
     public void StartSingleScenario(Scenario s)
     {
-        inSession = false; SessionReportActive = false; SessionResults.Clear(); SessionWorkload.Clear();
+        inSession = false; SessionReportActive = false; SessionResults.Clear();
         StartScenario(s);
     }
 
@@ -176,7 +177,6 @@ public class GameManager : MonoBehaviour
     {
         sessionQueue.Clear();
         SessionResults.Clear();
-        SessionWorkload.Clear();
         SessionReportActive = false;
         inSession = true;
         foreach (var s in ScenarioLibrary.GradedSession()) sessionQueue.Enqueue(s);
@@ -196,7 +196,7 @@ public class GameManager : MonoBehaviour
     {
         ExperimentSession.Begin(ParticipantManager.ID, ParticipantManager.Session);
         experimentQueue.Clear();
-        SessionResults.Clear(); SessionWorkload.Clear();
+        SessionResults.Clear();
         SessionReportActive = false;
         ExperimentRunning = true;
         ExperimentTrialIndex = 0;
@@ -264,7 +264,7 @@ public class GameManager : MonoBehaviour
         ExperimentStatus = "Session complete — " + SessionResults.Count + " trials recorded.";
         if (SessionResults.Count > 0)
         {
-            SessionReporter.Generate(SessionResults, SessionWorkload);
+            SessionReporter.Generate(SessionResults);
             ParticipantManager.RecordSessionComplete();
             SessionReportActive = true;
             State = GameState.Results;
@@ -304,32 +304,6 @@ public class GameManager : MonoBehaviour
         ToMenu();
     }
 
-    void BeginWorkloadQuestionnaire()
-    {
-        WorkloadQuestionnaireActive = true;
-        WorkloadQuestionnaireToken++;
-        ScenarioRunner?.MarkTlxStart();
-    }
-
-    // ---- Phase 5 workload questionnaire --------------------------------------
-    /// <summary>Called by ResultsUI once the participant submits the NASA-TLX/BEDFORD
-    /// form for the trial that just ended. Saves the rating, then lets the normal
-    /// score-breakdown screen show (WorkloadQuestionnaireActive flips off).</summary>
-    public void SubmitWorkloadRating(WorkloadRating rating)
-    {
-        if (!WorkloadQuestionnaireActive) return;
-        var s = ScenarioRunner.Current;
-        WorkloadLog.Save(s != null ? s.Id : "unknown", s != null ? s.Title : "", rating);
-        // For an experiment mission the response ALSO goes into that trial's folder as
-        // nasa_tlx.json, beside its telemetry, events and metadata, so the self-report
-        // can never be separated from the data it describes.
-        if (s != null && s.Mission != null && ScenarioRunner.Experiment != null)
-            ScenarioRunner.Experiment.WriteTlx(rating, ScenarioRunner.Time01);
-        ScenarioRunner.MarkTlxSubmitAndClose(rating.RTLX, rating.Bedford);
-        SessionWorkload.Add(rating);
-        WorkloadQuestionnaireActive = false;
-    }
-
     void AdvanceSessionOrMenu()
     {
         if (SessionReportActive) { ExitScenarioToMenu(); return; }
@@ -349,7 +323,7 @@ public class GameManager : MonoBehaviour
         if (sessionQueue.Count > 0) { StartScenario(sessionQueue.Dequeue()); return; }
         if (inSession && SessionResults.Count > 0)
         {
-            SessionReporter.Generate(SessionResults, SessionWorkload);
+            SessionReporter.Generate(SessionResults);
             ParticipantManager.RecordSessionComplete();
             SessionReportActive = true;
             return;
@@ -365,7 +339,6 @@ public class GameManager : MonoBehaviour
         ExperimentRunning = false;
         experimentQueue.Clear();
         SessionReportActive = false;
-        WorkloadQuestionnaireActive = false;
         sessionQueue.Clear();
         ToMenu();
     }
@@ -402,7 +375,6 @@ public class GameManager : MonoBehaviour
                 break;
 
             case GameState.Results:
-                if (WorkloadQuestionnaireActive) break;   // questionnaire owns input until SUBMIT is clicked
                 if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
                 {
                     if (ScenarioActive) AdvanceSessionOrMenu(); else ToMenu();
@@ -425,13 +397,13 @@ public class GameManager : MonoBehaviour
             var tier = Aircraft.Landing != LandingTier.None ? Aircraft.Landing : LandingTier.Destroyed;
             Effects?.Trigger(tier, Aircraft.transform.position);
             ScenarioRunner.OnCrash(); RecordCampaign(); Crashed = true;
-            BeginWorkloadQuestionnaire(); State = GameState.Results; return;
+            ScenarioRunner.CloseTrial(); State = GameState.Results; return;
         }
         if (Aircraft.AltitudeM < -40f) { ScenarioRunner.Restart(); return; }   // fell out of the world -> restart trial
 
         if (Input.GetKeyDown(KeyCode.R)) ScenarioRunner.Restart();
         else if (Input.GetKeyDown(KeyCode.Escape)) ExitScenarioToMenu();
-        else if (ScenarioRunner.IsComplete) { RecordCampaign(); BeginWorkloadQuestionnaire(); State = GameState.Results; }
+        else if (ScenarioRunner.IsComplete) { RecordCampaign(); ScenarioRunner.CloseTrial(); State = GameState.Results; }
     }
 
     void Finish()
@@ -471,7 +443,7 @@ public class GameManager : MonoBehaviour
     /// <summary>Mirrors Enter/Return on the Results screen.</summary>
     public void Confirm()
     {
-        if (State != GameState.Results || WorkloadQuestionnaireActive) return;
+        if (State != GameState.Results) return;
         if (ScenarioActive) AdvanceSessionOrMenu(); else ToMenu();
     }
 
@@ -484,7 +456,6 @@ public class GameManager : MonoBehaviour
                 if (ScenarioActive) ScenarioRunner.Restart(); else StartFlight(Level.Mode);
                 break;
             case GameState.Results:
-                if (WorkloadQuestionnaireActive) return;
                 if (ScenarioActive) { Effects?.ClearEffects(); ScenarioRunner.Restart(); Crashed = false; State = GameState.Flying; }
                 else StartFlight(Level.Mode);
                 break;

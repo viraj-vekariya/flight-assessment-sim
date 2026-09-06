@@ -8,7 +8,6 @@
 //       <TRIAL>_<MISSION>/
 //           telemetry.csv                50 Hz aircraft + systems + control state
 //           events.csv                   every marker, three clocks each
-//           nasa_tlx.json                the participant's actual self-report
 //           metadata.json                the mission spec + the pre-registration
 //           eeg/                         where the EEG recording is dropped
 //               sync.json                clock offsets for alignment
@@ -493,36 +492,6 @@ public class ExperimentLogger
         sb.AppendLine($"  \"approximations\": {J(m.Approximations)}");
         sb.AppendLine("}");
         File.WriteAllText(Path.Combine(TrialDir, "metadata.json"), sb.ToString(), Utf8NoBom);
-    }
-
-    /// <summary>Write the participant's ACTUAL NASA-TLX response for this trial.
-    /// Called only from the questionnaire submit path. Never synthesised.</summary>
-    public void WriteTlx(WorkloadRating r, float missionElapsed)
-    {
-        if (string.IsNullOrEmpty(TrialDir)) return;
-        var sb = new StringBuilder();
-        sb.AppendLine("{");
-        sb.AppendLine($"  \"participant_id\": {J(Sanitize(ParticipantManager.FilePrefix))},");
-        sb.AppendLine($"  \"session_id\": {J(SessionId)},");
-        sb.AppendLine($"  \"trial_ordinal\": {trialOrdinal},");
-        sb.AppendLine($"  \"mission_id\": {J(mission != null ? mission.Id : "")},");
-        sb.AppendLine($"  \"condition\": {J(mission != null ? mission.ClassTag : "")},");
-        sb.AppendLine($"  \"submitted_utc\": {J(System.DateTime.UtcNow.ToString("o"))},");
-        sb.AppendLine($"  \"trial_duration_s\": {missionElapsed.ToString("F1", CI)},");
-        sb.AppendLine("  \"instrument\": \"NASA-TLX, raw/unweighted (RTLX). 21-point scale, 0-100 in steps of 5, per the NASA TLX manual.\",");
-        sb.AppendLine("  \"nasa_tlx\": {");
-        sb.AppendLine($"    \"mental_demand\": {r.MentalDemand.ToString("F0", CI)},");
-        sb.AppendLine($"    \"physical_demand\": {r.PhysicalDemand.ToString("F0", CI)},");
-        sb.AppendLine($"    \"temporal_demand\": {r.TemporalDemand.ToString("F0", CI)},");
-        sb.AppendLine($"    \"performance\": {r.Performance.ToString("F0", CI)},");
-        sb.AppendLine($"    \"effort\": {r.Effort.ToString("F0", CI)},");
-        sb.AppendLine($"    \"frustration\": {r.Frustration.ToString("F0", CI)},");
-        sb.AppendLine($"    \"rtlx\": {r.RTLX.ToString("F2", CI)}");
-        sb.AppendLine("  },");
-        sb.AppendLine("  \"note_performance_anchor\": \"Performance is anchored GOOD=0 .. POOR=100, so a HIGHER value means the participant judged their own performance WORSE. It is averaged in that direction, per raw-TLX convention.\",");
-        sb.AppendLine($"  \"bedford\": {r.Bedford}");
-        sb.AppendLine("}");
-        File.WriteAllText(Path.Combine(TrialDir, "nasa_tlx.json"), sb.ToString(), Utf8NoBom);
     }
 
     /// <summary>Append the trial's objective performance summary to metadata's sibling.</summary>
