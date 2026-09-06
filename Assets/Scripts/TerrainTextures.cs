@@ -50,6 +50,51 @@ public static class TerrainTextures
         return tex;
     }
 
+    // ═════════════════════════════════════════════════════════════════════════════
+    // DEV-ONLY: tinting, for the terrain look variants
+    // ═════════════════════════════════════════════════════════════════════════════
+    //
+    // Reached ONLY from WorldBuilder.ReskinTerrainForDesign, which is called ONLY by
+    // LevelDesignShots under -levelshots. Nothing below runs in a normal session, and
+    // no method above this line changed.
+    //
+    // WHY A TINT AND NOT A RECOLOURED ProceduralGrass(). The ground textures in this
+    // project are REAL CC0 photographs in StreamingAssets/Terrain/*.jpg. Load() returns
+    // those and only falls back to ProceduralGrass() when the file is absent — so while
+    // those five .jpg files exist, ProceduralGrass() is never reached and editing its
+    // three green constants would change precisely nothing on screen. A variant's colour
+    // therefore has to be applied to the LOADED image.
+    //
+    // Mutating in place would be a trap if the textures were cached; they are not —
+    // StreamingImage() constructs a new Texture2D on every call — but this returns a
+    // copy anyway, so a variant can never leak into another variant or into a later run.
+
+    /// <summary>A tinted COPY of a ground texture: saturation scaled about its own
+    /// luminance, then multiplied by <paramref name="mul"/>. The source is untouched.</summary>
+    public static Texture2D Tint(Texture2D src, Color mul, float sat)
+    {
+        if (src == null) return null;
+
+        var px = src.GetPixels();
+        for (int i = 0; i < px.Length; i++)
+        {
+            Color c = px[i];
+            // Rec.601 luma — desaturating toward luma keeps the texture's tonal detail,
+            // which is the whole reason a photo reads as ground and a flat colour does not.
+            float lum = c.r * 0.299f + c.g * 0.587f + c.b * 0.114f;
+            c.r = Mathf.Clamp01(Mathf.Lerp(lum, c.r, sat) * mul.r);
+            c.g = Mathf.Clamp01(Mathf.Lerp(lum, c.g, sat) * mul.g);
+            c.b = Mathf.Clamp01(Mathf.Lerp(lum, c.b, sat) * mul.b);
+            px[i] = c;
+        }
+
+        var dst = new Texture2D(src.width, src.height, TextureFormat.RGB24, true)
+        { wrapMode = TextureWrapMode.Repeat, anisoLevel = 4 };
+        dst.SetPixels(px);
+        dst.Apply(true);
+        return dst;
+    }
+
     static Texture2D FromStreamingAssets(string name) => StreamingImage("Terrain/" + name + ".jpg");
 
     /// <summary>Load a JPG/PNG from StreamingAssets at runtime, or null if absent/unreadable.</summary>

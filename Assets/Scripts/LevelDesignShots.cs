@@ -10,7 +10,7 @@
 // taken from somewhere a pilot actually is.
 //
 //   Unity -batchmode -projectPath <p> -executeMethod PlayCapture.RunLevelShots \
-//         -levelshots -lighting=N -logFile level.log            (N = 0..3)
+//         -levelshots -lighting=N -terrain=M -logFile level.log   (N, M = 0..3)
 //
 // NOTE: no -nographics (the PFD/MFD render to off-screen cameras and the null graphics
 // device crashes on them) and no -quit (the editor must survive long enough to play).
@@ -22,6 +22,14 @@
 //   the sun is taken from RenderSettings.sun and every sky material used here is a
 //   fresh instance, so WorldBuilder's own shared clearSky/overcastSky are never mutated.
 //   Anyone running the sim normally gets byte-identical lighting to before this file.
+//
+// TERRAIN VARIANTS ARE FLAG-ONLY AND VARIANT 0 IS A NO-OP, ON THE SAME TERMS.
+//   -terrain=M calls WorldBuilder.ReskinTerrainForDesign, which returns immediately for
+//   M = 0 and otherwise replaces ONLY the already-built terrain's layers and alphamap.
+//   No height is read or written by that path, so terrain SHAPE — and therefore the
+//   runway pad, take-off and every mission's ground clearance — is identical in all
+//   four. The terrain look is a property of the world, not of a mission, so it is the
+//   same in every scenario and cannot become a per-mission confound.
 
 using System.Collections;
 using System.IO;
@@ -70,6 +78,18 @@ public class LevelDesignShots : MonoBehaviour
         // the city at (250, 1950) and the coastal range that grows toward +X are both in
         // frame, and pitched 7 deg down so ground and horizon share the picture.
         new View("cruise",      new Vector3(0f, 600f, 0f),     CruiseAim(),                42f),
+
+        // Flare: 15 m over the threshold on the centreline, looking down the strip.
+        //
+        // This is the shot the terrain round exists for. The other three are at 150 m,
+        // eye height on the ground, and 600 m — none of them is at the altitude where
+        // ground TEXTURE decides whether the picture reads as real. At 15 m the grass
+        // tile is a few metres across in frame, so a tile that is too coarse stops
+        // being detail and becomes flat paint, which is the fault being hunted.
+        //
+        // Aimed at y = 6 down the far end rather than level, so ground fills the lower
+        // two-thirds of the frame instead of the horizon splitting it.
+        new View("flare",       new Vector3(0f, 15.4f, -290f), new Vector3(0f, 6f, 290f),  42f),
     };
 
     static Vector3 CruiseAim()
@@ -80,14 +100,21 @@ public class LevelDesignShots : MonoBehaviour
     }
 
     static readonly string[] VariantNames = { "current", "clear_morning", "midday_haze", "overcast_soft" };
+    static readonly string[] TerrainNames = { "current", "dry_season", "green_temperate", "worn_airfield" };
 
     int variant;
+    int terrain;
     string dir;
     Camera cam;
+
+    /// <summary>The stem both axes are readable in: L&lt;lighting&gt;_&lt;name&gt;_T&lt;terrain&gt;_&lt;name&gt;.</summary>
+    string Stem => string.Format("L{0}_{1}_T{2}_{3}", variant, VariantNames[variant],
+                                                      terrain, TerrainNames[terrain]);
 
     IEnumerator Start()
     {
         variant = ReadVariant();
+        terrain = ReadTerrain();
 
         // Nothing here flies the aeroplane, but FlightTest does, and it would be moving
         // the machine (and therefore the terrain LOD and the aircraft's own shadow)
@@ -108,10 +135,15 @@ public class LevelDesignShots : MonoBehaviour
         // -lighting value, to produce one set of twelve images. A whole-folder wipe would
         // leave only the last variant's three files and quietly destroy the comparison
         // the tool exists to make.
+        //
+        // Scoped to the LIGHTING x TERRAIN pair for the same reason: the tool is now run
+        // sixteen times, and a wipe keyed on lighting alone would delete the other three
+        // terrain variants shot under the same light.
         int wiped = 0;
-        foreach (var f in Directory.GetFiles(dir, "lighting" + variant + "_*"))
+        foreach (var f in Directory.GetFiles(dir, Stem + "_*"))
         { try { File.Delete(f); wiped++; } catch { } }
-        Debug.Log("[LEVELSHOTS] variant " + variant + " (" + VariantNames[variant] + "), wiped "
+        Debug.Log("[LEVELSHOTS] lighting " + variant + " (" + VariantNames[variant] + ")"
+                  + ", terrain " + terrain + " (" + TerrainNames[terrain] + "), wiped "
                   + wiped + " stale file(s) in " + dir);
 
         float t0 = Time.realtimeSinceStartup;
@@ -122,6 +154,12 @@ public class LevelDesignShots : MonoBehaviour
         }
         if (!ParticipantManager.IsSet) ParticipantManager.SetID("LEVEL");
         GameManager.Instance.SetParticipantReady();
+
+        // TERRAIN VARIANT, before the settle. This replaces the already-built terrain's
+        // layers and alphamap and nothing else — no height is read or written, so the
+        // shape of the ground, the runway pad and every mission's clearance are the same
+        // in all four. Variant 0 returns without touching anything.
+        WorldBuilder.ReskinTerrainForDesign(terrain);
 
         // Let the terrain finish generating its splatmap/detail and the water animator
         // settle, so all four variants photograph an identically-settled world.
@@ -134,7 +172,7 @@ public class LevelDesignShots : MonoBehaviour
 
         BuildCam();
         foreach (var v in Views)
-            yield return Shot(v, string.Format("lighting{0}_{1}_{2}.png", variant, VariantNames[variant], v.Name));
+            yield return Shot(v, Stem + "_" + v.Name + ".png");
 
         DumpLightingState();
         Debug.Log("[LEVELSHOTS] wrote shots to " + dir);
@@ -152,6 +190,19 @@ public class LevelDesignShots : MonoBehaviour
             return 0;
         }
         return 0;   // no flag = the project as it is
+    }
+
+    static int ReadTerrain()
+    {
+        foreach (var a in System.Environment.GetCommandLineArgs())
+        {
+            if (!a.StartsWith("-terrain=")) continue;
+            int n;
+            if (int.TryParse(a.Substring("-terrain=".Length), out n) && n >= 0 && n <= 3) return n;
+            Debug.LogError("[LEVELSHOTS] bad " + a + " — expected -terrain=0..3; using 0");
+            return 0;
+        }
+        return 0;   // no flag = the ground as it is
     }
 
     // ── the four looks ────────────────────────────────────────────────────────────
@@ -319,10 +370,20 @@ public class LevelDesignShots : MonoBehaviour
     {
         var sb = new System.Text.StringBuilder();
         var sun = RenderSettings.sun;
-        sb.AppendLine("LEVEL LIGHTING STATE");
+        sb.AppendLine("LEVEL LIGHTING + TERRAIN STATE");
         sb.AppendLine("variant       : " + variant + "  (" + VariantNames[variant] + ")");
         if (variant == 0)
             sb.AppendLine("                variant 0 applies NOTHING; these are WorldBuilder's own values.");
+        sb.AppendLine("terrain       : " + terrain + "  (" + TerrainNames[terrain] + ")");
+        sb.AppendLine("  tiles/blend : " + WorldBuilder.DescribeLook(terrain));
+        if (terrain == 0)
+            sb.AppendLine("                terrain 0 applies NOTHING; the ground is the project's own.");
+        if (terrain == 2)
+        {
+            sb.AppendLine("                NOTE: in this variant ONLY, layer 1 is tinted DARK GRASS");
+            sb.AppendLine("                rather than dirt, so grass<->dirt reads as light<->dark green.");
+        }
+        sb.AppendLine("  heights     : UNTOUCHED — the re-skin replaces layers + alphamap only.");
         sb.AppendLine("sun rotation  : " + (sun != null ? sun.transform.rotation.eulerAngles.ToString("0.00") : "(none)"));
         sb.AppendLine("sun intensity : " + (sun != null ? sun.intensity.ToString("0.0000") : "-"));
         sb.AppendLine("sun color     : " + (sun != null ? sun.color.ToString("0.0000") : "-"));
@@ -347,8 +408,8 @@ public class LevelDesignShots : MonoBehaviour
             sb.AppendLine(string.Format("  {0,-12} pos={1} lookAt={2} fov={3}",
                                         v.Name, v.Pos.ToString("0.0"), v.LookAt.ToString("0.0"), v.Fov));
 
-        File.WriteAllText(Path.Combine(dir, "lighting_state_" + variant + ".txt"), sb.ToString());
-        Debug.Log("[LEVELSHOTS]   wrote lighting_state_" + variant + ".txt");
+        File.WriteAllText(Path.Combine(dir, "state_" + Stem + ".txt"), sb.ToString());
+        Debug.Log("[LEVELSHOTS]   wrote state_" + Stem + ".txt");
     }
 
     void Done() { Finished = true; }

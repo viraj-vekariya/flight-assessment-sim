@@ -329,16 +329,173 @@ public static class WorldBuilder
         return t * t * (3f - 2f * t);
     }
 
-    static TerrainLayer[] BuildLayers()
+    static TerrainLayer[] BuildLayers(int v = 0)
     {
+        // v == 0 is the project as it ships. Byte-for-byte the original method body:
+        // do not "unify" this with the variant path below, because re-deriving a
+        // baseline from a table is exactly how a baseline stops being one.
+        if (v == 0)
+            return new[]
+            {
+                Layer(TerrainTextures.Grass(), 6f),
+                Layer(TerrainTextures.Dirt(), 5f),
+                Layer(TerrainTextures.Rock(), 9f),
+                Layer(TerrainTextures.Sand(), 5f),
+                Layer(TerrainTextures.Snow(), 10f),
+            };
+
+        var L = Looks[v];
         return new[]
         {
-            Layer(TerrainTextures.Grass(), 6f),
-            Layer(TerrainTextures.Dirt(), 5f),
-            Layer(TerrainTextures.Rock(), 9f),
-            Layer(TerrainTextures.Sand(), 5f),
-            Layer(TerrainTextures.Snow(), 10f),
+            Layer(TerrainTextures.Tint(TerrainTextures.Grass(), L.GrassTint, L.GrassSat), L.GrassTile),
+            Layer(TerrainTextures.Tint(TerrainTextures.Dirt(),  L.DirtTint,  L.DirtSat),  L.DirtTile),
+            Layer(TerrainTextures.Rock(), L.RockTile),
+            Layer(TerrainTextures.Tint(TerrainTextures.Sand(),  L.SandTint,  1f),         L.SandTile),
+            Layer(TerrainTextures.Snow(), L.SnowTile),
         };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEV-ONLY TERRAIN LOOK VARIANTS  (LevelDesignShots -terrain=N)
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // APPEARANCE ONLY. Nothing here reads or writes a height. BuildTerrain, BaseHeight,
+    // Height, PadFlatten, Octave and Peak are not called, not modified and not reachable
+    // from this path — the re-skin runs against an ALREADY-BUILT TerrainData and replaces
+    // only terrainLayers and the alphamap. Take-off and every mission's ground clearance
+    // are therefore unaffected by construction, not merely by intent.
+    //
+    // Variant 0 never enters any of it: ReskinTerrainForDesign returns immediately.
+    //
+    // Each variant moves THREE things together — texture colour, blend patchiness, and
+    // tile scale. Tile scale carries the widest spread because coarse tiling is what
+    // makes ground read as flat paint on short final; grass runs 6.0 m today down to
+    // 2.5 m at the finest.
+    //
+    // EVERY TINT MULTIPLIER IS BELOW 1.0, AND THAT IS A RULE, NOT A COINCIDENCE.
+    // The first pass used multipliers above 1.0 (dry season 1.14/1.02/0.66, worn airfield
+    // 1.02/0.98/0.92) on textures that are already bright photographs. Under a lit scene
+    // the product clipped against 1.0 and the ground went to flat paper — and clipping
+    // destroys precisely the tonal range that makes a tile READ as texture, so the tile
+    // scale being compared became invisible in two of the four variants. A tint darkens;
+    // the light supplies the brightness.
+    struct TerrainLook
+    {
+        public string Name;
+        public float GrassTile, DirtTile, RockTile, SandTile, SnowTile;
+        public Color GrassTint, DirtTint, SandTint;
+        public float GrassSat, DirtSat;
+        public float PatchAmount;    // 0..1 of open grass that can turn to layer 1
+        public float PatchScale;     // metres — the size of one patch, in WORLD units
+        public float SandAmount;     // extra sand mixed into open ground
+        public float WearAmount;     // dirt wear keyed to distance from pavement
+    }
+
+    static readonly TerrainLook[] Looks =
+    {
+        // [0] never used — ReskinTerrainForDesign returns before reading the table.
+        new TerrainLook { Name = "current" },
+
+        // [1] DRY SEASON — warmer, yellower, more dirt and sand in the blend. Grass tile
+        // drops 6.0 -> 3.5 m so parched ground still has near-field detail.
+        new TerrainLook
+        {
+            Name = "dry_season",
+            GrassTile = 3.5f, DirtTile = 4.0f, RockTile = 9f, SandTile = 6.0f, SnowTile = 10f,
+            GrassTint = new Color(0.86f, 0.74f, 0.42f), GrassSat = 0.68f,
+            DirtTint  = new Color(0.78f, 0.66f, 0.48f), DirtSat  = 0.85f,
+            SandTint  = new Color(0.82f, 0.76f, 0.62f),
+            PatchAmount = 0.45f, PatchScale = 260f,
+            SandAmount = 0.18f, WearAmount = 0f,
+        },
+
+        // [2] GREEN TEMPERATE — richer green and the clearest dark/light patchiness, on
+        // the finest grass tile of the four (2.5 m).
+        //
+        // NOTE, because it changes what a layer MEANS: there is only one grass layer, so
+        // dark/light patchiness cannot come from the alphamap alone. In THIS variant only,
+        // layer 1 is tinted to a DARK GRASS shade instead of dirt, which turns the
+        // existing grass<->dirt blend into light-green <-> dark-green. No layer is added
+        // and no other variant does this. The state dump says so on the picture's behalf.
+        new TerrainLook
+        {
+            Name = "green_temperate",
+            GrassTile = 2.5f, DirtTile = 5.0f, RockTile = 9f, SandTile = 5.0f, SnowTile = 10f,
+            GrassTint = new Color(0.58f, 0.82f, 0.44f), GrassSat = 1.25f,
+            DirtTint  = new Color(0.30f, 0.50f, 0.24f), DirtSat  = 1.10f,   // dark grass, not dirt
+            SandTint  = Color.white,
+            PatchAmount = 0.55f, PatchScale = 190f,
+            SandAmount = 0f, WearAmount = 0f,
+        },
+
+        // [3] WORN AIRFIELD — desaturated grey-green grass with dirt wear along the
+        // runway, taxiway A, link B and the stand. Dirt gets the finest tile of any
+        // variant (2.5 m) so the wear reads as scuffed ground rather than a painted band.
+        new TerrainLook
+        {
+            Name = "worn_airfield",
+            GrassTile = 4.5f, DirtTile = 2.5f, RockTile = 9f, SandTile = 5.0f, SnowTile = 10f,
+            GrassTint = new Color(0.62f, 0.66f, 0.54f), GrassSat = 0.50f,
+            DirtTint  = new Color(0.60f, 0.53f, 0.43f), DirtSat  = 0.72f,
+            SandTint  = new Color(0.70f, 0.68f, 0.64f),
+            PatchAmount = 0.22f, PatchScale = 320f,
+            SandAmount = 0f, WearAmount = 0.85f,
+        },
+    };
+
+    /// <summary>Distance from a point to the edge of an axis-aligned rectangle, 0 inside.</summary>
+    static float RectDist(float x, float z, float cx, float cz, float hx, float hz)
+    {
+        float dx = Mathf.Max(0f, Mathf.Abs(x - cx) - hx);
+        float dz = Mathf.Max(0f, Mathf.Abs(z - cz) - hz);
+        return Mathf.Sqrt(dx * dx + dz * dz);
+    }
+
+    /// <summary>1 at the edge of the paved surfaces, falling to 0 by 90 m out.
+    ///
+    /// The alphamap is 512 cells across 12 km = 23.4 m per cell, so a 90 m falloff is
+    /// about four cells: this reads as a broad worn verge around the field, not a crisp
+    /// edge. ARES is deliberately NOT raised for the variants — that would add a fourth
+    /// thing varying between them and make the comparison unfair.</summary>
+    static float WearNearPavement(float x, float z)
+    {
+        float dRun   = RectDist(x, z,   0f,    0f, 15f, 300f);   // runway, 30 x 600 on x = 0
+        float dTaxi  = RectDist(x, z, -80f, -450f, 12f, 160f);   // taxiway A, parallel at x = -80
+        float dLink  = RectDist(x, z, -40f, -320f, 40f,  12f);   // link B, taxiway -> threshold
+        float dStand = RectDist(x, z, -80f, -585f, 20f,  25f);   // apron and stand 1
+        float d = Mathf.Min(Mathf.Min(dRun, dTaxi), Mathf.Min(dLink, dStand));
+        return 1f - Smooth(8f, 90f, d);
+    }
+
+    /// <summary>Re-skin the terrain that already exists: replace its layers and alphamap,
+    /// and nothing else. Dev tool only — the sole caller is LevelDesignShots, which itself
+    /// only exists under -levelshots. Heights are never read or written.</summary>
+    public static void ReskinTerrainForDesign(int v)
+    {
+        if (v == 0) return;    // the project as it ships — apply NOTHING
+        if (v < 0 || v >= Looks.Length) { Debug.LogError("[TERRAIN] bad variant " + v); return; }
+
+        var t = Object.FindFirstObjectByType<Terrain>();
+        if (t == null || t.terrainData == null)
+        { Debug.LogError("[TERRAIN] no Terrain in the scene — variant " + v + " not applied"); return; }
+
+        var td = t.terrainData;
+        td.terrainLayers = BuildLayers(v);
+        td.SetAlphamaps(0, 0, BuildAlphamap(td, v));
+        t.Flush();
+        Debug.Log("[TERRAIN] variant " + v + " (" + Looks[v].Name + ") applied — layers + alphamap only, heights untouched");
+    }
+
+    /// <summary>The tile sizes actually in force, so a picture can be read as numbers.</summary>
+    public static string DescribeLook(int v)
+    {
+        if (v == 0) return "current  grass=6.0 dirt=5.0 rock=9.0 sand=5.0 snow=10.0  (no patch, no wear)";
+        var L = Looks[v];
+        return string.Format(
+            "{0}  grass={1:0.0} dirt={2:0.0} rock={3:0.0} sand={4:0.0} snow={5:0.0}  " +
+            "patch={6:0.00}@{7:0}m sand+={8:0.00} wear={9:0.00}",
+            L.Name, L.GrassTile, L.DirtTile, L.RockTile, L.SandTile, L.SnowTile,
+            L.PatchAmount, L.PatchScale, L.SandAmount, L.WearAmount);
     }
 
     static TerrainLayer Layer(Texture2D t, float tile)
@@ -347,7 +504,7 @@ public static class WorldBuilder
     }
 
     // blend the 5 layers by altitude + slope: grass(0) dirt(1) rock(2) sand(3) snow(4)
-    static float[,,] BuildAlphamap(TerrainData td)
+    static float[,,] BuildAlphamap(TerrainData td, int lookVariant = 0)
     {
         int aw = td.alphamapWidth, ah = td.alphamapHeight;
         var map = new float[ah, aw, 5];
@@ -379,6 +536,43 @@ public static class WorldBuilder
                 float rock = Mathf.Max(steep, Smooth(620f, 920f, worldY)) * (1f - snow) * (1f - sand);
                 float dirt = steep * 0.4f * (1f - snow) * (1f - sand);
                 float grass = Mathf.Max(0.02f, (1f - snow) * (1f - sand) * (1f - steep));
+
+                // ── DEV-ONLY variant blend ───────────────────────────────────────
+                // v == 0 skips this entirely, so the shipped alphamap is the same
+                // arithmetic it has always been. Variants only ever REDISTRIBUTE open
+                // grass into layer 1 (and a little sand); snow, rock and the coastal
+                // sand rule above are left exactly as they are, so the mountains and
+                // the shoreline stay recognisably the same place in all four pictures.
+                if (lookVariant != 0)
+                {
+                    var L = Looks[lookVariant];
+                    float open = grass;
+
+                    // Patch field in WORLD METRES, so patch size is physical and does
+                    // not silently change if the alphamap resolution ever moves.
+                    float p1 = Mathf.PerlinNoise(wx / L.PatchScale + 13.7f,
+                                                 wz / L.PatchScale + 41.3f);
+                    float p2 = Mathf.PerlinNoise(wx / (L.PatchScale * 0.31f) + 5.1f,
+                                                 wz / (L.PatchScale * 0.31f) + 9.4f);
+                    float patch = Mathf.Clamp01(p1 * 0.70f + p2 * 0.30f);
+
+                    float toDirt = open * L.PatchAmount * patch;
+
+                    if (L.WearAmount > 0f)
+                        toDirt += open * L.WearAmount * WearNearPavement(wx, wz);
+
+                    if (L.SandAmount > 0f)
+                    {
+                        float toSand = open * L.SandAmount * patch * (1f - steep) * (1f - snow);
+                        sand += toSand;
+                        grass -= toSand;
+                    }
+
+                    toDirt = Mathf.Min(toDirt, Mathf.Max(0f, grass - 0.02f));
+                    grass -= toDirt;
+                    dirt  += toDirt;
+                    grass = Mathf.Max(0.02f, grass);
+                }
 
                 float sum = grass + dirt + rock + sand + snow + 1e-4f;
                 map[zi, xi, 0] = grass / sum;
