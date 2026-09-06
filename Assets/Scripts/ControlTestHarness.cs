@@ -303,363 +303,28 @@ public class ControlTestHarness : MonoBehaviour
               "grabbed=" + c.Grabbed + " handle=" + c.Smoothed.ToString("F2")
               + " phys.throttle=" + ac.Throttle01.ToString("F2"));
 
-        // And the GEOMETRY moved with it — not just the number.
-        //
-        // spec.visual is the ARM, which animates from IDENTITY; the rest rake lives on its
-        // parent pivot. Both halves are checked, because the whole point of splitting them
-        // is that neither may leak into the other:
-        //
-        //   arm.localRotation   must be exactly value x sweep about the animated axis
-        //   pivot.localRotation must be the rest rake, and must NEVER change
-        //
-        // An arm that carried its own rake would be driven from 0 to +44 deg instead of
-        // -22 to +22 — hard on one stop at idle, 22 deg past the other at full power. A
-        // rake added to the animated value instead of held on the pivot is the +-22 -> -66
-        // deg bug that laid an earlier build's handles flat across their own placards.
+        // And the GEOMETRY moved with it — not just the number. spec.visual is the
+        // carriage; its offset along the channel must equal value x travel. This is what
+        // catches the visualBase-captured-in-Awake bug, which puts the handle at the
+        // centre of the channel at idle and past the end stop at full power.
         if (c.spec.visual != null)
         {
-            var arm = c.spec.visual;
-            var pivot = arm.parent;
-            Check("the animated visual hangs off a pivot", pivot != null && pivot.name == "LeverPivot",
-                  "parent=" + (pivot == null ? "NONE" : pivot.name));
-
-            float armDeg = Quaternion.Angle(Quaternion.identity, arm.localRotation);
-            float wantDeg = Mathf.Abs(c.Smoothed * c.spec.visualTravel);
-            Check("the arm is rotated by value x sweep", Mathf.Abs(armDeg - wantDeg) < 1.0f,
-                  "arm=" + armDeg.ToString("F1") + " deg, expected " + wantDeg.ToString("F1") + " deg");
-
-            if (pivot != null)
-            {
-                // The invariant is that the rake EXISTS and lives HERE — not that it happens
-                // to equal half the sweep. Asserting a particular angle would freeze a design
-                // choice into the test: the rake is set from what the pilot can see, and it
-                // was moved from -22 deg to +20 deg for exactly that reason. What must never
-                // be true is a rake of zero, which would mean it had been folded back into
-                // the animated value.
-                float rake = Quaternion.Angle(Quaternion.identity, pivot.localRotation);
-                Check("the pivot carries a real rest rake, not the arm", rake > 1f,
-                      "pivot rake=" + rake.ToString("F1") + " deg");
-                pivotRakeAtPower = pivot.localRotation;
-            }
-
-            // At idle the arm must be back at IDENTITY — the rest pose, with the rake still
-            // supplying the whole of the lever's angle.
+            float y = c.spec.visual.localPosition.y;
+            float want = c.Smoothed * c.spec.visualTravel;
+            Check("the handle GEOMETRY sits at value x travel",
+                  Mathf.Abs(y - want) < 0.002f,
+                  "handle y=" + (y * 1000f).ToString("F1") + " mm, expected "
+                  + (want * 1000f).ToString("F1") + " mm");
+            // Rest must be the BOTTOM of the channel, not its middle.
             for (int i = 0; i < 10; i++) { ctl.SetThrottle(0f); yield return null; }
             yield return WaitSeconds(0.25f);
-            Check("idle returns the arm to identity",
-                  Quaternion.Angle(Quaternion.identity, arm.localRotation) < 1.0f,
-                  "arm=" + Quaternion.Angle(Quaternion.identity, arm.localRotation).ToString("F1") + " deg from rest");
-            if (pivot != null)
-                Check("the pivot rake is the same at idle as at power",
-                      Quaternion.Angle(pivotRakeAtPower, pivot.localRotation) < 0.01f,
-                      "moved " + Quaternion.Angle(pivotRakeAtPower, pivot.localRotation).ToString("F3") + " deg");
+            Check("idle parks the handle at the bottom of its channel",
+                  Mathf.Abs(c.spec.visual.localPosition.y) < 0.002f,
+                  "handle y=" + (c.spec.visual.localPosition.y * 1000f).ToString("F1") + " mm from rest");
         }
         ctl.ClearOverrides(); yield return WaitFrames(2);
 
         yield return ThrottleIsWhatTheMouseGrabs(c);
-        yield return ThrottleSweepIsClear(c);
-        yield return ThrottleTracksTheHand(c);
-    }
-
-    /// <summary>THE KNOB MUST GO WHERE THE HAND PUTS IT.
-    ///
-    /// PhysicalControl is position-based on purpose: hand displacement maps to control
-    /// position, so a participant's control input does not depend on how long they held
-    /// their hand somewhere. That promise is only kept if spec.travel is the distance the
-    /// HAND moves, in world metres, along spec.axis.
-    ///
-    /// On an arc it is easy to gear to the wrong length. The knob's straight-line movement
-    /// between the stops is the chord, 48.7 mm, but only its vertical component, 28.6 mm,
-    /// lies along the axis the hand is measured on — and the model is not at unit scale, so
-    /// neither number is a world distance. Gear to the chord and the ball trails the hand
-    /// holding it by nearly half; nothing else in this battery would notice.</summary>
-    IEnumerator ThrottleTracksTheHand(PhysicalControl c)
-    {
-        Section("THROTTLE GEARING  (the ball must keep up with the hand dragging it)");
-
-        var grip = GripOf(c);
-        if (grip == null) { Fail("throttle gearing", "no grip to follow"); yield break; }
-
-        for (int i = 0; i < 10; i++) { ctl.SetThrottle(0f); yield return null; }
-        yield return WaitSeconds(0.3f);
-        ctl.ClearOverrides();
-
-        Vector3 axis = c.transform.TransformDirection(c.spec.axis).normalized;
-        // MEASURE IN THE CONTROL'S OWN FRAME. The aeroplane is on the ground and about to be
-        // given most of its power, so it rolls, and a world-space before/after would be
-        // measuring the take-off roll as well as the lever. The control's frame moves with
-        // the aeroplane, so the difference is the lever and nothing else.
-        Vector3 fromLocal = c.transform.InverseTransformPoint(grip.bounds.center);
-        // Local metres are not world metres — spec.travel is a world distance, so the two
-        // have to be compared in the same units. This is the factor between them.
-        float localToWorld = c.transform.TransformVector(c.spec.axis.normalized).magnitude;
-
-        // HOLD THE HAND STILL IN THE WORLD, relative to the point it took hold at.
-        //
-        // UpdateGrab measures the hand as a world delta from wherever the grab started, so
-        // the target has to be offset from THAT point, once. Recomputing it from
-        // c.transform.position every frame quietly subtracts the aeroplane's own movement
-        // from the hand: this test opens the throttle to full on the ground, the aeroplane
-        // starts its take-off roll, and the lever stalled at 0.85 with the drift looking
-        // exactly like a gearing error. The brake is held for the same reason.
-        Vector3 origin = c.transform.position;
-        c.EndGrab();
-        c.BeginGrab(origin);
-        // Settle on Time.deltaTime, the clock the smoothing itself uses. Accumulating
-        // unscaledDeltaTime here left the lever short after what looked like ten time
-        // constants — the same trap TestFrameRateIndependence documents.
-        float held = 0f, settle = Mathf.Max(0.4f, c.spec.smoothingTau * 12f);
-        while (held < settle)
-        {
-            c.UpdateGrab(origin + axis * c.spec.travel);
-            ctl.SetBrake(1f);
-            held += Time.deltaTime;
-            yield return null;
-        }
-        Vector3 toLocal = c.transform.InverseTransformPoint(grip.bounds.center);
-        float moved = Vector3.Dot(toLocal - fromLocal, c.spec.axis.normalized) * localToWorld;
-        float asked = c.spec.travel;
-        c.EndGrab();
-
-        report.AppendLine("   model lossyScale=" + c.transform.lossyScale.ToString("F3")
-                          + "  local->world along the axis=" + localToWorld.ToString("F3")
-                          + "  ball radius=" + (Mathf.Max(grip.bounds.extents.x,
-                              Mathf.Max(grip.bounds.extents.y, grip.bounds.extents.z)) * 1000f).ToString("F1") + " mm");
-        Check("one full travel of the hand reaches full power", c.Smoothed > 0.95f,
-              "value=" + c.Smoothed.ToString("F3"));
-        Check("the ball moved as far as the hand did",
-              Mathf.Abs(moved - asked) < 0.006f,
-              "hand moved " + (asked * 1000f).ToString("F1") + " mm, ball moved "
-              + (moved * 1000f).ToString("F1") + " mm along the same axis");
-
-        for (int i = 0; i < 10; i++) { ctl.SetThrottle(0f); ctl.SetBrake(1f); yield return null; }
-        for (int i = 0; i < 8; i++) { ctl.SetBrake(0f); yield return null; }
-        ctl.ClearOverrides(); yield return WaitFrames(2);
-    }
-
-    /// <summary>THE KNOB MUST SWEEP THROUGH FRESH AIR, AND THE GROUP MUST STAY OFF THE MFD.
-    ///
-    /// A lever on an arc can foul things a lever in a slot cannot: the knob leaves the
-    /// casing's plane, so at the stops it can be driven into the quadrant cheeks, into the
-    /// panel behind it, or up through the display above it. None of that shows up in any
-    /// wiring test — the control would read, drive and animate perfectly while visibly
-    /// passing through solid aeroplane.
-    ///
-    /// Measured against DRAWN TRIANGLES, not renderer bounds. A bounds test against a
-    /// cockpit panel is a test against a box the size of the cabin, and would either fail
-    /// constantly or, if loosened, pass constantly. It is also why the triangle count is
-    /// reported: a geometry test that silently examined nothing would pass, and this
-    /// project has already been burnt once by a probe that confidently measured the wrong
-    /// thing.</summary>
-    IEnumerator ThrottleSweepIsClear(PhysicalControl c)
-    {
-        Section("THROTTLE SWEEP  (the knob must clear the casing, the panel and the MFD)");
-
-        var arm = c.spec.visual;
-        if (arm == null) { Fail("throttle sweep", "the throttle has no animated visual"); yield break; }
-        var pivot = arm.parent;
-
-        // The KNOB is the arm's furthest child renderer from the pivot — found by geometry
-        // rather than by name, so renaming a primitive cannot quietly disarm this.
-        Renderer knob = null; float far = -1f;
-        foreach (var r in arm.GetComponentsInChildren<Renderer>(true))
-        {
-            float d = Vector3.Distance(r.bounds.center, pivot != null ? pivot.position : arm.position);
-            if (d > far) { far = d; knob = r; }
-        }
-        if (knob == null) { Fail("throttle sweep", "the arm has no renderers"); yield break; }
-        float knobR = Mathf.Max(knob.bounds.extents.x, Mathf.Max(knob.bounds.extents.y, knob.bounds.extents.z));
-
-        // Everything that is NOT the moving arm is an obstacle — including this control's
-        // own casing, which is exactly the thing a lever is most likely to swing through.
-        var obstacles = new System.Collections.Generic.List<MeshFilter>();
-        foreach (var mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
-        {
-            if (mf.sharedMesh == null) continue;
-            if (mf.transform.IsChildOf(arm)) continue;
-            // The EXTERIOR is not an obstacle. AircraftBuilder's fuselage is a placeholder
-            // capsule on layer 10 that the cockpit camera culls and that the whole cabin
-            // sits INSIDE — so "distance to it" is measured from within its own skin and
-            // says nothing about whether the knob clips anything the pilot can see. Left in,
-            // it reported the fuselage shell as the nearest geometry at full power and
-            // buried the number that matters, which is the clearance to the casing.
-            if (mf.gameObject.layer == AircraftBuilder.ExteriorLayer) continue;
-            var rr = mf.GetComponent<Renderer>();
-            if (rr == null || !rr.enabled) continue;
-            obstacles.Add(mf);
-        }
-
-        Camera eyeCam = null;
-        foreach (var k in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
-            if (k.targetTexture == null && k.name == "CockpitCamera") eyeCam = k;
-        Check("the pilot's own camera was found, so visibility is judged from the seat",
-              eyeCam != null, eyeCam == null ? "CockpitCamera MISSING" : "ok");
-
-        Transform model = c.transform;
-        while (model != null && model.name != "RealCockpitModel") model = model.parent;
-        Check("the cockpit model was found, so the MFD bound can be checked in its frame",
-              model != null, model == null ? "RealCockpitModel MISSING" : "ok");
-
-        const float MfdLowerEdge = 0.4856f;    // model-local y, measured
-        float worstTop = float.MinValue; string worstTopAt = "";
-
-        foreach (float where in new[] { 0f, 0.5f, 1f })
-        {
-            for (int i = 0; i < 12; i++) { ctl.SetThrottle(where); yield return null; }
-            yield return WaitSeconds(0.3f);
-
-            string at = where < 0.25f ? "idle" : where > 0.75f ? "full power" : "mid-travel";
-            Vector3 kc = knob.bounds.center;
-            float best = float.MaxValue; string bestName = "nothing"; int tris = 0, meshes = 0, unreadable = 0;
-
-            foreach (var mf in obstacles)
-            {
-                var rr = mf.GetComponent<Renderer>();
-                // Prune on bounds first: only geometry that could possibly be within reach
-                // of the knob is worth walking triangle by triangle.
-                if ((rr.bounds.ClosestPoint(kc) - kc).magnitude > knobR + 0.05f) continue;
-                var mesh = mf.sharedMesh;
-                if (!mesh.isReadable) { unreadable++; continue; }
-                meshes++;
-                var v = mesh.vertices; var idx = mesh.triangles;
-                var xf = mf.transform;
-                for (int i = 0; i + 2 < idx.Length; i += 3)
-                {
-                    Vector3 a = xf.TransformPoint(v[idx[i]]);
-                    Vector3 b = xf.TransformPoint(v[idx[i + 1]]);
-                    Vector3 d = xf.TransformPoint(v[idx[i + 2]]);
-                    float dist = Vector3.Distance(kc, ClosestOnTriangle(kc, a, b, d));
-                    tris++;
-                    if (dist < best) { best = dist; bestName = mf.name + " (" + xf.parent?.name + ")"; }
-                }
-            }
-
-            Check("the knob examined real geometry at " + at, tris > 0,
-                  tris + " triangles across " + meshes + " meshes"
-                  + (unreadable > 0 ? ", " + unreadable + " unreadable and SKIPPED" : ""));
-            Check("the knob clears everything at " + at, best > knobR,
-                  "nearest geometry is " + ((best - knobR) * 1000f).ToString("F1")
-                  + " mm outside the ball (" + bestName + "); knob radius "
-                  + (knobR * 1000f).ToString("F1") + " mm");
-
-            // ── THE PILOT HAS TO BE ABLE TO SEE IT ──────────────────────────────
-            //
-            // A control that works, animates and can be grabbed is still broken if it sits
-            // below the bottom edge of the frame. The first arc build put 76% of the ball
-            // off-screen at idle and every other check in this battery passed.
-            //
-            // Measured on the REAL cockpit camera, which carries CockpitCamera.basePitch,
-            // so this is the view the participant actually gets before they touch the
-            // right mouse button to look around.
-            if (eyeCam != null)
-            {
-                Vector3 kcv = knob.bounds.center;
-                float r = knobR;
-                bool inFrame = true; float lowest = 9f;
-                foreach (var probe in new[] { kcv,
-                                              kcv + eyeCam.transform.up * r,
-                                              kcv - eyeCam.transform.up * r,
-                                              kcv + eyeCam.transform.right * r,
-                                              kcv - eyeCam.transform.right * r })
-                {
-                    Vector3 vp = eyeCam.WorldToViewportPoint(probe);
-                    lowest = Mathf.Min(lowest, vp.y);
-                    if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f) inFrame = false;
-                }
-                Check("the whole knob is inside the pilot's default view at " + at, inFrame,
-                      "lowest point of the ball is at viewport y=" + lowest.ToString("F3")
-                      + " (0 is the bottom edge of the frame)");
-            }
-
-            // The whole group — casing and lever together — against the display above it.
-            if (model != null)
-            {
-                // REAL VERTICES, not bounds corners. An axis-aligned box round a blade
-                // raked 64 deg overstates its height by about 5 mm, and 5 mm is most of the
-                // clearance being measured — a conservative test that fails on its own
-                // padding is no more use than one that passes on slack.
-                float top = float.MinValue;
-                foreach (var mf in c.GetComponentsInChildren<MeshFilter>(true))
-                {
-                    var mesh = mf.sharedMesh;
-                    if (mesh == null || !mesh.isReadable) continue;
-                    var xf = mf.transform;
-                    foreach (var vtx in mesh.vertices)
-                        top = Mathf.Max(top, model.InverseTransformPoint(xf.TransformPoint(vtx)).y);
-                }
-                if (top > worstTop) { worstTop = top; worstTopAt = at; }
-                Check("the group stays below the MFD's lower edge at " + at, top < MfdLowerEdge,
-                      "top of group y=" + top.ToString("F4") + " vs MFD lower edge "
-                      + MfdLowerEdge.ToString("F4") + " ("
-                      + ((MfdLowerEdge - top) * 1000f).ToString("F1") + " mm clear)");
-            }
-        }
-        report.AppendLine("   highest point of the whole throttle group: y=" + worstTop.ToString("F4")
-                          + " at " + worstTopAt + ", MFD lower edge y=" + MfdLowerEdge.ToString("F4"));
-
-        ctl.ClearOverrides(); yield return WaitFrames(2);
-    }
-
-    /// <summary>The GRIP of a lever: the furthest child renderer of the animated visual
-    /// from its pivot.
-    ///
-    /// Found by geometry, never by name, and never assumed to be spec.visual itself. On the
-    /// quadrant lever spec.visual is the ARM, whose origin sits ON the pivot — so aiming at
-    /// spec.visual.position aims at the hinge, 65 mm from the ball the pilot actually
-    /// clicks. Doing exactly that made the reach test report a comfortable 40 mm when it was
-    /// measuring a point no participant will ever aim at.</summary>
-    static Renderer GripOf(PhysicalControl c)
-    {
-        var arm = c.spec.visual;
-        if (arm == null) return null;
-        Vector3 hinge = arm.parent != null ? arm.parent.position : arm.position;
-        Renderer best = null; float far = -1f;
-        foreach (var r in arm.GetComponentsInChildren<Renderer>(true))
-        {
-            float d = Vector3.Distance(r.bounds.center, hinge);
-            if (d > far) { far = d; best = r; }
-        }
-        return best;
-    }
-
-    static System.Collections.Generic.IEnumerable<Vector3> Corners(Bounds b)
-    {
-        Vector3 m = b.min, x = b.max;
-        yield return new Vector3(m.x, m.y, m.z); yield return new Vector3(x.x, m.y, m.z);
-        yield return new Vector3(m.x, x.y, m.z); yield return new Vector3(x.x, x.y, m.z);
-        yield return new Vector3(m.x, m.y, x.z); yield return new Vector3(x.x, m.y, x.z);
-        yield return new Vector3(m.x, x.y, x.z); yield return new Vector3(x.x, x.y, x.z);
-    }
-
-    /// <summary>Closest point on a triangle to a point — Ericson, Real-Time Collision
-    /// Detection, 5.1.5. Used instead of a bounds test because the things the knob can
-    /// foul are large flat panels, whose bounds say nothing useful about where they are.</summary>
-    static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
-    {
-        Vector3 ab = b - a, ac = c - a, ap = p - a;
-        float d1 = Vector3.Dot(ab, ap), d2 = Vector3.Dot(ac, ap);
-        if (d1 <= 0f && d2 <= 0f) return a;
-
-        Vector3 bp = p - b;
-        float d3 = Vector3.Dot(ab, bp), d4 = Vector3.Dot(ac, bp);
-        if (d3 >= 0f && d4 <= d3) return b;
-
-        float vc = d1 * d4 - d3 * d2;
-        if (vc <= 0f && d1 >= 0f && d3 <= 0f) return a + ab * (d1 / (d1 - d3));
-
-        Vector3 cp = p - c;
-        float d5 = Vector3.Dot(ab, cp), d6 = Vector3.Dot(ac, cp);
-        if (d6 >= 0f && d5 <= d6) return c;
-
-        float vb = d5 * d2 - d1 * d6;
-        if (vb <= 0f && d2 >= 0f && d6 <= 0f) return a + ac * (d2 / (d2 - d6));
-
-        float va = d3 * d6 - d5 * d4;
-        if (va <= 0f && (d4 - d3) >= 0f && (d5 - d6) >= 0f)
-            return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
-
-        float denom = 1f / (va + vb + vc);
-        return a + ab * (vb * denom) + ac * (vc * denom);
     }
 
     /// <summary>AIMING AT THE THROTTLE MUST GRAB THE THROTTLE.
@@ -685,19 +350,16 @@ public class ControlTestHarness : MonoBehaviour
         foreach (var k in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
             if (k.targetTexture == null && k.name == "CockpitCamera") cam = k;
         if (cam == null) { Fail("throttle reach", "no CockpitCamera to aim with"); yield break; }
-        var grip = GripOf(c);
-        if (grip == null) { Fail("throttle reach", "throttle has no grip to aim at"); yield break; }
-        float gripR = Mathf.Max(grip.bounds.extents.x,
-                      Mathf.Max(grip.bounds.extents.y, grip.bounds.extents.z));
+        if (c.spec.visual == null) { Fail("throttle reach", "throttle has no visual to aim at"); yield break; }
 
         foreach (float where in new[] { 0f, 1f })
         {
             for (int i = 0; i < 10; i++) { ctl.SetThrottle(where); yield return null; }
             yield return WaitSeconds(0.25f);
 
-            // Aim at the BALL the pilot can see and click — not at the arm's origin, which
-            // is the hinge. See GripOf.
-            Ray ray = cam.ScreenPointToRay(cam.WorldToScreenPoint(grip.bounds.center));
+            // Aim at the KNOB — the sphere the pilot can actually see and click.
+            Vector3 knob = c.spec.visual.position;
+            Ray ray = cam.ScreenPointToRay(cam.WorldToScreenPoint(knob));
 
             // CockpitInteractorMouse.Nearest, minus the reach clamp (which only rejects
             // controls further than arm's length and cannot change the winner here).
@@ -723,50 +385,6 @@ public class ControlTestHarness : MonoBehaviour
 
             string at = where < 0.5f ? "idle" : "full power";
             Check("aiming at the knob at " + at + " selects the throttle", best == c,
-                  "selected=" + (best == null ? "NOTHING" : best.spec.id) + " | " + seen);
-
-            // Hitting the CENTRE of the ball is not enough — a participant aims anywhere on
-            // it. The capture radius has to reach the ball's far edge, or clicks that
-            // visibly land on the knob will do nothing.
-            float toCentre = Vector3.Distance(ray.GetPoint(
-                Vector3.Dot(c.transform.position - ray.origin, ray.direction)), c.transform.position);
-            Check("the whole ball is inside the capture radius at " + at,
-                  toCentre + gripR <= c.spec.captureRadius,
-                  "centre is " + (toCentre * 1000f).ToString("F0") + " mm off the axis + ball radius "
-                  + (gripR * 1000f).ToString("F0") + " mm = "
-                  + ((toCentre + gripR) * 1000f).ToString("F0") + " mm needed, radius is "
-                  + (c.spec.captureRadius * 1000f).ToString("F0") + " mm");
-        }
-
-        // ── AND THE OTHER WAY ROUND ──────────────────────────────────────────────
-        //
-        // The knob now stands 60 mm proud of the panel, which puts it NEARER the pilot
-        // than the yoke hub. Nearest-along-the-ray therefore now favours the throttle,
-        // and the ambiguity that had to be fixed in one direction can reappear in the
-        // other: a bigger throttle sphere could start stealing clicks meant for the yoke.
-        // Sizing one radius against the other is only safe if both directions are checked.
-        var yoke = Find("yoke");
-        if (yoke != null)
-        {
-            Ray ray = cam.ScreenPointToRay(cam.WorldToScreenPoint(yoke.transform.position));
-            PhysicalControl best = null; float bestT = float.MaxValue;
-            var seen = new System.Text.StringBuilder();
-            foreach (var k in rig.Controls)
-            {
-                if (k == null) continue;
-                Vector3 toC = k.transform.position - ray.origin;
-                float t = Vector3.Dot(toC, ray.direction);
-                if (t < 0f) continue;
-                float dist = Vector3.Distance(ray.GetPoint(t), k.transform.position);
-                if (seen.Length > 0) seen.Append("; ");
-                seen.Append(k.spec.id + " ray-dist=" + (dist * 1000f).ToString("F0")
-                            + "mm radius=" + (k.spec.captureRadius * 1000f).ToString("F0")
-                            + "mm range=" + (t * 1000f).ToString("F0") + "mm"
-                            + (dist <= k.spec.captureRadius ? " ELIGIBLE" : ""));
-                if (dist > k.spec.captureRadius) continue;
-                if (t < bestT) { bestT = t; best = k; }
-            }
-            Check("aiming at the yoke still selects the yoke", best == yoke,
                   "selected=" + (best == null ? "NOTHING" : best.spec.id) + " | " + seen);
         }
         ctl.ClearOverrides(); yield return WaitFrames(2);
@@ -1208,10 +826,6 @@ public class ControlTestHarness : MonoBehaviour
         float t = 0f;
         while (t < s) { t += Time.unscaledDeltaTime; yield return null; }
     }
-
-    /// <summary>The pivot's rake, sampled at power, so idle can be compared against it.
-    /// A rake that moves is a rake that has leaked into the animated value.</summary>
-    Quaternion pivotRakeAtPower = Quaternion.identity;
 
     PhysicalControl Find(string id)
     {

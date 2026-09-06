@@ -142,80 +142,6 @@ public class CockpitControlRig : MonoBehaviour
     const float SlideTravel = 0.044f;
     static readonly Vector3 SpoilerLeverPos = new Vector3(SlideX - SlideSpacing, SlideY, SlideZ);
     static readonly Vector3 ThrottlePos     = new Vector3(SlideX,                SlideY, SlideZ);
-
-    // ── THE THROTTLE QUADRANT LEVER ────────────────────────────────────────────────
-    // The throttle is a LEVER ON A PIVOT, not a carriage in a slot: a 65 mm arm that
-    // sweeps 44 deg, pointing aft out of a casing on the panel so the knob stands 60 mm
-    // proud where a hand meets it.
-    //
-    // The pivot sits ON the panel at ThrottlePos; the KNOB, at rest length along the arm,
-    // is what the pilot sees and reaches for. Those are 65 mm apart, and which of the two
-    // the capture sphere is centred on decides whether the control can be grabbed at all —
-    // see ThrottleGrabPos.
-    const float LeverArm      = 0.065f;   // pivot to knob centre
-    const float LeverSweepDeg = 44f;      // idle to full power, total
-    const float KnobDia       = 0.024f;
-
-    /// <summary>The arm's angle ABOVE HORIZONTAL at idle — the rest rake, carried by the
-    /// pivot. 20 deg, and it is the parameter that decides whether the control can be seen
-    /// at all, so it is derived from the seat rather than picked for symmetry.
-    ///
-    /// A lever that rests pointing straight aft (0 deg) or below it hangs its knob the full
-    /// arm length toward the pilot and 20-odd mm down. Built that way, at 22 deg below
-    /// horizontal, the ball came out at 41.6 deg below the eye line — BELOW the bottom edge
-    /// of the pilot's default view, with 76% of it off the frame (measured: viewport y
-    /// -0.16 to +0.05). It worked perfectly and could not be seen.
-    ///
-    /// Raking the whole sweep up puts the knob higher AND closer to the panel at both ends,
-    /// because the knob rides a circle: cos shortens the standoff as sin lifts it. At 20 deg
-    /// the idle ball sits 36.4 deg below the eye line, which is where the previous straight
-    /// slide handle sat, and it is in frame.
-    ///
-    /// It is not free. Vertical knob travel falls from 48.7 mm (symmetric) to 36.2 mm,
-    /// because the span is L*(sin(a+44) - sin a) and that shrinks as the rake grows. The
-    /// knob makes up the difference fore-and-aft, so the total movement is still the full
-    /// 48.7 mm chord, and idle-aft/full-forward is the 14 CFR 23.779 sense of the control
-    /// anyway.
-    ///
-    /// 32 deg, not 20, and the 12 deg between them is the whole budget. At 20 deg the ball's
-    /// lowest point measured viewport y = -0.023 — still clipped by the bottom of the frame,
-    /// barely — while the top of the group measured y = 0.4878, 2.2 mm THROUGH the MFD's
-    /// lower edge. Squeezed from both ends at once, because the knob's vertical span and the
-    /// gap between the frame floor and the display ceiling are within a few mm of each other.
-    ///
-    /// Raking further buys at the bottom faster than it costs at the top: the span
-    /// L*(sin(a+44) - sin a) shrinks as a grows, so the idle end rises more than the power
-    /// end does. 20 -> 32 deg lifts idle by 7.8 mm and full by only 2.2 mm, and shortens the
-    /// idle standoff by 6 mm as well, which lifts the apparent elevation again.
-    const float LeverIdleDeg = 32f;
-    static readonly float LeverMidDeg = LeverIdleDeg + LeverSweepDeg * 0.5f;
-
-
-    /// <summary>The pivot, on the panel. y is set by the ceiling: the knob's highest point
-    /// at full power must stay below the MFD's lower edge at y = 0.4856, which with a 32 deg
-    /// rake puts the pivot at 0.4075 and leaves 3 mm of clearance. Checked in the control
-    /// battery across the whole sweep, because this bound was measured and was wrong on the
-    /// first attempt.</summary>
-    static readonly Vector3 ThrottlePivotPos = new Vector3(SlideX, 0.4075f, SlideZ);
-
-    /// <summary>WHERE THE CAPTURE SPHERE GOES: on the KNOB's mid-travel position, one arm
-    /// length aft of the pivot — NOT on the pivot.
-    ///
-    /// The knob is 65 mm from the pivot at every point in the sweep, so a sphere centred on
-    /// the pivot would need a 77 mm radius just to contain the thing being aimed at, and
-    /// would swallow half the panel doing it. Centred on the knob's mid position the knob
-    /// is never more than 25 mm away — the arc's own sagitta and half-chord — and a modest
-    /// radius covers both stops. This is the arc equivalent of the straight slot's problem,
-    /// where the sphere sat on the middle of the channel while the pilot aimed at a handle
-    /// 22 mm away at either end.</summary>
-    static readonly Vector3 ThrottleGrabPos = ThrottlePivotPos + new Vector3(
-        0f,
-         LeverArm * Mathf.Sin(LeverMidDeg * Mathf.Deg2Rad),
-        -LeverArm * Mathf.Cos(LeverMidDeg * Mathf.Deg2Rad));
-
-    /// <summary>Pivot expressed in the CONTROL's frame — the exact inverse of the offset
-    /// above, so the two can never drift apart.</summary>
-    static readonly Vector3 PivotFromGrab = ThrottlePivotPos - ThrottleGrabPos;
     static readonly Vector3 FlapLeverPos    = new Vector3(SlideX + SlideSpacing, SlideY, SlideZ);
     // left-hand engine / systems group
     static readonly Vector3 CarbHeatPos     = new Vector3(-0.068f, 0.385f, PanelZ);
@@ -584,176 +510,76 @@ public class CockpitControlRig : MonoBehaviour
     {
         // THROTTLE — the control that must be identifiable without looking. Shape does that
         // work, not colour: a round ball grip, the 14 CFR 23.781(b) powerplant shape, and
-        // the only spherical grip in the cockpit.
+        // the only spherical grip in the cockpit. It is also the largest of the three.
         //
-        // A QUADRANT LEVER: a 65 mm arm on a pivot mounted on the panel, sweeping 44 deg in
-        // the fore/aft plane. The knob rises for power (23.779: "forward to increase forward
-        // thrust"; up is the accepted equivalent on a panel-mounted control) and its angle
-        // along the arc IS the value — bottom stop = idle, top stop = full.
-        //
-        // The capture sphere is centred on the KNOB's mid-travel position, not on the pivot;
-        // ThrottleGrabPos explains why that distinction decides whether it can be grabbed.
-        var c = Make("throttle", model.TransformPoint(ThrottleGrabPos));
+        // Slides UP for power (23.779: "forward to increase forward thrust"; up is the
+        // accepted equivalent on a panel-mounted control). Handle position IS the value —
+        // bottom of travel = idle, halfway = ~0.5, top = full.
+        var c = Make("throttle", model.TransformPoint(ThrottlePos));
         c.transform.SetParent(quadrant, true);
 
-        // The pivot, in the control's own frame. +Z points AT the panel, so the casing sits
-        // forward and above the capture centre and the lever reaches down and back toward
-        // the pilot at idle.
-        LeverCasing(c.transform, PivotFromGrab);
+        SlideMount(c.transform);
 
-        // ═══════════════════════════════════════════════════════════════════════════
-        // THE REST ANGLE LIVES ON THE PIVOT. IT IS NEVER ADDED TO THE ANIMATED VALUE.
-        // ═══════════════════════════════════════════════════════════════════════════
+        // THE CARRIAGE MUST REST AT LOCAL ZERO. This is not a style choice.
         //
-        // Two separate reasons, and both have already cost this project a build.
+        // PhysicalControl captures its visual's rest position in Awake(), and Unity runs
+        // Awake() at AddComponent — which happens inside Make(), BEFORE spec.visual is
+        // assigned. visualBase is therefore ALWAYS Vector3.zero, whatever the carriage's
+        // real rest position is, and UpdateVisual drives the handle from
+        //     zero  ->  zero + up * travel
+        // i.e. from the CENTRE of the channel to 22 mm PAST the top end stop, instead of
+        // from stop to stop.
         //
-        // ONE — the Awake() capture bug, rotation edition. PhysicalControl reads its
-        // visual's rest pose in Awake(), which Unity runs at AddComponent, inside Make(),
-        // BEFORE spec.visual is assigned. The captured rest is therefore ALWAYS the
-        // identity, whatever the arm's real rest pose is, and UpdateVisual writes an
-        // absolute localRotation of AngleAxis(t * visualTravel, axis). An arm carrying its
-        // own -22 deg rake would be driven from 0 to +44 deg instead of -22 to +22, i.e.
-        // hard against one stop at idle and 22 deg past the other at full power. The
-        // translating side of this is worked around the same way, on HandleBase.
-        //
-        // TWO — the +-22 -> -66 deg bug, which actually happened. An earlier build gave the
-        // levers a SHARED rest-angle bias while their specs animated about Vector3.left and
-        // Vector3.right respectively. For the two that animated the other way the bias and
-        // the travel added instead of cancelling, swinging those handles through 66 deg and
-        // laying them flat across their own placards. The travel DIRECTIONS were correct
-        // throughout; the rest position was what was wrong.
-        //
-        // Both disappear if the rest pose is a fixed parent transform and the animated
-        // child starts from identity. The pivot rakes; the arm animates; they cannot
-        // interact, and no sign convention has to agree with anything.
-        var pivot = new GameObject("LeverPivot").transform;
-        pivot.SetParent(c.transform, false);
-        pivot.localPosition = PivotFromGrab;
-        pivot.localRotation = Quaternion.Euler(LeverIdleDeg, 0f, 0f);
+        // Putting the -22 mm offset on a PARENT and leaving the carriage itself at local
+        // zero makes the animation correct for either value of visualBase, and keeps the
+        // repair in this file rather than in PhysicalControl, which several other things
+        // depend on. The underlying Awake() bug is recorded here because it will bite the
+        // next control that gets restored with a translating visual.
+        var handleBase = new GameObject("HandleBase").transform;
+        handleBase.SetParent(c.transform, false);
+        handleBase.localPosition = new Vector3(0f, -SlideTravel * 0.5f, 0f);
 
-        var arm = new GameObject("Arm").transform;
-        arm.SetParent(pivot, false);
-        arm.localPosition = Vector3.zero;
-        arm.localRotation = Quaternion.identity;   // MUST be identity — see above
+        var h = SlideHandle(handleBase, startAtTop: false);
+        h.localPosition = Vector3.zero;      // the offset lives on handleBase, see above
 
-        // Blade: thin across the cockpit and deep in the swing plane, so its travel is
-        // legible edge-on from the seat the way a real quadrant lever is.
-        Metal(Gloss(Box(arm, new Vector3(0f, 0f, -LeverArm * 0.5f),
-                        new Vector3(0.009f, 0.016f, LeverArm), LeverSteel), 0.55f), 0.6f);
-        // Collar where the blade meets the grip, so the ball is mounted rather than stuck on.
-        var collar = Cylinder(arm, new Vector3(0f, 0f, -LeverArm + 0.010f), 0.0075f, 0.005f, QuadEdge);
-        collar.localRotation = Quaternion.Euler(90f, 0f, 0f);      // axis along the blade
-        Gloss(collar, 0.4f);
-
-        var knob = Sphere(arm, new Vector3(0f, 0f, -LeverArm), KnobDia, KnobBlack);
+        // Ball grip on a short neck. The neck keeps the ball off the carriage so a hand
+        // (or a VR controller) has something to close around.
+        Gloss(Cylinder(h, new Vector3(0f, 0f, -0.017f), 0.0060f, 0.005f, LeverSteel), 0.5f);
+        var knob = Sphere(h, new Vector3(0f, 0f, -0.029f), 0.024f, KnobBlack);
+        knob.localScale = new Vector3(0.024f, 0.024f, 0.019f);   // slightly flattened, not a gearstick
         Gloss(knob, 0.30f);
-
-        // ── GEARING: MEASURED FROM THE BUILT LEVER, NOT COMPUTED FROM THE DESIGN ────
-        //
-        // spec.travel is the distance THE HAND moves, in WORLD metres, resolved onto
-        // spec.axis. Two things make that easy to get wrong here, and both would show up
-        // only as a lever that feels heavy rather than as a failure:
-        //
-        //   The arc. The knob's straight-line movement between the stops is the chord,
-        //   48.7 mm, but only its VERTICAL component, 28.6 mm, lies along spec.axis. Gear
-        //   to the chord and the hand has to travel 49 mm to drag the ball 29 mm — the ball
-        //   visibly lagging the hand that is holding it, which is the exact failure the
-        //   position-based control model exists to avoid.
-        //
-        //   The scale. Every constant in this file is in the GLB's frame, and the model is
-        //   not at unit scale, so a design distance is not a world distance.
-        //
-        // Rather than reason about either, swing the finished lever between its stops and
-        // measure where the knob actually goes. That is correct by construction for any
-        // arm, sweep, rake or model scale.
-        Vector3 axisWorld = c.transform.TransformDirection(Vector3.up).normalized;
-        arm.localRotation = Quaternion.identity;
-        Vector3 knobAtIdle = knob.position;
-        arm.localRotation = Quaternion.AngleAxis(LeverSweepDeg, Vector3.right);
-        Vector3 knobAtFull = knob.position;
-        arm.localRotation = Quaternion.identity;
-        float handTravel = Vector3.Dot(knobAtFull - knobAtIdle, axisWorld);
-        Debug.Log("[CockpitRig] throttle gearing: the knob rises " + (handTravel * 1000f).ToString("F1")
-                  + " mm in world metres between the stops; the hand is geared to that.");
 
         // NO PLACARD. Labels were removed from this cockpit on 3 September and the brief
         // for restoring the throttle was "nothing else". The ball grip is the only
         // spherical control in the cabin and the only thing on the lower panel, so there
         // is nothing it can be confused with. Restoring the legend is one line:
-        //   Label(c.transform, PivotFromGrab + new Vector3(0f, 0.040f, -0.006f),
+        //   Label(c.transform, new Vector3(0f, SlideTravel * 0.5f + 0.003f, -0.006f),
         //         "THROTTLE", PlacardText, Placard);
 
         c.spec = new ControlSpec
         {
             id = "throttle", label = "THROTTLE", kind = ControlKind.Lever, target = ControlTarget.Throttle,
-            axis = Vector3.up,          // the hand moves UP for power
-            // Measured above by swinging the built lever stop to stop — see the note there.
-            travel = handTravel,
+            axis = Vector3.up,          // slide up = more power
+            travel = SlideTravel,
             centred = false,
-            // 55 mm, MEASURED at both stops rather than reasoned about.
-            //
-            // ControlTestHarness.ThrottleIsWhatTheMouseGrabs aims at the BALL and reports
-            // what reaching it costs. On an arc the two ends are not symmetric — the knob
-            // swings toward the pilot as well as up, so perspective moves it further off
-            // the capture axis at one end than the other:
-            //
-            //     idle        25 mm off axis + 16 mm ball radius = 41 mm needed
-            //     full power  21 mm off axis + 16 mm ball radius = 37 mm needed
-            //
-            // Sized against IDLE, the worse end, with 14 mm of margin so a click that lands
-            // near the ball rather than dead on it still takes. Which end is worse moved
-            // when the rake changed, which is the argument for measuring both every run
-            // rather than reasoning about one.
-            //
-            // It cannot steal the yoke: a ray aimed at the yoke passes 111 mm from this
-            // centre, twice the radius. That direction is now worth checking, because the
-            // knob standing 60 mm proud of the panel put it NEARER the pilot than the yoke
-            // hub, which reverses who wins nearest-along-the-ray.
-            captureRadius = 0.055f,
+            // 45 mm. The capture sphere is centred on the CONTROL — the middle of the
+            // channel — but what the pilot aims at is the KNOB, which is 22 mm away at
+            // either end of travel and is itself 12 mm in radius. The old 20 mm radius was
+            // sized against neighbouring levers that no longer exist, and left the visible
+            // ball sitting on the very edge of its own grab volume: the measured ray
+            // distance was 18 mm at idle and 20 mm at full power, against a 20 mm radius.
+            // 45 mm covers the whole ball at both stops. It cannot steal the yoke, because
+            // the yoke is nearer along the ray and wins whenever both are eligible.
+            captureRadius = 0.045f,
             smoothingTau = 0.035f,
-            visual = arm, visualIsRotation = true,
-            visualAxis = Vector3.right, visualTravel = LeverSweepDeg,
+            visual = h, visualIsRotation = false,
+            visualAxis = Vector3.up, visualTravel = SlideTravel,
         };
         Configure(c);
         c.SetSilently(phys != null ? phys.Throttle01 : 0f);
         return c;
     }
 
-    /// <summary>The FIXED half of the quadrant: the escutcheon on the panel, the cheeks the
-    /// blade swings between, the slot behind it and the two end stops.
-    ///
-    /// Built on the CONTROL, deliberately not on the pivot — furniture that rotated with the
-    /// lever would be the same coupling that once made a rudder pedal move and hide together
-    /// with the control that was supposed to be independent of it.
-    ///
-    /// The cheeks are a frame, not a block: the blade sweeps between them, so the casing has
-    /// to be open down the middle or the lever passes through its own housing.</summary>
-    void LeverCasing(Transform t, Vector3 pivot)
-    {
-        // Escutcheon, flat on the panel. Half-height 36 mm brackets the blade where it
-        // leaves the casing at both ends of the sweep, and keeps the top of the casing at
-        // model y 0.448 — clear of the MFD's lower edge at 0.4856. That bound is asserted
-        // across the whole sweep in the control battery rather than trusted here, because it
-        // was measured and it was wrong on the first attempt.
-        Gloss(Box(t, pivot + new Vector3(0f, 0f, 0.002f),
-                  new Vector3(0.034f, 0.072f, 0.005f), QuadBody), 0.16f);
-        // Slot: the dark recess the blade runs out of.
-        Gloss(Box(t, pivot + new Vector3(0f, 0f, -0.001f),
-                  new Vector3(0.020f, 0.064f, 0.004f), SlotDark), 0.05f);
-        // Cheeks either side of the blade. Inner faces at x +-9.5 mm against a 9 mm blade,
-        // so the lever swings clear.
-        foreach (float sx in new[] { -0.0125f, 0.0125f })
-            Gloss(Box(t, pivot + new Vector3(sx, 0f, -0.012f),
-                      new Vector3(0.006f, 0.068f, 0.024f), QuadEdge), 0.34f);
-        // End stops, bracketing the sweep.
-        foreach (float sy in new[] { -0.034f, 0.034f })
-            Gloss(Box(t, pivot + new Vector3(0f, sy, -0.012f),
-                      new Vector3(0.030f, 0.005f, 0.024f), QuadEdge), 0.34f);
-        // Pivot boss, axis across the cockpit.
-        var boss = Cylinder(t, pivot + new Vector3(0f, 0f, -0.004f), 0.008f, 0.013f, QuadEdge);
-        boss.localRotation = Quaternion.Euler(0f, 0f, 90f);
-        Gloss(boss, 0.34f);
-    }
 
     PhysicalControl BuildTrimWheel()
     {
