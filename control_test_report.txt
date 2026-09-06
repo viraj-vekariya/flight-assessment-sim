@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-06 05:10:57
+generated 2026-09-06 12:40:12
 unity 6000.0.77f1
 
 controls built: 2
@@ -20,14 +20,42 @@ modality      : Desktop
    OK    idle   [throttle=0.00]
    OK    midpoint   [throttle=0.50]
    OK    full   [throttle=1.00]
-   OK    push forward increases power   [0.20 -> 0.88]
+   OK    push forward increases power   [0.20 -> 1.00]
    OK    the handle follows the keyboard, ungrabbed   [grabbed=False handle=0.65 phys.throttle=0.65]
-   OK    the handle GEOMETRY sits at value x travel   [handle y=28.6 mm, expected 28.6 mm]
-   OK    idle parks the handle at the bottom of its channel   [handle y=0.0 mm from rest]
+   OK    the animated visual hangs off a pivot   [parent=LeverPivot]
+   OK    the arm is rotated by value x sweep   [arm=28.6 deg, expected 28.6 deg]
+   OK    the pivot carries a real rest rake, not the arm   [pivot rake=32.0 deg]
+   OK    idle returns the arm to identity   [arm=0.0 deg from rest]
+   OK    the pivot rake is the same at idle as at power   [moved 0.000 deg]
 
 ── THROTTLE REACH  (the mouse must resolve to the knob, not the yoke)
-   OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=93mm radius=65mm range=185mm; throttle ray-dist=18mm radius=45mm range=228mm ELIGIBLE]
-   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=100mm radius=65mm range=186mm; throttle ray-dist=20mm radius=45mm range=232mm ELIGIBLE]
+   OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=116mm radius=65mm range=171mm; throttle ray-dist=25mm radius=55mm range=180mm ELIGIBLE]
+   OK    the whole ball is inside the capture radius at idle   [centre is 25 mm off the axis + ball radius 16 mm = 41 mm needed, radius is 55 mm]
+   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=109mm radius=65mm range=182mm; throttle ray-dist=21mm radius=55mm range=188mm ELIGIBLE]
+   OK    the whole ball is inside the capture radius at full power   [centre is 21 mm off the axis + ball radius 16 mm = 37 mm needed, radius is 55 mm]
+   OK    aiming at the yoke still selects the yoke   [selected=yoke | yoke ray-dist=0mm radius=65mm range=208mm ELIGIBLE; throttle ray-dist=105mm radius=55mm range=168mm]
+
+── THROTTLE SWEEP  (the knob must clear the casing, the panel and the MFD)
+   OK    the pilot's own camera was found, so visibility is judged from the seat   [ok]
+   OK    the cockpit model was found, so the MFD bound can be checked in its frame   [ok]
+   OK    the knob examined real geometry at idle   [68090 triangles across 16 meshes]
+   OK    the knob clears everything at idle   [nearest geometry is 16.1 mm outside the ball (Cube (Ctl_throttle)); knob radius 15.1 mm]
+   OK    the whole knob is inside the pilot's default view at idle   [lowest point of the ball is at viewport y=0.024 (0 is the bottom edge of the frame)]
+   OK    the group stays below the MFD's lower edge at idle   [top of group y=0.4539 vs MFD lower edge 0.4856 (31.7 mm clear)]
+   OK    the knob examined real geometry at mid-travel   [71886 triangles across 19 meshes]
+   OK    the knob clears everything at mid-travel   [nearest geometry is 6.4 mm outside the ball (Cube (Ctl_throttle)); knob radius 15.1 mm]
+   OK    the whole knob is inside the pilot's default view at mid-travel   [lowest point of the ball is at viewport y=0.122 (0 is the bottom edge of the frame)]
+   OK    the group stays below the MFD's lower edge at mid-travel   [top of group y=0.4721 vs MFD lower edge 0.4856 (13.5 mm clear)]
+   OK    the knob examined real geometry at full power   [71006 triangles across 18 meshes]
+   OK    the knob clears everything at full power   [nearest geometry is 11.4 mm outside the ball (LiveMFDQuad (RealCockpitModel)); knob radius 15.1 mm]
+   OK    the whole knob is inside the pilot's default view at full power   [lowest point of the ball is at viewport y=0.193 (0 is the bottom edge of the frame)]
+   OK    the group stays below the MFD's lower edge at full power   [top of group y=0.4826 vs MFD lower edge 0.4856 (3.0 mm clear)]
+   highest point of the whole throttle group: y=0.4826 at full power, MFD lower edge y=0.4856
+
+── THROTTLE GEARING  (the ball must keep up with the hand dragging it)
+   model lossyScale=(1.000, 1.000, 1.000)  local->world along the axis=1.000  ball radius=15.1 mm
+   OK    one full travel of the hand reaches full power   [value=1.000]
+   OK    the ball moved as far as the hand did   [hand moved 28.6 mm, ball moved 28.6 mm along the same axis]
 
 ── MINIMAL COCKPIT  (yoke + throttle are the only physical controls)
    OK    exactly two physical controls   [2 built: yoke, throttle]
@@ -56,8 +84,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
    OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
+   OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
 
 ── CONTROL OWNERSHIP  (the override latch regression)
    OK    a single write takes ownership   [PitchOverridden=true]
