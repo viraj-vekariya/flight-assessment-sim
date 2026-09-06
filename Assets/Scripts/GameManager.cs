@@ -56,6 +56,45 @@ public class GameManager : MonoBehaviour
     const float LogInterval = 0.1f;     // 10 Hz
     float logAccum;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // UI-ONLY MODE
+    // ═══════════════════════════════════════════════════════════════════════════
+    // This project exists to look at the cockpit, not to run the study. With UiOnly on,
+    // pressing Play drops straight into FREE FLIGHT: no participant-ID entry, no mission
+    // menu, no session runner, nothing to click through on the way in.
+    //
+    // NOTHING IS DELETED. ParticipantUI and MenuUI still compile and are still correct;
+    // they are simply not instantiated. Every mission, scenario, baseline, questionnaire
+    // and telemetry path is untouched — the 42-mission bank still runs and still passes.
+    // The single change is which two components get added and which state the game starts
+    // in. Set this to false and the full experiment build is back, with no other edit.
+    //
+    // Free flight is deliberately the mode chosen: LevelManager.Measured is false for it,
+    // so no participant file is opened and no trial data is written while the UI is being
+    // looked at.
+    public const bool UiOnly = true;
+
+    /// <summary>UI-only applies to a person pressing Play, never to a batch harness.
+    ///
+    /// Every battery in this project runs with -batchmode and drives the state machine
+    /// itself — StartSingleMission, ControlCheckMode.Enter, and so on. Starting a free
+    /// flight underneath them would put the aeroplane in the air before they set it up.
+    /// Keying off batch mode rather than a list of harness flags means a battery added
+    /// later is covered without anyone remembering to add its flag here.
+    ///
+    /// -uionly forces it back on for a batch run. Without that there is no way to exercise
+    /// this path in a headless check at all — the mode is off in batch mode by definition —
+    /// and an untested startup path is exactly the kind of thing that is discovered by the
+    /// person pressing Play.</summary>
+    static bool UiOnlyActive =>
+        UiOnly && (!Application.isBatchMode || HasArg("-uionly"));
+
+    static bool HasArg(string flag)
+    {
+        foreach (var a in System.Environment.GetCommandLineArgs()) if (a == flag) return true;
+        return false;
+    }
+
     void Awake()
     {
         // Singleton guard: if a GameManager already exists (e.g. a saved scene has one
@@ -76,8 +115,13 @@ public class GameManager : MonoBehaviour
 
         Logger = gameObject.AddComponent<FlightDataLogger>();
         gameObject.AddComponent<Hud2D>();
-        gameObject.AddComponent<ParticipantUI>();   // blocks menu until participant is confirmed
-        gameObject.AddComponent<MenuUI>();
+        // The two screens that stand between Play and the aeroplane. Skipped in UI-only
+        // mode; ParticipantReady is read by nothing else, so it simply stops mattering.
+        if (!UiOnlyActive)
+        {
+            gameObject.AddComponent<ParticipantUI>();   // blocks menu until participant is confirmed
+            gameObject.AddComponent<MenuUI>();
+        }
         gameObject.AddComponent<ResultsUI>();
         gameObject.AddComponent<ScenarioHud>();
         // VR runtime + camera rig. BOTH are always present and both no-op when there is
@@ -107,6 +151,22 @@ public class GameManager : MonoBehaviour
 
         Aircraft.ResetTo(runway.Start, runway.Rot, false, 0f);   // park on runway for the menu
         State = GameState.Menu;
+    }
+
+    /// <summary>In UI-only mode, go flying. Deliberately in Start rather than Awake: the
+    /// cockpit, the interactors and the camera rig are built by other components' Awake
+    /// calls, and StartFlight resets the aeroplane, so it has to run after all of them
+    /// rather than in the middle of the list.</summary>
+    void Start()
+    {
+        if (!UiOnlyActive) return;
+        StartFlight(FlightMode.FreeFlight);
+        Debug.Log("[GameManager] UI-only mode: started free flight directly."
+                + "  State=" + State
+                + "  mode=" + (Level != null ? Level.Mode.ToString() : "?")
+                + "  measured(logging)=" + (Level != null && Level.Measured)
+                + "  ParticipantUI=" + (GetComponent<ParticipantUI>() == null ? "absent" : "PRESENT")
+                + "  MenuUI=" + (GetComponent<MenuUI>() == null ? "absent" : "PRESENT"));
     }
 
     public void StartFlight(FlightMode mode)
@@ -460,6 +520,15 @@ public class GameManager : MonoBehaviour
         Crashed = false;
         Aircraft.ResetTo(runway.Start, runway.Rot, false, 0f);
         State = GameState.Menu;
+
+        // THERE IS NO MENU TO RETURN TO IN UI-ONLY MODE.
+        //
+        // MenuUI is not instantiated, so Escape while flying — and Enter on the results
+        // screen after a crash — would both drop the player into GameState.Menu with
+        // nothing drawn: a parked aeroplane, an empty screen and no way forward. Free
+        // flight IS the application here, so "back to the start" means back on the runway
+        // and flying, which is also what Escape does in every other sandbox sim.
+        if (UiOnlyActive) StartFlight(FlightMode.FreeFlight);
     }
 
     // ---- programmatic control API ----------------------------------------------
