@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-06 05:10:57
+generated 2026-09-14 04:29:31
 unity 6000.0.77f1
 
 controls built: 2
@@ -47,6 +47,35 @@ modality      : Desktop
    OK    brake still driveable   [brakeInput01=1.00]
    OK    brake releases   [brakeInput01=0.00]
    OK    trim still driveable   [phys.trim=0.50]
+
+── RUDDER FEEL  (Q/E must be proportional, not a switch)
+   OK    the keyboard rudder has a ramp rate at all   [yawRate=3.00 per second]
+   OK    a 100 ms tap gives a SMALL rudder input, not full deflection   [tap -> 0.30 of full]
+   OK    holding the key still reaches full rudder   [after 1 s -> 1.00]
+   OK    releasing the key returns the rudder to centre   [centred in 0.33 s]
+   OK    left and right build at the same rate   [left -0.600  right 0.600]
+   full deflection takes 0.33 s, the same as the aileron and elevator axes
+
+── RUDDER PEDALS  (Q/E must show in the cockpit)
+   OK    all four pedals were built from the twin mesh   [pilot L=ok pilot R=ok copilot L=ok copilot R=ok]
+   OK    each pedal is ONE pad, not a whole pair   [pilot left 28 mm wide, right 28 mm (the whole pair is 75 mm)]
+   OK    the pilot's two pedals sit side by side in HIS footwell, right outboard of left   [left x=-0.113  right x=-0.073 (both must be negative — the pilot's side — and right must be the larger)]
+   OK    full right rudder actually reaches the aeroplane   [yawInput=1.00]
+   OK    the pedals move at all with right rudder   [right pedal moved 17.9 mm]
+   OK    the pedals move in OPPOSITE directions   [right 17.9 mm, left -17.9 mm]
+   OK    right rudder pushes the RIGHT pedal forward, away from the pilot   [right pedal 17.9 mm along +Z (+Z is toward the panel)]
+   OK    the throw is a believable pedal movement (8-40 mm at model scale)   [17.9 mm, about 51 mm at life size]
+   OK    PedalPilotLeft examined real geometry at full right rudder   [4813536 vertex/triangle pairs]
+   OK    PedalPilotLeft does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 16.8 mm away (Object_56)]
+   OK    PedalPilotRight examined real geometry at full right rudder   [5168352 vertex/triangle pairs]
+   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 12.0 mm away (Object_58)]
+   OK    PedalPilotLeft examined real geometry at full left rudder   [5168352 vertex/triangle pairs]
+   OK    PedalPilotLeft does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 15.3 mm away (Object_56)]
+   OK    PedalPilotRight examined real geometry at full left rudder   [4739616 vertex/triangle pairs]
+   OK    PedalPilotRight does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 12.0 mm away (Object_58)]
+   OK    the co-pilot's pedals are linked to the pilot's   [dual controls move together]
+   OK    the pedals return to rest when the rudder is released   [left off-rest 0.00 mm, right 0.00 mm]
+   pedals in the pilot's DEFAULT view: viewport y -0.21 .. -0.02  (BELOW the frame — visible only when looking down)
 
 ── SYSTEMS  (no cockpit object — keyboard H/J/K/L path)
    OK    carb heat can be set   [CarbHeatOn=True]

@@ -41,6 +41,23 @@ public class AircraftController : MonoBehaviour
     public float throttleRate = 0.5f;    // per second, keyboard
     public float trimRate = 0.25f;       // per second, keyboard — a trim wheel is slow
     public float brakeRate = 4f;         // per second, keyboard brake ramp
+    // RUDDER, keyboard. Q/E used to write +-1 the instant they were touched, which made
+    // the rudder the ONLY flight control in the aeroplane that was a switch: pitch and roll
+    // come through Input.GetAxis and ramp over about a third of a second, throttle and trim
+    // are rate-based, and even the BRAKE ramps on brakeRate. Only the rudder slammed to full
+    // deflection and back.
+    //
+    // That was survivable while the rudder only swung the nose. It stopped being survivable
+    // once the dihedral term went in, because full rudder now rolls the aeroplane through
+    // 64 degrees — so a tap of Q was a step input straight into a large roll, with no way to
+    // ask for a small amount of rudder at all. For an experiment that is worse than
+    // unpleasant: a participant could not make a proportional rudder correction, so their
+    // rudder trace was a square wave no matter how gently they meant to fly.
+    //
+    // 3 per second matches Unity's default axis sensitivity/gravity, which is what Horizontal
+    // and Vertical use — so the rudder now builds and releases at the same rate as the
+    // ailerons and elevator, and the three primary axes finally feel like one aeroplane.
+    public float yawRate = 3f;           // per second, keyboard rudder ramp (and self-centre)
 
     CessnaPhysics phys;
     float flapsTarget;
@@ -52,6 +69,7 @@ public class AircraftController : MonoBehaviour
     float spoilerTarget;
     bool spoilerKeyDown;
     float keyBrake;
+    float keyYaw;                        // ramped keyboard rudder, see yawRate
 
     // ── override channel ──────────────────────────────────────────────────────
     // Value + the frame it was written. Honoured for GraceFrames frames, then it lapses.
@@ -170,6 +188,16 @@ public class AircraftController : MonoBehaviour
         }
     }
 
+    /// <summary>One step of the keyboard rudder ramp: move toward <paramref name="target"/>
+    /// at <paramref name="rate"/> per second, which also self-centres when the key is let go
+    /// because the target falls to zero.
+    ///
+    /// Pure and public so the control battery can measure the ramp directly — a batch test
+    /// cannot press a key, and a feel change nobody can test is a feel change that silently
+    /// regresses.</summary>
+    public static float RampRudder(float current, float target, float rate, float dt)
+        => Mathf.MoveTowards(current, target, Mathf.Max(0f, rate) * Mathf.Max(0f, dt));
+
     void Awake() => phys = GetComponent<CessnaPhysics>();
 
     void Update()
@@ -179,6 +207,7 @@ public class AircraftController : MonoBehaviour
         {
             phys.pitchInput = phys.rollInput = phys.yawInput = 0f;
             phys.braking = false; phys.brakeInput01 = 0f;
+            keyYaw = 0f;             // no rudder may survive into the next trial
             spoilerTarget = 0f;      // start each flight with spoilers retracted
             return;
         }
@@ -187,10 +216,14 @@ public class AircraftController : MonoBehaviour
         phys.pitchInput = PitchOverridden ? pitchCmd : Input.GetAxis("Vertical");
         phys.rollInput  = RollOverridden  ? rollCmd  : Input.GetAxis("Horizontal");
 
+        // RUDDER. Held keys RAMP toward full deflection and fall back to centre when
+        // released, at the same rate the aileron and elevator axes use — see yawRate. A tap
+        // of Q is now a touch of left rudder instead of all of it.
         float yawKeys = 0f;
         if (Input.GetKey(KeyCode.Q)) yawKeys -= 1f;
         if (Input.GetKey(KeyCode.E)) yawKeys += 1f;
-        phys.yawInput = YawOverridden ? yawCmd : Mathf.Clamp(yawKeys, -1f, 1f);
+        keyYaw = RampRudder(keyYaw, Mathf.Clamp(yawKeys, -1f, 1f), yawRate, Time.deltaTime);
+        phys.yawInput = YawOverridden ? yawCmd : keyYaw;
 
         // ── throttle ──────────────────────────────────────────────────────────
         // A physical lever is POSITION-based, so an override sets the value directly.

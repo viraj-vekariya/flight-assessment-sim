@@ -105,6 +105,7 @@ public class ControlTestHarness : MonoBehaviour
         // The spoiler lever was removed long before this; the simulation capability
         // remains, so the test runs only if a spoiler control is actually present.
         if (HasControl("spoiler")) yield return TestSpoiler();
+        yield return TestRudderIsNotASwitch();
         yield return TestRudderPedalsFollowTheRudder();
         yield return TestSystemsStillReachable();
         yield return TestDisplaysDoNotLeakIntoTheWorld();
@@ -335,6 +336,62 @@ public class ControlTestHarness : MonoBehaviour
                                        : "  (in frame)"));
         }
         ctl.ClearOverrides(); yield return WaitFrames(2);
+    }
+
+    /// <summary>THE RUDDER MUST NOT BE A SWITCH.
+    ///
+    /// Q/E wrote +-1 the instant they were pressed, which made the rudder the only flight
+    /// control in the aeroplane that was a step input — pitch and roll ramp through
+    /// Input.GetAxis, throttle and trim are rate-based, and even the brake ramps. It became
+    /// intolerable once the dihedral term gave full rudder a 64-degree roll, because a tap
+    /// of Q was a step straight into that roll and there was no way to ask for a SMALL
+    /// amount of rudder.
+    ///
+    /// Measured on AircraftController.RampRudder rather than by pressing keys, which a batch
+    /// run cannot do. The three properties that matter are that a brief press gives a small
+    /// deflection, that a held key still reaches full, and that letting go returns to
+    /// centre — in other words that the control is proportional in both directions.</summary>
+    IEnumerator TestRudderIsNotASwitch()
+    {
+        Section("RUDDER FEEL  (Q/E must be proportional, not a switch)");
+
+        var ac2 = ac.GetComponent<AircraftController>();
+        float rate = ac2 != null ? ac2.yawRate : 0f;
+        Check("the keyboard rudder has a ramp rate at all", rate > 0.1f,
+              "yawRate=" + rate.ToString("F2") + " per second");
+        if (rate <= 0.1f) yield break;
+
+        const float Dt = 1f / 60f;
+
+        // A SHORT press — 100 ms, about the shortest deliberate tap.
+        float v = 0f;
+        for (float t = 0f; t < 0.10f; t += Dt) v = AircraftController.RampRudder(v, 1f, rate, Dt);
+        Check("a 100 ms tap gives a SMALL rudder input, not full deflection",
+              v > 0.02f && v < 0.55f, "tap -> " + v.ToString("F2") + " of full");
+
+        // HELD — must still reach the stops, or the rudder has been made useless.
+        float held = 0f;
+        for (float t = 0f; t < 1.0f; t += Dt) held = AircraftController.RampRudder(held, 1f, rate, Dt);
+        Check("holding the key still reaches full rudder", held > 0.99f,
+              "after 1 s -> " + held.ToString("F2"));
+
+        // RELEASED — must come back to centre by itself, in a comparable time.
+        float rel = held; float tRel = 0f;
+        while (rel > 0.001f && tRel < 3f) { rel = AircraftController.RampRudder(rel, 0f, rate, Dt); tRel += Dt; }
+        Check("releasing the key returns the rudder to centre", rel <= 0.001f,
+              "centred in " + tRel.ToString("F2") + " s");
+
+        // And the two directions must be symmetric — a rudder that builds faster one way
+        // than the other would bias every turn a participant makes.
+        float l = 0f, r = 0f;
+        for (float t = 0f; t < 0.20f; t += Dt)
+        { l = AircraftController.RampRudder(l, -1f, rate, Dt); r = AircraftController.RampRudder(r, 1f, rate, Dt); }
+        Check("left and right build at the same rate", Mathf.Abs(Mathf.Abs(l) - r) < 0.001f,
+              "left " + l.ToString("F3") + "  right " + r.ToString("F3"));
+
+        report.AppendLine("   full deflection takes " + (1f / rate).ToString("F2")
+                        + " s, the same as the aileron and elevator axes");
+        yield break;
     }
 
     /// <summary>Hold a rudder deflection for real time, rewriting it every frame so the
