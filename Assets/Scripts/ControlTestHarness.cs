@@ -100,6 +100,8 @@ public class ControlTestHarness : MonoBehaviour
         // battery follows the cockpit rather than dictating it: if the throttle object is
         // removed again the section stands down instead of reporting a regression.
         if (HasControl("throttle")) yield return TestThrottle();
+        if (HasControl("flaps")) yield return TestFlaps();
+        if (HasControl("brake")) yield return TestBrake();
         yield return TestOnlyYokeIsPhysical();
         yield return TestRemovedInputsStillDriveable();
         // The spoiler lever was removed long before this; the simulation capability
@@ -132,7 +134,7 @@ public class ControlTestHarness : MonoBehaviour
     /// that says so. The method keeps its name so the history stays greppable.</summary>
     IEnumerator TestOnlyYokeIsPhysical()
     {
-        Section("MINIMAL COCKPIT  (yoke + throttle are the only physical controls)");
+        Section("MINIMAL COCKPIT  (yoke + throttle + flaps + brake, and nothing else)");
 
         int n = 0;
         var names = new System.Text.StringBuilder();
@@ -143,11 +145,13 @@ public class ControlTestHarness : MonoBehaviour
             if (names.Length > 0) names.Append(", ");
             names.Append(c.spec.id);
         }
-        Check("exactly two physical controls", n == 2, n + " built: " + names);
+        Check("exactly four physical controls", n == 4, n + " built: " + names);
         Check("the yoke is present", HasControl("yoke"), "yoke=" + (HasControl("yoke") ? "present" : "MISSING"));
         Check("the throttle is present", HasControl("throttle"), "throttle=" + (HasControl("throttle") ? "present" : "MISSING"));
+        Check("the flap button is present", HasControl("flaps"), "flaps=" + (HasControl("flaps") ? "present" : "MISSING"));
+        Check("the brake handle is present", HasControl("brake"), "brake=" + (HasControl("brake") ? "present" : "MISSING"));
 
-        foreach (string gone in new[] { "flaps", "brake", "trim", "carb_heat",
+        foreach (string gone in new[] { "trim", "carb_heat",
                                         "fuel_selector", "load_shed", "alt_static" })
             Check("no cockpit object for " + gone, !HasControl(gone),
                   HasControl(gone) ? "STILL PRESENT" : "removed");

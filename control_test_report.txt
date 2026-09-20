@@ -1,9 +1,9 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-20 19:12:36
+generated 2026-09-20 19:53:17
 unity 6000.0.77f1
 
-controls built: 2
+controls built: 4
 VR status     : VR: no XR loader active (desktop). Expected on macOS — OpenXR is Windows/Android only. On Windows, check Project Settings > XR Plug-in Management > OpenXR is ticked.
 modality      : Desktop
 
@@ -26,15 +26,32 @@ modality      : Desktop
    OK    idle parks the handle at the bottom of its channel   [handle y=0.0 mm from rest]
 
 ── THROTTLE REACH  (the mouse must resolve to the knob, not the yoke)
-   OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=93mm radius=65mm range=185mm; throttle ray-dist=18mm radius=45mm range=228mm ELIGIBLE]
-   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=100mm radius=65mm range=186mm; throttle ray-dist=20mm radius=45mm range=232mm ELIGIBLE]
+   OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=93mm radius=65mm range=185mm; throttle ray-dist=18mm radius=40mm range=228mm ELIGIBLE; flaps ray-dist=42mm radius=38mm range=212mm; brake ray-dist=219mm radius=45mm range=144mm]
+   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=101mm radius=65mm range=186mm; throttle ray-dist=20mm radius=40mm range=232mm ELIGIBLE; flaps ray-dist=50mm radius=38mm range=215mm; brake ray-dist=225mm radius=45mm range=141mm]
 
-── MINIMAL COCKPIT  (yoke + throttle are the only physical controls)
-   OK    exactly two physical controls   [2 built: yoke, throttle]
+── FLAP LEVER  (detents -> selected flap)
+   OK    detent UP selected   [selected=UP]
+   OK    detent 10° selected   [selected=10°]
+   OK    detent FULL selected   [selected=FULL]
+   OK    flaps actually extend   [flaps_actual=1.00]
+   OK    flap failure: selection moves   [selected=UP]
+   OK    flap failure: actual stays where the motor died   [flaps_actual=1.00 authority=1.00]
+   OK    flaps retract once the motor is restored   [flaps_actual=0.00]
+
+── BRAKE  (spring lever -> analog wheel brakes, ground only)
+   OK    aircraft is on the ground (wheel brakes only exist there)   [Grounded=True]
+   OK    off   [braking=False]
+   OK    full applied   [braking=True pressure=1.00]
+   OK    partial pressure   [pressure=0.50]
+   OK    releases to zero   [pressure=0.00]
+   OK    airborne: brake input is ignored   [braking=False pressure=0.00]
+
+── MINIMAL COCKPIT  (yoke + throttle + flaps + brake, and nothing else)
+   OK    exactly four physical controls   [4 built: yoke, throttle, flaps, brake]
    OK    the yoke is present   [yoke=present]
    OK    the throttle is present   [throttle=present]
-   OK    no cockpit object for flaps   [removed]
-   OK    no cockpit object for brake   [removed]
+   OK    the flap button is present   [flaps=present]
+   OK    the brake handle is present   [brake=present]
    OK    no cockpit object for trim   [removed]
    OK    no cockpit object for carb_heat   [removed]
    OK    no cockpit object for fuel_selector   [removed]
@@ -71,10 +88,10 @@ modality      : Desktop
    OK    PedalPilotLeft examined real geometry at full right rudder   [4648896 vertex/triangle pairs]
    OK    PedalPilotLeft does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 64.4 mm away (Object_56)]
    OK    PedalPilotRight examined real geometry at full right rudder   [5049408 vertex/triangle pairs]
-   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 30.0 mm away (Object_81)]
+   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 30.1 mm away (Object_81)]
    OK    PedalPilotLeft examined real geometry at full left rudder   [5049408 vertex/triangle pairs]
    OK    PedalPilotLeft does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 30.7 mm away (Object_81)]
-   OK    PedalPilotRight examined real geometry at full left rudder   [4540032 vertex/triangle pairs]
+   OK    PedalPilotRight examined real geometry at full left rudder   [4544064 vertex/triangle pairs]
    OK    PedalPilotRight does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 64.0 mm away (Object_56)]
    OK    the pedals return to rest when the rudder is released   [left off-rest 0.00 mm, right 0.00 mm]
    pedals in the pilot's DEFAULT view: viewport y -0.21 .. -0.02  (BELOW the frame — visible only when looking down)
@@ -87,8 +104,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
    OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
+   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
 
 ── CONTROL OWNERSHIP  (the override latch regression)
    OK    a single write takes ownership   [PitchOverridden=true]

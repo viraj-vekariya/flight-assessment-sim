@@ -142,6 +142,13 @@ public class CockpitControlRig : MonoBehaviour
     const float SlideTravel = 0.044f;
     static readonly Vector3 SpoilerLeverPos = new Vector3(SlideX - SlideSpacing, SlideY, SlideZ);
     static readonly Vector3 ThrottlePos     = new Vector3(SlideX,                SlideY, SlideZ);
+
+    // FLAPS — inboard of the throttle, under the MFD (whose lower edge is y 0.4856; the
+    // control's escutcheon tops out at 0.463). One CLICK steps UP -> 10 -> FULL -> UP.
+    static readonly Vector3 FlapPos  = new Vector3(0.060f, SlideY, SlideZ);
+    // BRAKE — lower LEFT panel, which is where a 172's brake handle is (POH Fig. 7-2), and
+    // outboard of the PFD's left edge at x -0.113 so it cannot cover the display.
+    static readonly Vector3 BrakePullPos = new Vector3(-0.133f, 0.435f, SlideZ);
     static readonly Vector3 FlapLeverPos    = new Vector3(SlideX + SlideSpacing, SlideY, SlideZ);
     // left-hand engine / systems group
     static readonly Vector3 CarbHeatPos     = new Vector3(-0.068f, 0.385f, PanelZ);
@@ -269,6 +276,8 @@ public class CockpitControlRig : MonoBehaviour
         BuildQuadrantHousing();
         list.Add(BuildYoke());
         list.Add(BuildThrottle());
+        list.Add(BuildFlapButton());
+        list.Add(BuildBrakePull());
 
         list.RemoveAll(c => c == null);
         Controls = list.ToArray();
@@ -568,9 +577,12 @@ public class CockpitControlRig : MonoBehaviour
             // sized against neighbouring levers that no longer exist, and left the visible
             // ball sitting on the very edge of its own grab volume: the measured ray
             // distance was 18 mm at idle and 20 mm at full power, against a 20 mm radius.
-            // 45 mm covers the whole ball at both stops. It cannot steal the yoke, because
-            // the yoke is nearer along the ray and wins whenever both are eligible.
-            captureRadius = 0.045f,
+            // 40 mm. It must cover the ball (18 mm off the capture axis + a 16 mm ball = 34 mm
+            // needed) while staying INSIDE the 42 mm that separates it from the flap paddle's
+            // aim ray — otherwise the two fight over every click in this corner of the panel,
+            // and the flap wins because it sits nearer the pilot along the ray. Measured at
+            // both ends of travel in ThrottleIsWhatTheMouseGrabs.
+            captureRadius = 0.040f,
             smoothingTau = 0.035f,
             visual = h, visualIsRotation = false,
             visualAxis = Vector3.up, visualTravel = SlideTravel,
@@ -580,6 +592,110 @@ public class CockpitControlRig : MonoBehaviour
         return c;
     }
 
+
+    /// <summary>FLAPS — one button. Click it and the flaps step UP -> 10 -> FULL -> UP;
+    /// it can also be dragged down the channel like a lever. Either way the handle's
+    /// position IS the selected detent, because PhysicalControl snaps a DetentLever to the
+    /// nearest detent on release and mirrors the aeroplane when nobody is holding it.
+    ///
+    /// Shape-coded as a flat PADDLE — 14 CFR 23.781(a) asks for a flap handle shaped like
+    /// the surface it drives, and it makes this unmistakable against the throttle's ball
+    /// without needing a placard.</summary>
+    PhysicalControl BuildFlapButton()
+    {
+        var c = Make("flaps", model.TransformPoint(FlapPos));
+        c.transform.SetParent(quadrant, true);
+        SlideMount(c.transform);
+
+        // Rest at the TOP of the channel = flaps UP. The offset lives on the parent for the
+        // same reason it does on the throttle: PhysicalControl captures its visual's rest
+        // pose in Awake(), which runs before spec.visual is assigned, so the captured rest
+        // is always zero and the carriage must actually BE at zero.
+        var handleBase = new GameObject("HandleBase").transform;
+        handleBase.SetParent(c.transform, false);
+        handleBase.localPosition = new Vector3(0f, SlideTravel * 0.5f, 0f);
+
+        var h = SlideHandle(handleBase, startAtTop: true);
+        h.localPosition = Vector3.zero;
+
+        // Flat paddle, wide and thin — the shape of the flap itself.
+        Gloss(Box(h, new Vector3(0f, 0f, -0.016f), new Vector3(0.026f, 0.005f, 0.020f), FlapWhite), 0.30f);
+
+        c.spec = new ControlSpec
+        {
+            id = "flaps", label = "FLAPS", kind = ControlKind.DetentLever, target = ControlTarget.Flaps,
+            axis = Vector3.down,              // 23.779: flaps extend DOWN/aft
+            travel = SlideTravel,
+            centred = false,
+            // 38 mm: enough for the paddle (22 mm up the channel + 13 mm of half-width) and
+            // under the 42 mm gap to the throttle's aim ray, so neither steals the other.
+            captureRadius = 0.038f,
+            smoothingTau = 0.04f,
+            detents = AircraftController.FlapDetents,
+            detentLabels = AircraftController.FlapLabels,
+            visual = h, visualIsRotation = false,
+            visualAxis = Vector3.down, visualTravel = SlideTravel,
+        };
+        Configure(c);
+        c.SetSilently(0f, 0);
+        return c;
+    }
+
+    /// <summary>BRAKE — a pull handle under the left panel edge, and a SPRING lever.
+    ///
+    /// HOW IT WORKS, and why this shape:
+    ///   * How far you pull IS how hard you brake. brakeInput01 is analog 0..1, so half a
+    ///     pull is half braking — you can hold a taxi speed instead of stamping on and off.
+    ///   * It SPRINGS BACK the moment you let go (ControlKind.SpringLever sets the value to
+    ///     zero on release), so the brakes can never be left dragging after a grab. That is
+    ///     the one behaviour a brake must have that a throttle must not.
+    ///   * The keyboard B key still works and is unchanged.
+    ///
+    /// It is deliberately NOT on the pedals. Toe brakes would be correct for a 172, but the
+    /// pedals sit below the pilot's default view (measured: viewport y -0.21..-0.02), so a
+    /// brake down there is a control you cannot see yourself operate.</summary>
+    PhysicalControl BuildBrakePull()
+    {
+        var c = Make("brake", model.TransformPoint(BrakePullPos));
+        c.transform.SetParent(quadrant, true);
+
+        // Escutcheon + bushing, flat on the panel. NEGATIVE local z stands proud of the
+        // panel, toward the pilot.
+        Gloss(Box(c.transform, new Vector3(0f, 0f, -0.002f),
+                  new Vector3(0.030f, 0.030f, 0.005f), QuadBody), 0.16f);
+        Gloss(Cylinder(c.transform, new Vector3(0f, 0f, -0.005f), 0.0075f, 0.004f, QuadEdge), 0.34f)
+            .localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+        var handleBase = new GameObject("HandleBase").transform;
+        handleBase.SetParent(c.transform, false);
+        handleBase.localPosition = Vector3.zero;
+
+        var pull = new GameObject("Pull").transform;
+        pull.SetParent(handleBase, false);
+        pull.localPosition = Vector3.zero;
+
+        // Shaft + knob, standing 20 mm proud at rest and 47 mm proud at full brake.
+        var shaft = Cylinder(pull, new Vector3(0f, 0f, -0.010f), 0.0035f, 0.010f, LeverSteel);
+        shaft.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        Metal(Gloss(shaft, 0.55f), 0.6f);
+        var knob = Sphere(pull, new Vector3(0f, 0f, -0.022f), 0.020f, Red);   // red: it stops the aeroplane
+        Gloss(knob, 0.30f);
+
+        c.spec = new ControlSpec
+        {
+            id = "brake", label = "BRAKE", kind = ControlKind.SpringLever, target = ControlTarget.WheelBrake,
+            axis = Vector3.back,              // pull TOWARD the pilot to brake
+            travel = 0.027f,
+            centred = false,
+            captureRadius = 0.045f,
+            smoothingTau = 0.03f,             // brakes must feel immediate
+            visual = pull, visualIsRotation = false,
+            visualAxis = Vector3.back, visualTravel = 0.027f,
+        };
+        Configure(c);
+        c.SetSilently(0f);
+        return c;
+    }
 
     PhysicalControl BuildTrimWheel()
     {
