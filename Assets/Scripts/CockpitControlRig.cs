@@ -126,7 +126,13 @@ public class CockpitControlRig : MonoBehaviour
     // 50 mm for one-hand RANDOM access, but 5.4.3.2.1.2 requires handle CODING when
     // controls are grouped, and all three grips are shape-coded per 14 CFR 23.781 (ball /
     // flat paddle / ribbed bar), which is what buys the separation back.
-    const float SlideX = 0.105f, SlideSpacing = 0.045f;
+    // SlideX 0.105 -> 0.075: the whole right-hand group moves 30 mm inboard. At 0.105/0.150
+    // the flap ran out to x 0.165, which reads as sitting against the door rather than on
+    // the instrument panel. The usable strip is bounded by the yoke's rim at x 0.047 and the
+    // door skin at x 0.138, so 0.075 and 0.120 sit two 30 mm escutcheons inside it with
+    // 13 mm clear of the wheel and 3 mm clear of the door. Spacing stays 45 mm, which is
+    // what the capture radii are sized against.
+    const float SlideX = 0.075f, SlideSpacing = 0.045f;
     // y = 0.432 with 44 mm of travel puts the whole group at viewport y ~0.02..0.19 —
     // fully inside the pilot's view, and with the top of the ESCUTCHEON below the MFD's
     // lower edge (viewport 0.24) so no display is occluded.
@@ -156,7 +162,7 @@ public class CockpitControlRig : MonoBehaviour
     // wheel. It fits, because the panel at this height actually reaches x = 0.1736
     // (Object_81, measured) — an old comment in this file claimed 0.159 and that is what
     // made this slot look unusable.
-    static readonly Vector3 FlapPos  = new Vector3(0.150f, SlideY, SlideZ);
+    static readonly Vector3 FlapPos  = new Vector3(0.120f, SlideY, SlideZ);
     // BRAKE — lower LEFT panel, which is where a 172's brake handle is (POH Fig. 7-2), and
     // outboard of the PFD's left edge at x -0.113 so it cannot cover the display.
     // Left side mirrors the right: two controls at 45 mm centres in the 127 mm between the
@@ -519,7 +525,11 @@ public class CockpitControlRig : MonoBehaviour
             // HAND, and a hand on the knob is 0 mm from the throttle against 140 mm from
             // the yoke. This is a mouse-only defect, which is exactly why aiming, and not
             // just grabbing, has to be tested.
-            captureRadius = 0.065f,
+            // 58 mm, reduced from 65 when the right-hand group moved 30 mm inboard: a ray
+            // aimed at the throttle knob then passed only 69 mm from the yoke hub, leaving
+            // 4 mm before the yoke would start stealing those clicks again. 58 keeps 11 mm
+            // and still leaves the yoke by far the largest target in the cockpit.
+            captureRadius = 0.058f,
             smoothingTau = 0.045f,
             // Slight softening around neutral so small hand jitter is not full-scale
             // aileron, without making large deflections feel dead.
