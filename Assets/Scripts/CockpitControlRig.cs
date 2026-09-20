@@ -659,12 +659,14 @@ public class CockpitControlRig : MonoBehaviour
         var c = Make("brake", model.TransformPoint(BrakePullPos));
         c.transform.SetParent(quadrant, true);
 
-        // Escutcheon + bushing, flat on the panel. NEGATIVE local z stands proud of the
-        // panel, toward the pilot.
-        Gloss(Box(c.transform, new Vector3(0f, 0f, -0.002f),
-                  new Vector3(0.030f, 0.030f, 0.005f), QuadBody), 0.16f);
-        Gloss(Cylinder(c.transform, new Vector3(0f, 0f, -0.005f), 0.0075f, 0.004f, QuadEdge), 0.34f)
-            .localRotation = Quaternion.Euler(90f, 0f, 0f);
+        // ── THE FIXED HALF: a round escutcheon and a raised bushing the rod runs in ──
+        // NEGATIVE local z stands proud of the panel, toward the pilot.
+        var plate = Cylinder(c.transform, new Vector3(0f, 0f, 0.001f), 0.016f, 0.002f, QuadBody);
+        plate.localRotation = Quaternion.Euler(90f, 0f, 0f);       // disc facing the pilot
+        Gloss(plate, 0.16f);
+        var bush = Cylinder(c.transform, new Vector3(0f, 0f, -0.006f), 0.009f, 0.005f, QuadEdge);
+        bush.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        Metal(Gloss(bush, 0.40f), 0.5f);
 
         var handleBase = new GameObject("HandleBase").transform;
         handleBase.SetParent(c.transform, false);
@@ -674,12 +676,36 @@ public class CockpitControlRig : MonoBehaviour
         pull.SetParent(handleBase, false);
         pull.localPosition = Vector3.zero;
 
-        // Shaft + knob, standing 20 mm proud at rest and 47 mm proud at full brake.
-        var shaft = Cylinder(pull, new Vector3(0f, 0f, -0.010f), 0.0035f, 0.010f, LeverSteel);
-        shaft.localRotation = Quaternion.Euler(90f, 0f, 0f);
-        Metal(Gloss(shaft, 0.55f), 0.6f);
-        var knob = Sphere(pull, new Vector3(0f, 0f, -0.022f), 0.020f, Red);   // red: it stops the aeroplane
-        Gloss(knob, 0.30f);
+        // ── THE ROD IS LONG ENOUGH TO STAY IN ITS BUSHING ───────────────────────
+        //
+        // The first version hung a 20 mm stub off the knob. The stub travels WITH the
+        // knob, so at full pull both had left the panel behind and the handle floated in
+        // front of the cockpit on nothing — the knob looked like it had come off in your
+        // hand. A real pull-rod does not get shorter; it slides, and the part you cannot
+        // see stays in its bushing.
+        //
+        // So the rod is 51 mm long and positioned so its INBOARD end is still behind the
+        // panel face at full extension (local z >= 0), while its outboard end always ends
+        // at the knob. Nothing scales and nothing is animated separately: one long rod
+        // parented to the moving handle does it, and the far end is buried inside the panel
+        // where it cannot be seen. The control battery asserts the no-gap condition at full
+        // brake rather than trusting these numbers.
+        var rod = Cylinder(pull, new Vector3(0f, 0f, -0.0005f), 0.0035f, 0.0255f, LeverSteel);
+        rod.name = "Rod";
+        rod.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        Metal(Gloss(rod, 0.55f), 0.7f);
+
+        // Chrome collar where the rod meets the grip, so the knob reads as fitted to the
+        // rod rather than skewered by it.
+        var collar = Cylinder(pull, new Vector3(0f, 0f, -0.019f), 0.008f, 0.003f, QuadEdge);
+        collar.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        Metal(Gloss(collar, 0.45f), 0.5f);
+
+        // Red mushroom knob — flattened along the rod so it reads as a knob to pull rather
+        // than a ball to push.
+        var knob = Sphere(pull, new Vector3(0f, 0f, -0.026f), 0.022f, Red);
+        knob.localScale = new Vector3(0.022f, 0.022f, 0.016f);
+        Gloss(knob, 0.28f);
 
         c.spec = new ControlSpec
         {
@@ -697,12 +723,12 @@ public class CockpitControlRig : MonoBehaviour
             // spec.axis is what the HAND is measured along; spec.visualAxis is where the
             // GEOMETRY goes. Dragging down now pulls the knob out toward the pilot.
             axis = Vector3.down,              // drag DOWN to brake
-            travel = 0.027f,
+            travel = 0.024f,
             centred = false,
             captureRadius = 0.045f,
             smoothingTau = 0.03f,             // brakes must feel immediate
             visual = pull, visualIsRotation = false,
-            visualAxis = Vector3.back, visualTravel = 0.027f,
+            visualAxis = Vector3.back, visualTravel = 0.024f,
         };
         Configure(c);
         c.SetSilently(0f);

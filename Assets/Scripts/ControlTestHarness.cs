@@ -416,6 +416,48 @@ public class ControlTestHarness : MonoBehaviour
               "knob moved " + (byKey * 1000f).ToString("F1") + " mm with brakeInput01="
               + ac.brakeInput01.ToString("F2"));
 
+        // ── NO GAP: THE ROD MUST STILL BE IN ITS BUSHING AT FULL PULL ──────────
+        //
+        // The knob and its rod both travel, so a short rod leaves the panel behind and the
+        // handle floats in front of the cockpit attached to nothing. Measured on the rod's
+        // own drawn geometry, in the CONTROL's frame where +Z is into the panel: at full
+        // extension the rod's inboard end must still be at or behind the panel face, and
+        // its outboard end must still reach the knob.
+        Transform rod = null, knobT = null;
+        foreach (var part in c.GetComponentsInChildren<Transform>(true))
+        {
+            if (part.name == "Rod") rod = part;
+            if (part.name == "Sphere" && part.IsChildOf(vis)) knobT = part;
+        }
+        if (rod != null)
+        {
+            float hold = 0f;
+            while (hold < 0.5f) { ctl.SetBrake(1f); hold += Time.deltaTime; yield return null; }
+
+            float rodIn = -9f, rodOut = 9f;
+            var rmf = rod.GetComponent<MeshFilter>();
+            foreach (var v in rmf.sharedMesh.vertices)
+            {
+                float z = c.transform.InverseTransformPoint(rod.TransformPoint(v)).z;
+                rodIn = Mathf.Max(rodIn, z); rodOut = Mathf.Min(rodOut, z);
+            }
+            Check("at full pull the rod is still inside the panel — no floating knob",
+                  rodIn >= 0f,
+                  "rod's inboard end at local z=" + (rodIn * 1000f).ToString("F1")
+                  + " mm (must be >= 0, i.e. at or behind the panel face)");
+
+            if (knobT != null)
+            {
+                float knobIn = -9f;
+                foreach (var v in knobT.GetComponent<MeshFilter>().sharedMesh.vertices)
+                    knobIn = Mathf.Max(knobIn, c.transform.InverseTransformPoint(knobT.TransformPoint(v)).z);
+                Check("the rod still reaches the knob — they are not separated",
+                      rodOut <= knobIn + 0.001f,
+                      "rod ends at z=" + (rodOut * 1000f).ToString("F1")
+                      + " mm, knob's inboard face at z=" + (knobIn * 1000f).ToString("F1") + " mm");
+            }
+        }
+
         ctl.ClearOverrides();
         yield return WaitSeconds(0.6f);
         Check("and returns to rest when the key is let go",

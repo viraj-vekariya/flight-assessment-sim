@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-20 20:12:51
+generated 2026-09-20 20:18:15
 unity 6000.0.77f1
 
 controls built: 4
@@ -27,7 +27,7 @@ modality      : Desktop
 
 ── THROTTLE REACH  (the mouse must resolve to the knob, not the yoke)
    OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=93mm radius=65mm range=185mm; throttle ray-dist=18mm radius=40mm range=228mm ELIGIBLE; flaps ray-dist=42mm radius=38mm range=212mm; brake ray-dist=219mm radius=45mm range=144mm]
-   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=100mm radius=65mm range=186mm; throttle ray-dist=20mm radius=40mm range=232mm ELIGIBLE; flaps ray-dist=50mm radius=38mm range=215mm; brake ray-dist=225mm radius=45mm range=142mm]
+   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=101mm radius=65mm range=186mm; throttle ray-dist=20mm radius=40mm range=232mm ELIGIBLE; flaps ray-dist=50mm radius=38mm range=215mm; brake ray-dist=225mm radius=45mm range=142mm]
 
 ── FLAP LEVER  (detents -> selected flap)
    OK    detent UP selected   [selected=UP]
@@ -47,10 +47,12 @@ modality      : Desktop
    OK    airborne: brake input is ignored   [braking=False pressure=0.00]
 
 ── BRAKE KNOB  (it has to visibly move, both ways)
-   OK    dragging the handle moves the knob   [knob moved 27.0 mm]
+   OK    dragging the handle moves the knob   [knob moved 24.0 mm]
    OK    dragging the handle actually brakes   [brakeInput01=1.00]
    OK    the knob springs back when released   [off-rest 0.00 mm]
-   OK    the knob follows the KEYBOARD brake too   [knob moved 27.0 mm with brakeInput01=1.00]
+   OK    the knob follows the KEYBOARD brake too   [knob moved 24.0 mm with brakeInput01=1.00]
+   OK    at full pull the rod is still inside the panel — no floating knob   [rod's inboard end at local z=1.0 mm (must be >= 0, i.e. at or behind the panel face)]
+   OK    the rod still reaches the knob — they are not separated   [rod ends at z=-50.0 mm, knob's inboard face at z=-42.0 mm]
    OK    and returns to rest when the key is let go   [off-rest 0.00 mm]
 
 ── MINIMAL COCKPIT  (yoke + throttle + flaps + brake, and nothing else)
@@ -111,8 +113,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
    OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
+   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
 
 ── CONTROL OWNERSHIP  (the override latch regression)
    OK    a single write takes ownership   [PitchOverridden=true]
