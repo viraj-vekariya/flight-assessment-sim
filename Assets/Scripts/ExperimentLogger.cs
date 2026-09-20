@@ -75,6 +75,37 @@ public class ExperimentLogger
     // ---- session-level state (shared by every trial in the session) -------------
     static string sessionDir = "";
     static int trialOrdinal;
+    // Completeness bookkeeping. A trial folder whose telemetry stops early looks exactly
+    // like a complete one on disk — P002's T01_H1V2 (3325 rows) and T02_H2V3 (1096 rows)
+    // sat beside full 15000-row trials with nothing to tell them apart. These fields let
+    // Close() state, in the trial's own folder, how much was actually recorded.
+    int telemRows;
+    double trialStartHost;
+    string trialStartUtc = "";
+    // Wall-clock hole detection. P002's L3V3 trial contains a 3197-second jump in t_host
+    // at t_mission = 60.02 — the participant left the game sitting for 53 minutes at the
+    // end of the in-task baseline. t_mission advances per frame, so it stepped a clean
+    // 0.02 s across the hole and showed nothing at all; only t_host recorded it. Aligning
+    // EEG on t_mission would have matched the task segment to the wrong 53 minutes of
+    // brain data and nothing downstream would have complained.
+    double lastSampleHost = -1.0;
+    double pausedTotalS;
+    double maxGapS;
+    int gapCount;
+
+    /// <summary>Log a gap this big. Diagnostic only — a hitch is worth seeing.</summary>
+    const double GapLogS = 0.5;
+
+    /// <summary>Above this, the trial is NOT continuous and must not be EEG-aligned.
+    ///
+    /// Measured, not guessed. Across 34 clean battery trials the worst engine hitch —
+    /// asset load, GC — was 0.641 s. The one real participant pause on disk was 3197 s.
+    /// 2.0 s sits about 3x above the worst hitch and three orders of magnitude below a
+    /// human walking away, so it separates them cleanly.
+    ///
+    /// The first cut at this used 0.5 s for BOTH jobs and marked 2 of 34 perfectly clean
+    /// trials unusable — a filter that rejects good data is worse than no filter.</summary>
+    const double DiscontinuityS = 2.0;
     public static string SessionId { get; private set; } = "";
     public static int Seed { get; private set; }
 
@@ -183,6 +214,13 @@ public class ExperimentLogger
         telem = new StreamWriter(TelemetryPath, false, Utf8NoBom);
         events = new StreamWriter(EventsPath, false, Utf8NoBom);
 
+        telemRows = 0;
+        lastSampleHost = -1.0;
+        pausedTotalS = 0.0;
+        maxGapS = 0.0;
+        gapCount = 0;
+        trialStartHost = HostNow;
+        trialStartUtc = System.DateTime.UtcNow.ToString("o");
         telem.WriteLine(TelemetryHeader());
         events.WriteLine("seq,t_mission,t_host,t_unix,t_lsl,marker,detail,mission_phase," +
                          "altitude_m,airspeed_kmh,heading_deg");
@@ -199,6 +237,55 @@ public class ExperimentLogger
         telem.Flush(); telem.Close(); telem = null;
         events.Flush(); events.Close(); events = null;
         Open = false;
+        WriteTrialJson();
+    }
+
+    /// <summary>trial.json — the one file that says whether this trial is USABLE.
+    ///
+    /// Everything else in the folder describes what the trial was meant to be. This says
+    /// what was actually recorded: how many telemetry rows landed against how many the
+    /// mission's duration calls for, and therefore whether a participant flew it to the
+    /// end or quit, crashed out or closed the game half way.
+    ///
+    /// Without it, an analysis script globbing the tree silently mixes a 1096-row
+    /// abandoned run into the same condition mean as a full 15000-row trial. `complete`
+    /// is the field every downstream filter should key on.</summary>
+    void WriteTrialJson()
+    {
+        if (string.IsNullOrEmpty(TrialDir)) return;
+        float dur = mission != null ? mission.DurationS : 0f;
+        int expected = Mathf.RoundToInt(dur * TelemetryHz);
+        // 99% rather than 100%: the last sample lands on whichever frame crosses the end
+        // of the mission, so a legitimately complete trial can be a few rows short.
+        bool complete = expected > 0 && telemRows >= Mathf.RoundToInt(expected * 0.99f);
+        double elapsed = HostNow - trialStartHost;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("{");
+        sb.AppendLine($"  \"participant_id\": {J(Sanitize(ParticipantManager.FilePrefix))},");
+        sb.AppendLine($"  \"session_id\": {J(SessionId)},");
+        sb.AppendLine($"  \"trial_ordinal\": {trialOrdinal},");
+        sb.AppendLine($"  \"mission_id\": {J(mission != null ? mission.Id : "")},");
+        sb.AppendLine($"  \"condition\": {J(mission != null ? mission.ClassTag : "")},");
+        sb.AppendLine($"  \"axis\": {J(mission != null ? mission.Axis.ToString() : "")},");
+        sb.AppendLine($"  \"flight_phase\": {J(mission != null ? mission.Phase.ToString() : "")},");
+        sb.AppendLine($"  \"variant\": {(mission != null ? mission.Variant : 0)},");
+        sb.AppendLine($"  \"started_utc\": {J(trialStartUtc)},");
+        sb.AppendLine($"  \"ended_utc\": {J(System.DateTime.UtcNow.ToString("o"))},");
+        sb.AppendLine($"  \"wall_clock_s\": {elapsed.ToString("F1", CI)},");
+        sb.AppendLine($"  \"telemetry_hz\": {TelemetryHz.ToString("F0", CI)},");
+        sb.AppendLine($"  \"telemetry_rows\": {telemRows},");
+        sb.AppendLine($"  \"telemetry_rows_expected\": {expected},");
+        sb.AppendLine($"  \"duration_s\": {dur.ToString("F0", CI)},");
+        sb.AppendLine($"  \"recording_gaps\": {gapCount},");
+        sb.AppendLine($"  \"paused_total_s\": {pausedTotalS.ToString("F3", CI)},");
+        sb.AppendLine($"  \"max_gap_s\": {maxGapS.ToString("F3", CI)},");
+        sb.AppendLine($"  \"discontinuity_threshold_s\": {DiscontinuityS.ToString("F1", CI)},");
+        sb.AppendLine($"  \"continuous\": {(maxGapS < DiscontinuityS ? "true" : "false")},");
+        sb.AppendLine($"  \"complete\": {(complete ? "true" : "false")},");
+        sb.AppendLine("  \"note\": \"complete=false means the participant did not fly this trial to the end. Exclude it, or handle it explicitly — never pool it with complete trials.\"");
+        sb.AppendLine("}");
+        File.WriteAllText(Path.Combine(TrialDir, "trial.json"), sb.ToString(), Utf8NoBom);
     }
 
     /// <summary>Mission time, driven by the engine so it matches event scheduling.</summary>
@@ -312,6 +399,24 @@ public class ExperimentLogger
 
         sb.Append(sys != null ? sys.TelemetryFields() : EmptySystems());
         telem.WriteLine(sb.ToString());
+        telemRows++;
+
+        // Catch the hole at the source, whatever caused it — lost focus, a paused editor,
+        // a long hitch. Checking the sample-to-sample delta catches all of them; watching
+        // OnApplicationFocus would catch only one.
+        double nowHost = HostNow;
+        if (lastSampleHost >= 0.0)
+        {
+            double d = nowHost - lastSampleHost;
+            if (d > GapLogS)
+            {
+                gapCount++;
+                pausedTotalS += d;
+                if (d > maxGapS) maxGapS = d;
+                Mark(EventMarkers.RecordingGap, "gap_s=" + d.ToString("F3", CI), ac);
+            }
+        }
+        lastSampleHost = nowHost;
     }
 
     /// <summary>Which physical control is in the pilot's hand right now, or "none".
