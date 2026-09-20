@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-20 19:53:17
+generated 2026-09-20 20:12:51
 unity 6000.0.77f1
 
 controls built: 4
@@ -27,7 +27,7 @@ modality      : Desktop
 
 ── THROTTLE REACH  (the mouse must resolve to the knob, not the yoke)
    OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=93mm radius=65mm range=185mm; throttle ray-dist=18mm radius=40mm range=228mm ELIGIBLE; flaps ray-dist=42mm radius=38mm range=212mm; brake ray-dist=219mm radius=45mm range=144mm]
-   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=101mm radius=65mm range=186mm; throttle ray-dist=20mm radius=40mm range=232mm ELIGIBLE; flaps ray-dist=50mm radius=38mm range=215mm; brake ray-dist=225mm radius=45mm range=141mm]
+   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=100mm radius=65mm range=186mm; throttle ray-dist=20mm radius=40mm range=232mm ELIGIBLE; flaps ray-dist=50mm radius=38mm range=215mm; brake ray-dist=225mm radius=45mm range=142mm]
 
 ── FLAP LEVER  (detents -> selected flap)
    OK    detent UP selected   [selected=UP]
@@ -45,6 +45,13 @@ modality      : Desktop
    OK    partial pressure   [pressure=0.50]
    OK    releases to zero   [pressure=0.00]
    OK    airborne: brake input is ignored   [braking=False pressure=0.00]
+
+── BRAKE KNOB  (it has to visibly move, both ways)
+   OK    dragging the handle moves the knob   [knob moved 27.0 mm]
+   OK    dragging the handle actually brakes   [brakeInput01=1.00]
+   OK    the knob springs back when released   [off-rest 0.00 mm]
+   OK    the knob follows the KEYBOARD brake too   [knob moved 27.0 mm with brakeInput01=1.00]
+   OK    and returns to rest when the key is let go   [off-rest 0.00 mm]
 
 ── MINIMAL COCKPIT  (yoke + throttle + flaps + brake, and nothing else)
    OK    exactly four physical controls   [4 built: yoke, throttle, flaps, brake]
@@ -81,14 +88,14 @@ modality      : Desktop
    OK    the pair is centred on the pilot, not offset to one side   [pair centre x=0.0000]
    OK    the box between the old two footwells is not drawn   [hidden]
    OK    full right rudder actually reaches the aeroplane   [yawInput=1.00]
-   OK    the pedals move at all with right rudder   [right pedal moved 17.8 mm]
-   OK    the pedals move in OPPOSITE directions   [right 17.8 mm, left -17.8 mm]
-   OK    right rudder pushes the RIGHT pedal forward, away from the pilot   [right pedal 17.8 mm along +Z (+Z is toward the panel)]
-   OK    the throw is a believable pedal movement (8-40 mm at model scale)   [17.8 mm, about 51 mm at life size]
+   OK    the pedals move at all with right rudder   [right pedal moved 17.9 mm]
+   OK    the pedals move in OPPOSITE directions   [right 17.9 mm, left -17.9 mm]
+   OK    right rudder pushes the RIGHT pedal forward, away from the pilot   [right pedal 17.9 mm along +Z (+Z is toward the panel)]
+   OK    the throw is a believable pedal movement (8-40 mm at model scale)   [17.9 mm, about 51 mm at life size]
    OK    PedalPilotLeft examined real geometry at full right rudder   [4648896 vertex/triangle pairs]
    OK    PedalPilotLeft does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 64.4 mm away (Object_56)]
    OK    PedalPilotRight examined real geometry at full right rudder   [5049408 vertex/triangle pairs]
-   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 30.1 mm away (Object_81)]
+   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 30.0 mm away (Object_81)]
    OK    PedalPilotLeft examined real geometry at full left rudder   [5049408 vertex/triangle pairs]
    OK    PedalPilotLeft does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 30.7 mm away (Object_81)]
    OK    PedalPilotRight examined real geometry at full left rudder   [4544064 vertex/triangle pairs]
@@ -104,8 +111,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
    OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
+   OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
 
 ── CONTROL OWNERSHIP  (the override latch regression)
    OK    a single write takes ownership   [PitchOverridden=true]

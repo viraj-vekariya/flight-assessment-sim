@@ -321,9 +321,20 @@ public class PhysicalControl : MonoBehaviour
             case ControlTarget.Throttle: Value = smoothed = phys.Throttle01; break;
             case ControlTarget.Trim:     Value = smoothed = phys.trim; break;
             case ControlTarget.WheelBrake:
-                // A spring lever must return to rest, not mirror a brake the keyboard
-                // is holding — otherwise releasing the virtual lever would not release.
-                Value = 0f;
+                // MIRROR THE AEROPLANE, like every other control here.
+                //
+                // This used to force the value to zero whenever the lever was not held, on
+                // the reasoning that a spring lever must return to rest. The effect was a
+                // brake handle that never moved for the KEYBOARD: press B, the aeroplane
+                // brakes, and the handle sits still — a control that lies about the
+                // aircraft, which is the one thing this class exists to prevent.
+                //
+                // Mirroring still springs back, because the thing being mirrored does. Let
+                // go of the lever and nothing writes the brake any more, so
+                // AircraftController ramps brakeInput01 down on brakeRate and the handle
+                // follows it home in about a quarter of a second — which is what a spring
+                // looks like, rather than a snap.
+                if (phys != null) Value = smoothed = phys.brakeInput01;
                 break;
             case ControlTarget.Flaps:
                 if (controller != null)

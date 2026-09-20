@@ -684,7 +684,19 @@ public class CockpitControlRig : MonoBehaviour
         c.spec = new ControlSpec
         {
             id = "brake", label = "BRAKE", kind = ControlKind.SpringLever, target = ControlTarget.WheelBrake,
-            axis = Vector3.back,              // pull TOWARD the pilot to brake
+            // THE HAND MOVES DOWN; THE KNOB MOVES OUT. These are deliberately different
+            // axes, and the control is unusable if they are the same.
+            //
+            // A mouse grab point is the closest point on the view RAY to the control, so
+            // dragging the mouse slides that point ACROSS the view — it barely moves along
+            // the ray at all. Give a pull-knob an axis of Vector3.back and you have asked
+            // the pilot to drag the mouse into the screen: the hand displacement resolved
+            // onto that axis stays near zero however far they drag, and the knob never
+            // moves. That is exactly how this shipped, and it looked like a dead control.
+            //
+            // spec.axis is what the HAND is measured along; spec.visualAxis is where the
+            // GEOMETRY goes. Dragging down now pulls the knob out toward the pilot.
+            axis = Vector3.down,              // drag DOWN to brake
             travel = 0.027f,
             centred = false,
             captureRadius = 0.045f,

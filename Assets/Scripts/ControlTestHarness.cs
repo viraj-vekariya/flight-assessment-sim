@@ -102,6 +102,7 @@ public class ControlTestHarness : MonoBehaviour
         if (HasControl("throttle")) yield return TestThrottle();
         if (HasControl("flaps")) yield return TestFlaps();
         if (HasControl("brake")) yield return TestBrake();
+        if (HasControl("brake")) yield return TestBrakeKnobActuallyMoves();
         yield return TestOnlyYokeIsPhysical();
         yield return TestRemovedInputsStillDriveable();
         // The spoiler lever was removed long before this; the simulation capability
@@ -354,6 +355,73 @@ public class ControlTestHarness : MonoBehaviour
                                        : "  (in frame)"));
         }
         ctl.ClearOverrides(); yield return WaitFrames(2);
+    }
+
+    /// <summary>THE BRAKE KNOB MUST ACTUALLY MOVE — BY MOUSE, AND BY KEYBOARD.
+    ///
+    /// TestBrake proves the WIRING: values in, pressure out. It passed completely while the
+    /// knob sat dead still, because it drives the control through SetSilently and never
+    /// looks at the geometry or at how a hand reaches it. Two separate faults hid behind it:
+    ///
+    ///   THE HAND AXIS. A mouse grab point is the closest point on the view ray, so dragging
+    ///   moves it ACROSS the view and hardly at all ALONG it. With spec.axis = Vector3.back
+    ///   the pilot was being asked to drag into the screen, and the resolved displacement
+    ///   stayed near zero no matter how far they pulled.
+    ///
+    ///   THE KEYBOARD. FollowAircraft forced the value to zero whenever the lever was not
+    ///   held, so pressing B braked the aeroplane and moved nothing in the cockpit.
+    ///
+    /// Both are checked on spec.visual's real position, which is the thing the pilot sees.</summary>
+    IEnumerator TestBrakeKnobActuallyMoves()
+    {
+        Section("BRAKE KNOB  (it has to visibly move, both ways)");
+
+        var c = Find("brake");
+        if (c == null || c.spec.visual == null) { Fail("brake knob", "no brake visual"); yield break; }
+        var vis = c.spec.visual;
+
+        ctl.ClearOverrides();
+        yield return WaitSeconds(0.4f);
+        Vector3 rest = vis.localPosition;
+
+        // ── BY HAND, the way the mouse actually moves ───────────────────────────
+        // Drag along the control's OWN axis by a full travel, held so the override
+        // never lapses.
+        Vector3 axis = c.transform.TransformDirection(c.spec.axis).normalized;
+        Vector3 origin = c.transform.position;
+        c.EndGrab();
+        c.BeginGrab(origin);
+        float held = 0f;
+        while (held < 0.4f)
+        { c.UpdateGrab(origin + axis * c.spec.travel); held += Time.deltaTime; yield return null; }
+        float pulled = (vis.localPosition - rest).magnitude;
+        float pressure = ac.brakeInput01;
+        c.EndGrab();
+
+        Check("dragging the handle moves the knob", pulled > 0.005f,
+              "knob moved " + (pulled * 1000f).ToString("F1") + " mm");
+        Check("dragging the handle actually brakes", pressure > 0.9f,
+              "brakeInput01=" + pressure.ToString("F2"));
+
+        yield return WaitSeconds(0.5f);
+        Check("the knob springs back when released",
+              (vis.localPosition - rest).magnitude < 0.002f,
+              "off-rest " + ((vis.localPosition - rest).magnitude * 1000f).ToString("F2") + " mm");
+
+        // ── BY KEYBOARD, which is the path B takes ──────────────────────────────
+        float t = 0f;
+        while (t < 0.5f) { ctl.SetBrake(1f); t += Time.deltaTime; yield return null; }
+        float byKey = (vis.localPosition - rest).magnitude;
+        Check("the knob follows the KEYBOARD brake too", byKey > 0.005f,
+              "knob moved " + (byKey * 1000f).ToString("F1") + " mm with brakeInput01="
+              + ac.brakeInput01.ToString("F2"));
+
+        ctl.ClearOverrides();
+        yield return WaitSeconds(0.6f);
+        Check("and returns to rest when the key is let go",
+              (vis.localPosition - rest).magnitude < 0.002f,
+              "off-rest " + ((vis.localPosition - rest).magnitude * 1000f).ToString("F2") + " mm");
+        yield return WaitFrames(2);
     }
 
     /// <summary>THE RUDDER MUST NOT BE A SWITCH.
