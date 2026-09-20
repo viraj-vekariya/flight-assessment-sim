@@ -60,6 +60,13 @@ public class RealCockpit : MonoBehaviour
         // panel, the bezel (Object_83) and both displays untouched.
         "Object_84", "Object_85", "Object_86",
         "Object_64",  // rear seats
+        // SINGLE-PILOT FOOTWELL (20 Sep 2026). Object_58 is a solid box on the centreline —
+        // x +-0.047, floor to y 0.445, running z 0.667..0.873 — i.e. the control-column
+        // tunnel that separates the two original footwells. It belongs to a TWO-seat cabin.
+        // This build re-centres the seat and the yoke onto the centreline and now does the
+        // same with one pair of rudder pedals, so the tunnel sits exactly where the single
+        // pilot's feet go: a solid slab between his own two pedals, dividing nothing.
+        "Object_58",
     };
     // The seat BODY (cushion + back + headrest) is a single TWIN mesh spanning both seats,
     // centred at x=0. Cut it to the pilot (left) half, then re-centre -> one seat in the middle.
@@ -122,16 +129,19 @@ public class RealCockpit : MonoBehaviour
     /// Verified in the control battery rather than assumed.</summary>
     public float pedalSign = 1f;
 
-    // FOUR pedals, not two. Object_52 holds the pilot's pair AND the co-pilot's pair:
-    // x -0.130..-0.055 and x +0.055..+0.130, with a 110 mm gap at the centreline. Splitting
-    // only at x = 0 gives one PAIR either side, so both of the pilot's pedals move together
-    // and neither of them is a rudder pedal. The render is what showed this — two pads in
-    // each footwell, not one.
+    // ONE pair, on the centreline. Object_52 holds FOUR pads — the pilot's pair at
+    // x -0.130..-0.055 and the co-pilot's at x +0.055..+0.130, with a 110 mm gap between
+    // them. (Splitting only at x = 0 yields one PAIR per side, so both of the pilot's
+    // pedals move together and neither is a rudder pedal. The render is what showed that —
+    // two pads in each footwell, not one.)
     //
-    // Dual controls are mechanically linked, so the co-pilot's pedals move with the
-    // pilot's: right rudder drives BOTH right-hand pedals forward.
-    Transform pedalPilotL, pedalPilotR, pedalCopilotL, pedalCopilotR;
-    Vector3 basePilotL, basePilotR, baseCopilotL, baseCopilotR;
+    // The co-pilot's pair is NOT rebuilt: this cabin has been converted to single-pilot,
+    // with the seat and the yoke already cut to the pilot's half and slid to the centreline.
+    // The pilot's two pads get the same treatment, so his pedals end up in front of him at
+    // x = 0 rather than off to one side, and the tunnel that used to sit between the two
+    // footwells (Object_58) is hidden because there is only one footwell now.
+    Transform pedalPilotL, pedalPilotR;
+    Vector3 basePilotL, basePilotR;
     float curPedal;
 
     Transform yokeRoot;      // on the column axis; slides along it with pitch
@@ -291,30 +301,39 @@ public class RealCockpit : MonoBehaviour
             return;
         }
 
-        pedalPilotL   = SplitPedal(model, node, cx => cx <  lCut,             "PedalPilotLeft");
-        pedalPilotR   = SplitPedal(model, node, cx => cx >= lCut && cx < 0f,  "PedalPilotRight");
-        pedalCopilotL = SplitPedal(model, node, cx => cx >= 0f && cx < rCut,  "PedalCopilotLeft");
-        pedalCopilotR = SplitPedal(model, node, cx => cx >= rCut,             "PedalCopilotRight");
-        if (pedalPilotL == null || pedalPilotR == null || pedalCopilotL == null || pedalCopilotR == null)
+        // Only the PILOT's two pads are rebuilt. The co-pilot's pair is simply never
+        // recreated, and disabling the original node's renderer takes all four out of the
+        // scene — so "removing" the second set costs nothing and leaves no orphan geometry.
+        pedalPilotL = SplitPedal(model, node, cx => cx <  lCut,            "PedalPilotLeft");
+        pedalPilotR = SplitPedal(model, node, cx => cx >= lCut && cx < 0f, "PedalPilotRight");
+        if (pedalPilotL == null || pedalPilotR == null)
         {
             Debug.LogWarning("[RealCockpit] could not split " + pedalTwinNode
-                           + " into four pedals — leaving them static.");
+                           + " into the pilot's two pedals — leaving them static.");
             return;
         }
 
         var r = node.GetComponent<Renderer>();
-        if (r != null) r.enabled = false;      // the four pads replace it
+        if (r != null) r.enabled = false;      // both original pairs go with it
 
-        basePilotL   = pedalPilotL.localPosition;
-        basePilotR   = pedalPilotR.localPosition;
-        baseCopilotL = pedalCopilotL.localPosition;
-        baseCopilotR = pedalCopilotR.localPosition;
-        foreach (var t in new[] { pedalPilotL, pedalPilotR, pedalCopilotL, pedalCopilotR })
-            SetLayer(t, CockpitBuilder.CockpitLayer);
+        // SLIDE THE PAIR ONTO THE CENTRELINE, the same move CentreGroup makes for the seat
+        // and the yoke. lCut is the midpoint of the pilot pair's own drawn extent, so
+        // shifting by -lCut puts the divider between his two pedals exactly on x = 0 and
+        // leaves the pads straddling it — in front of the pilot's eye point, which is also
+        // on the centreline, and in the space Object_58 used to occupy.
+        var centre = new Vector3(-lCut, 0f, 0f);
+        pedalPilotL.localPosition += centre;
+        pedalPilotR.localPosition += centre;
 
-        Debug.Log("[RealCockpit] rudder pedals rigged: " + pedalTwinNode
-                + " cut into 4 at x=" + lCut.ToString("F4") + ", 0, " + rCut.ToString("F4")
-                + "; +-" + (pedalTravel * 1000f).ToString("F0") + " mm of travel.");
+        basePilotL = pedalPilotL.localPosition;
+        basePilotR = pedalPilotR.localPosition;
+        SetLayer(pedalPilotL, CockpitBuilder.CockpitLayer);
+        SetLayer(pedalPilotR, CockpitBuilder.CockpitLayer);
+
+        Debug.Log("[RealCockpit] rudder pedals rigged: the pilot's pair only, cut at x="
+                + lCut.ToString("F4") + " (co-pilot pair at x=" + rCut.ToString("F4")
+                + " dropped), slid " + (-lCut * 1000f).ToString("F1")
+                + " mm onto the centreline; +-" + (pedalTravel * 1000f).ToString("F0") + " mm of travel.");
     }
 
     /// <summary>Find the x at which each footwell's pedal PAIR divides: the midpoint of
@@ -623,11 +642,8 @@ public class RealCockpit : MonoBehaviour
             float kp = 1f - Mathf.Exp(-pedalSmooth * Time.deltaTime);
             curPedal = Mathf.Lerp(curPedal, Mathf.Clamp(phys.yawInput, -1f, 1f), kp);
             float d = pedalSign * curPedal * pedalTravel;
-            pedalPilotR.localPosition   = basePilotR   + Vector3.forward * d;
-            pedalPilotL.localPosition   = basePilotL   - Vector3.forward * d;
-            // Dual controls are linked, so the other seat's pedals go with them.
-            if (pedalCopilotR != null) pedalCopilotR.localPosition = baseCopilotR + Vector3.forward * d;
-            if (pedalCopilotL != null) pedalCopilotL.localPosition = baseCopilotL - Vector3.forward * d;
+            pedalPilotR.localPosition = basePilotR + Vector3.forward * d;
+            pedalPilotL.localPosition = basePilotL - Vector3.forward * d;
         }
 
         if (propPivot != null)   // spin the front fan with throttle

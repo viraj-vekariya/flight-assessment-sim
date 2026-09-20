@@ -195,16 +195,18 @@ public class ControlTestHarness : MonoBehaviour
             if (t.name == "PedalCopilotLeft")  coL   = t;
             if (t.name == "PedalCopilotRight") coR   = t;
         }
-        // FOUR, not two. Object_52 holds both footwells' pairs, so a cut at the centreline
-        // alone yields one PAIR per side and moves both of the pilot's pedals together —
-        // which is not a rudder at all. Asserted because the first build did exactly that
-        // and every other check in this section still passed.
-        Check("all four pedals were built from the twin mesh",
-              left != null && right != null && coL != null && coR != null,
+        // ONE pair, and it must be the pilot's. Object_52 holds both footwells' pairs; the
+        // cabin has been converted to single-pilot, so the co-pilot's two pads are not
+        // rebuilt at all. Both halves of that are asserted: the pilot's exist, and the
+        // co-pilot's are gone — a build that quietly kept all four would still pass every
+        // motion check below.
+        Check("the pilot's two rudder pedals were built", left != null && right != null,
               "pilot L=" + (left == null ? "MISSING" : "ok")
-              + " pilot R=" + (right == null ? "MISSING" : "ok")
-              + " copilot L=" + (coL == null ? "MISSING" : "ok")
-              + " copilot R=" + (coR == null ? "MISSING" : "ok"));
+              + " pilot R=" + (right == null ? "MISSING" : "ok"));
+        Check("the co-pilot's pedals are gone — this is a single-pilot cabin",
+              coL == null && coR == null,
+              "copilot L=" + (coL == null ? "absent" : "STILL PRESENT")
+              + " copilot R=" + (coR == null ? "absent" : "STILL PRESENT"));
         if (left == null || right == null) yield break;
 
         var lr = left.GetComponent<Renderer>();
@@ -218,10 +220,27 @@ public class ControlTestHarness : MonoBehaviour
               + (rw * 1000f).ToString("F0") + " mm (the whole pair is 75 mm)");
         float lxc = model.InverseTransformPoint(lr.bounds.center).x;
         float rxc = model.InverseTransformPoint(rr.bounds.center).x;
-        Check("the pilot's two pedals sit side by side in HIS footwell, right outboard of left",
-              lxc < 0f && rxc < 0f && rxc > lxc,
+        // STRADDLING THE CENTRELINE, because the pair has been slid there to match the seat
+        // and the yoke. The pilot's eye point is at x = 0, so pedals still sitting off at
+        // x = -0.09 would be in front of nobody.
+        Check("the pedals straddle the centreline, left of it and right of it",
+              lxc < 0f && rxc > 0f,
               "left x=" + lxc.ToString("F3") + "  right x=" + rxc.ToString("F3")
-              + " (both must be negative — the pilot's side — and right must be the larger)");
+              + " (must bracket 0 — the pilot's eye is on the centreline)");
+        Check("the pair is centred on the pilot, not offset to one side",
+              Mathf.Abs((lxc + rxc) * 0.5f) < 0.010f,
+              "pair centre x=" + ((lxc + rxc) * 0.5f).ToString("F4"));
+
+        // The tunnel that used to divide the two footwells must be gone, or the pedals have
+        // been slid straight into it.
+        Transform tunnel = null;
+        foreach (var t in model.GetComponentsInChildren<Transform>(true))
+            if (t.name == "Object_58") tunnel = t;
+        var tr = tunnel == null ? null : tunnel.GetComponent<Renderer>();
+        Check("the box between the old two footwells is not drawn",
+              tunnel == null || tr == null || !tr.enabled,
+              tunnel == null ? "Object_58 absent"
+                             : (tr == null ? "no renderer" : (tr.enabled ? "STILL DRAWN" : "hidden")));
 
         Vector3 lRest = left.localPosition, rRest = right.localPosition;
 
@@ -304,11 +323,6 @@ public class ControlTestHarness : MonoBehaviour
         }
 
         yield return HoldYaw(0f, 0.5f);
-        Check("the co-pilot's pedals are linked to the pilot's",
-              coR == null || coL == null
-              || Mathf.Abs((coR.localPosition - coL.localPosition).z
-                         - (right.localPosition - left.localPosition).z) < 0.001f,
-              "dual controls move together");
         yield return HoldYaw(0f, 0.5f);
         Check("the pedals return to rest when the rudder is released",
               (left.localPosition - lRest).magnitude < 0.002f

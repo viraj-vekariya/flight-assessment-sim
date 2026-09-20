@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-14 04:29:31
+generated 2026-09-20 19:12:36
 unity 6000.0.77f1
 
 controls built: 2
@@ -57,23 +57,25 @@ modality      : Desktop
    full deflection takes 0.33 s, the same as the aileron and elevator axes
 
 ── RUDDER PEDALS  (Q/E must show in the cockpit)
-   OK    all four pedals were built from the twin mesh   [pilot L=ok pilot R=ok copilot L=ok copilot R=ok]
+   OK    the pilot's two rudder pedals were built   [pilot L=ok pilot R=ok]
+   OK    the co-pilot's pedals are gone — this is a single-pilot cabin   [copilot L=absent copilot R=absent]
    OK    each pedal is ONE pad, not a whole pair   [pilot left 28 mm wide, right 28 mm (the whole pair is 75 mm)]
-   OK    the pilot's two pedals sit side by side in HIS footwell, right outboard of left   [left x=-0.113  right x=-0.073 (both must be negative — the pilot's side — and right must be the larger)]
+   OK    the pedals straddle the centreline, left of it and right of it   [left x=-0.020  right x=0.020 (must bracket 0 — the pilot's eye is on the centreline)]
+   OK    the pair is centred on the pilot, not offset to one side   [pair centre x=0.0000]
+   OK    the box between the old two footwells is not drawn   [hidden]
    OK    full right rudder actually reaches the aeroplane   [yawInput=1.00]
-   OK    the pedals move at all with right rudder   [right pedal moved 17.9 mm]
-   OK    the pedals move in OPPOSITE directions   [right 17.9 mm, left -17.9 mm]
-   OK    right rudder pushes the RIGHT pedal forward, away from the pilot   [right pedal 17.9 mm along +Z (+Z is toward the panel)]
-   OK    the throw is a believable pedal movement (8-40 mm at model scale)   [17.9 mm, about 51 mm at life size]
-   OK    PedalPilotLeft examined real geometry at full right rudder   [4813536 vertex/triangle pairs]
-   OK    PedalPilotLeft does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 16.8 mm away (Object_56)]
-   OK    PedalPilotRight examined real geometry at full right rudder   [5168352 vertex/triangle pairs]
-   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 12.0 mm away (Object_58)]
-   OK    PedalPilotLeft examined real geometry at full left rudder   [5168352 vertex/triangle pairs]
-   OK    PedalPilotLeft does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 15.3 mm away (Object_56)]
-   OK    PedalPilotRight examined real geometry at full left rudder   [4739616 vertex/triangle pairs]
-   OK    PedalPilotRight does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 12.0 mm away (Object_58)]
-   OK    the co-pilot's pedals are linked to the pilot's   [dual controls move together]
+   OK    the pedals move at all with right rudder   [right pedal moved 17.8 mm]
+   OK    the pedals move in OPPOSITE directions   [right 17.8 mm, left -17.8 mm]
+   OK    right rudder pushes the RIGHT pedal forward, away from the pilot   [right pedal 17.8 mm along +Z (+Z is toward the panel)]
+   OK    the throw is a believable pedal movement (8-40 mm at model scale)   [17.8 mm, about 51 mm at life size]
+   OK    PedalPilotLeft examined real geometry at full right rudder   [4648896 vertex/triangle pairs]
+   OK    PedalPilotLeft does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 64.4 mm away (Object_56)]
+   OK    PedalPilotRight examined real geometry at full right rudder   [5049408 vertex/triangle pairs]
+   OK    PedalPilotRight does not bury itself in the aeroplane at full right rudder   [nearest drawn geometry is 30.0 mm away (Object_81)]
+   OK    PedalPilotLeft examined real geometry at full left rudder   [5049408 vertex/triangle pairs]
+   OK    PedalPilotLeft does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 30.7 mm away (Object_81)]
+   OK    PedalPilotRight examined real geometry at full left rudder   [4540032 vertex/triangle pairs]
+   OK    PedalPilotRight does not bury itself in the aeroplane at full left rudder   [nearest drawn geometry is 64.0 mm away (Object_56)]
    OK    the pedals return to rest when the rudder is released   [left off-rest 0.00 mm, right 0.00 mm]
    pedals in the pilot's DEFAULT view: viewport y -0.21 .. -0.02  (BELOW the frame — visible only when looking down)
 
@@ -85,8 +87,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
    OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
+   OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
 
 ── CONTROL OWNERSHIP  (the override latch regression)
    OK    a single write takes ownership   [PitchOverridden=true]
