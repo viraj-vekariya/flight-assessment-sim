@@ -103,6 +103,7 @@ public class ControlTestHarness : MonoBehaviour
         if (HasControl("flaps")) yield return TestFlaps();
         if (HasControl("brake")) yield return TestBrake();
         if (HasControl("brake")) yield return TestBrakeKnobActuallyMoves();
+        if (HasControl("trim")) yield return TestTrim();
         yield return TestOnlyYokeIsPhysical();
         yield return TestRemovedInputsStillDriveable();
         // The spoiler lever was removed long before this; the simulation capability
@@ -135,7 +136,7 @@ public class ControlTestHarness : MonoBehaviour
     /// that says so. The method keeps its name so the history stays greppable.</summary>
     IEnumerator TestOnlyYokeIsPhysical()
     {
-        Section("MINIMAL COCKPIT  (yoke + throttle + flaps + brake, and nothing else)");
+        Section("MINIMAL COCKPIT  (yoke + throttle + flaps + brake + trim, and nothing else)");
 
         int n = 0;
         var names = new System.Text.StringBuilder();
@@ -146,13 +147,14 @@ public class ControlTestHarness : MonoBehaviour
             if (names.Length > 0) names.Append(", ");
             names.Append(c.spec.id);
         }
-        Check("exactly four physical controls", n == 4, n + " built: " + names);
+        Check("exactly five physical controls", n == 5, n + " built: " + names);
         Check("the yoke is present", HasControl("yoke"), "yoke=" + (HasControl("yoke") ? "present" : "MISSING"));
         Check("the throttle is present", HasControl("throttle"), "throttle=" + (HasControl("throttle") ? "present" : "MISSING"));
         Check("the flap button is present", HasControl("flaps"), "flaps=" + (HasControl("flaps") ? "present" : "MISSING"));
         Check("the brake handle is present", HasControl("brake"), "brake=" + (HasControl("brake") ? "present" : "MISSING"));
+        Check("the trim wheel is present", HasControl("trim"), "trim=" + (HasControl("trim") ? "present" : "MISSING"));
 
-        foreach (string gone in new[] { "trim", "carb_heat",
+        foreach (string gone in new[] { "carb_heat",
                                         "fuel_selector", "load_shed", "alt_static" })
             Check("no cockpit object for " + gone, !HasControl(gone),
                   HasControl(gone) ? "STILL PRESENT" : "removed");
@@ -788,11 +790,30 @@ public class ControlTestHarness : MonoBehaviour
 
         c.SetSilently(0f); yield return WaitFrames(10);
 
-        // Winding the wheel FORWARD must trim nose DOWN.
-        c.BeginGrab(c.transform.position);
-        c.UpdateGrab(c.transform.position + c.transform.TransformDirection(Vector3.forward).normalized * 0.04f);
-        yield return WaitFrames(10);
-        Check("wind forward -> nose down", ac.trim < -0.05f, "trim=" + ac.trim.ToString("F2"));
+        // WOUND BY HAND, along the control's OWN axis.
+        //
+        // This used to drag along Vector3.forward, from when the wheel was wound fore/aft.
+        // That axis points away from the pilot, i.e. straight down the view ray, and a mouse
+        // grab point slides ACROSS the view rather than along it — so the hand could never
+        // generate any displacement on it. The same fault killed the brake knob. The wheel
+        // is now wound vertically: DOWN for nose up, like pulling the yoke back.
+        Vector3 dir = c.transform.TransformDirection(c.spec.axis).normalized;
+        Vector3 at = c.transform.position;
+        c.EndGrab();
+        c.BeginGrab(at);
+        c.UpdateGrab(at + dir * (c.spec.travel * 0.5f));
+        yield return WaitSeconds(0.5f);
+        Check("winding the wheel by hand trims NOSE UP", ac.trim > 0.05f,
+              "trim=" + ac.trim.ToString("F2"));
+        c.EndGrab();
+
+        c.SetSilently(0f); yield return WaitFrames(10);
+        c.BeginGrab(at);
+        c.UpdateGrab(at - dir * (c.spec.travel * 0.5f));
+        yield return WaitSeconds(0.5f);
+        Check("winding it the other way trims NOSE DOWN", ac.trim < -0.05f,
+              "trim=" + ac.trim.ToString("F2"));
+        c.EndGrab();
         c.EndGrab(); yield return WaitFrames(2);
     }
 

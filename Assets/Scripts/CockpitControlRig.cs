@@ -143,12 +143,26 @@ public class CockpitControlRig : MonoBehaviour
     static readonly Vector3 SpoilerLeverPos = new Vector3(SlideX - SlideSpacing, SlideY, SlideZ);
     static readonly Vector3 ThrottlePos     = new Vector3(SlideX,                SlideY, SlideZ);
 
-    // FLAPS — inboard of the throttle, under the MFD (whose lower edge is y 0.4856; the
-    // control's escutcheon tops out at 0.463). One CLICK steps UP -> 10 -> FULL -> UP.
-    static readonly Vector3 FlapPos  = new Vector3(0.060f, SlideY, SlideZ);
+    // FLAPS — OUTBOARD of the throttle. One CLICK steps UP -> 10 -> FULL -> UP.
+    //
+    // It was at x = 0.060 and that was too close to the yoke. The pilot's wheel is 94 mm
+    // across (measured from the GLB: the twin mesh's pilot half spans x -0.1105..-0.0165,
+    // so +-0.047 once CentreGroup slides it to the centreline), and a 30 mm escutcheon at
+    // 0.060 spans 0.045..0.075 — its inboard edge INSIDE the wheel's envelope. The wheel
+    // swept across the flap handle every time the aeroplane was rolled.
+    //
+    // 0.150 puts it in the third slot of the original quadrant layout: 45 mm outboard of
+    // the throttle (which the capture radii are already sized for) and 88 mm clear of the
+    // wheel. It fits, because the panel at this height actually reaches x = 0.1736
+    // (Object_81, measured) — an old comment in this file claimed 0.159 and that is what
+    // made this slot look unusable.
+    static readonly Vector3 FlapPos  = new Vector3(0.150f, SlideY, SlideZ);
     // BRAKE — lower LEFT panel, which is where a 172's brake handle is (POH Fig. 7-2), and
     // outboard of the PFD's left edge at x -0.113 so it cannot cover the display.
-    static readonly Vector3 BrakePullPos = new Vector3(-0.133f, 0.435f, SlideZ);
+    // Left side mirrors the right: two controls at 45 mm centres in the 127 mm between the
+    // yoke's rim (x -0.047) and the panel edge (x -0.1736).  trim | brake | PFD .. MFD | throttle | flap
+    static readonly Vector3 BrakePullPos = new Vector3(-0.105f, 0.435f, SlideZ);
+    static readonly Vector3 TrimPos      = new Vector3(-0.150f, SlideY,  SlideZ);
     static readonly Vector3 FlapLeverPos    = new Vector3(SlideX + SlideSpacing, SlideY, SlideZ);
     // left-hand engine / systems group
     static readonly Vector3 CarbHeatPos     = new Vector3(-0.068f, 0.385f, PanelZ);
@@ -278,6 +292,7 @@ public class CockpitControlRig : MonoBehaviour
         list.Add(BuildThrottle());
         list.Add(BuildFlapButton());
         list.Add(BuildBrakePull());
+        list.Add(BuildTrimWheelSmall());
 
         list.RemoveAll(c => c == null);
         Controls = list.ToArray();
@@ -725,10 +740,71 @@ public class CockpitControlRig : MonoBehaviour
             axis = Vector3.down,              // drag DOWN to brake
             travel = 0.024f,
             centred = false,
-            captureRadius = 0.045f,
+            captureRadius = 0.038f,           // 45 mm to the trim wheel; must not reach it
             smoothingTau = 0.03f,             // brakes must feel immediate
             visual = pull, visualIsRotation = false,
             visualAxis = Vector3.back, visualTravel = 0.024f,
+        };
+        Configure(c);
+        c.SetSilently(0f);
+        return c;
+    }
+
+    /// <summary>ELEVATOR TRIM — a wheel on the left panel that holds the stick force so the
+    /// pilot does not have to.
+    ///
+    /// WHY IT IS THE ONE CONTROL THIS COCKPIT COULD NOT DO WITHOUT. The yoke HOLDS ITS
+    /// POSITION when released (PhysicalControl.EndGrab, deliberately — a real yoke does not
+    /// spring to neutral). Trim is therefore the only way to set an attitude and take your
+    /// hands off: you wind in trim until the aeroplane flies the pitch you want by itself.
+    /// Without it the pilot must hold the yoke for the whole flight. It is not a spoiler and
+    /// not a brake — it changes nothing about drag or stopping; it only moves where "hands
+    /// off" sits.
+    ///
+    /// TWO TRAPS, both avoided here:
+    ///   * The HAND axis is vertical, not fore/aft. A mouse grab point slides across the
+    ///     view, barely along it, so a fore/aft axis is undraggable — the same fault that
+    ///     made the brake knob look dead.
+    ///   * UpdateVisual writes an ABSOLUTE localRotation, so it wipes any orientation stored
+    ///     on the animated transform. The wheel's 90-degree tilt therefore lives on a CHILD,
+    ///     and the animated pivot starts at identity.</summary>
+    PhysicalControl BuildTrimWheelSmall()
+    {
+        var c = Make("trim", model.TransformPoint(TrimPos));
+        c.transform.SetParent(quadrant, true);
+
+        Gloss(Box(c.transform, new Vector3(0f, 0f, 0.001f),
+                  new Vector3(0.040f, 0.040f, 0.005f), QuadBody), 0.16f);
+
+        var pivot = new GameObject("TrimPivot").transform;   // animated: MUST stay identity
+        pivot.SetParent(c.transform, false);
+        pivot.localPosition = new Vector3(0f, 0f, -0.013f);
+        pivot.localRotation = Quaternion.identity;
+
+        // Hub, tilted on a CHILD so the animation cannot overwrite the orientation.
+        var hub = Cylinder(pivot, Vector3.zero, 0.017f, 0.005f, new Color(0.22f, 0.22f, 0.24f));
+        hub.localRotation = Quaternion.Euler(0f, 0f, 90f);   // axis across the cockpit
+        Gloss(hub, 0.30f);
+        // Rim ribs in the Y-Z plane, so rotation about X visibly winds the wheel.
+        for (int i = 0; i < 10; i++)
+        {
+            float a = i * Mathf.PI * 2f / 10f;
+            Metal(Gloss(Box(pivot, new Vector3(0f, Mathf.Sin(a) * 0.016f, Mathf.Cos(a) * 0.016f),
+                            new Vector3(0.016f, 0.004f, 0.004f), Steel), 0.45f), 0.5f);
+        }
+
+        c.spec = new ControlSpec
+        {
+            id = "trim", label = "TRIM", kind = ControlKind.TrimWheel, target = ControlTarget.Trim,
+            axis = Vector3.down,        // wind DOWN for nose UP, like pulling the yoke back
+            // Deliberately long: trim is a fine adjustment, and a short travel would turn it
+            // into a precision task — an unnecessary motor demand in a workload experiment.
+            travel = 0.12f,
+            centred = true,
+            captureRadius = 0.038f,     // 45 mm to the brake; must not reach it
+            smoothingTau = 0.06f,
+            visual = pivot, visualIsRotation = true,
+            visualAxis = Vector3.right, visualTravel = 160f,   // degrees at full trim
         };
         Configure(c);
         c.SetSilently(0f);
