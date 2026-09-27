@@ -68,6 +68,22 @@ public class RealCockpit : MonoBehaviour
         // pilot's feet go: a solid slab between his own two pedals, dividing nothing.
         "Object_58",
     };
+    // ---- the glass the pilot looks THROUGH ------------------------------------------
+    // Object_37 is the windscreen and 34/123 the side windows. All three share the GLB's
+    // one "Window" material, which ships as alphaMode BLEND with
+    // baseColorFactor (0.14, 0.14, 0.14, 0.37): a 37%-opaque DARK GREY pane. Everything
+    // outside is seen through it, and measured through the pilot's camera it multiplies
+    // the runway, the grass and the sky by about 0.5 each — uniformly, which is how it
+    // was found: the level-design renders (exterior camera, no glass) and the seated
+    // view disagreed by the same factor on every surface.
+    //
+    // The old sky only looked acceptable because its blue push over-brightened it enough
+    // to survive being halved. A real 172 windscreen is clear. This sets the pane to a
+    // faint, mostly-clear glass so the world outside is seen at the brightness the
+    // lighting was actually designed at.
+    public string[] glassNodes = { "Object_37", "Object_34", "Object_123" };
+    public Color glassColour = new Color(0.90f, 0.94f, 1.00f, 0.10f);   // faint cool, ~90% transmissive
+
     // The seat BODY (cushion + back + headrest) is a single TWIN mesh spanning both seats,
     // centred at x=0. Cut it to the pilot (left) half, then re-centre -> one seat in the middle.
     public string[] seatBodyTwinNodes = { "Object_96", "Object_98", "Object_100" };
@@ -192,6 +208,7 @@ public class RealCockpit : MonoBehaviour
             var t = FindDeep(holder.transform, n);
             if (t != null) KeepHalf(holder.transform, t);
         }
+        ClearTheGlass(holder.transform);
         CentreGroup(holder.transform, seatBodyTwinNodes);
 
         // Yoke: the model's OWN wheel — kept exactly as Blender has it, just cut to one,
@@ -275,6 +292,45 @@ public class RealCockpit : MonoBehaviour
     //       Object_94 (the column hub, riding along behind the wheel's boss)
     // With yokeShaftStretch the hub instead stays anchored in the panel, under its own
     // YokeShaft node, and stretches along the column to reach the wheel.
+    /// <summary>Make the cabin glass transmit light. See glassNodes.
+    ///
+    /// The material is SHARED by all three panes, so it is edited once through the first
+    /// renderer that carries it. gltfast's shader is glTF/PbrMetallicRoughness and its
+    /// albedo property is "baseColorFactor" — not _Color or _BaseColor — and setting the
+    /// wrong one is a silent no-op, which this project has been caught by before. So the
+    /// property is looked up, the one found is logged, and finding none is a WARNING
+    /// rather than nothing.</summary>
+    void ClearTheGlass(Transform model)
+    {
+        Material glass = null; string on = null;
+        foreach (var n in glassNodes)
+        {
+            var t = FindDeep(model, n);
+            var r = t != null ? t.GetComponent<Renderer>() : null;
+            if (r != null && r.sharedMaterial != null) { glass = r.sharedMaterial; on = n; break; }
+        }
+        if (glass == null)
+        {
+            Debug.LogWarning("[RealCockpit] no cabin glass found among " + string.Join("/", glassNodes)
+                           + " — the windscreen keeps the GLB's dark tint.");
+            return;
+        }
+
+        string prop = glass.HasProperty("baseColorFactor") ? "baseColorFactor"
+                    : glass.HasProperty("_BaseColor")      ? "_BaseColor"
+                    : glass.HasProperty("_Color")          ? "_Color" : null;
+        if (prop == null)
+        {
+            Debug.LogWarning("[RealCockpit] cabin glass material '" + glass.name + "' (" + glass.shader.name
+                           + ") has no albedo property this code knows — windscreen tint NOT changed.");
+            return;
+        }
+        Color was = glass.GetColor(prop);
+        glass.SetColor(prop, glassColour);
+        Debug.Log("[RealCockpit] cabin glass '" + glass.name + "' via " + on + ": " + prop + " "
+                + was.ToString("F2") + " -> " + glassColour.ToString("F2") + " (shared by all panes).");
+    }
+
     /// <summary>Cut the twin pedal mesh in two and drive each half from the rudder input.
     ///
     /// The original node's renderer is switched off rather than destroyed, so if the split

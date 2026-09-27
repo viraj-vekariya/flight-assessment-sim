@@ -98,25 +98,51 @@ public static class WorldBuilder
     static Material clearSky, overcastSky;
     static Light sunLight;
 
-    /// <summary>Clear blue sky, bright sun, long visibility.</summary>
+    /// <summary>Clear day: the CLEAR MORNING look, long visibility, warm low sun.
+    ///
+    /// CHOSEN FROM PICTURES, NOT CONSTANTS. The level-design tool in the Level project
+    /// (LevelDesignShots) rendered this world under four lightings from three fixed
+    /// viewpoints, and this is the one that survived looking at them:
+    ///
+    ///   * The previous clear sky and the midday-haze candidate both put a GREEN band on
+    ///     the horizon and washed the ground to lime. The cause is in the sky shader:
+    ///     _SkyTint scales the scattering coefficients, so the old blue push
+    ///     (0.55, 0.68, 0.92) turns a low sun's horizon glow green rather than warm. A
+    ///     NEUTRAL grey tint — Unity's own default — gives a blue zenith with a warm band.
+    ///     The warmth now lives in the sun colour, where it belongs.
+    ///   * Overcast-soft was never a candidate for THIS path: bad weather already has its
+    ///     own sky (SetSkyOvercast), and the LOW missions are specified as a clear day.
+    ///
+    /// The overcast path is untouched, so the weather missions transition exactly as they
+    /// did; only the state a clear mission sits in has changed.</summary>
     public static void SetSkyClear()
     {
         if (clearSky == null)
         {
             clearSky = new Material(Shader.Find("Skybox/Procedural"));
-            clearSky.SetFloat("_AtmosphereThickness", 0.85f);
-            clearSky.SetFloat("_Exposure", 1.35f);
-            clearSky.SetColor("_SkyTint", new Color(0.55f, 0.68f, 0.92f));
-            clearSky.SetColor("_GroundColor", new Color(0.42f, 0.44f, 0.42f));
+            clearSky.SetFloat("_AtmosphereThickness", 0.90f);   // >1.05 goes yellow
+            clearSky.SetFloat("_Exposure", 1.30f);
+            clearSky.SetColor("_SkyTint", new Color(0.50f, 0.50f, 0.50f));   // neutral — see above
+            clearSky.SetColor("_GroundColor", new Color(0.38f, 0.36f, 0.32f));
         }
         RenderSettings.skybox = clearSky;
         RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.58f, 0.63f, 0.70f);
-        RenderSettings.fogColor = new Color(0.74f, 0.82f, 0.92f);
-        RenderSettings.fogDensity = 0.00009f;
-        if (sunLight != null) { sunLight.intensity = 1.25f; sunLight.color = new Color(1f, 0.97f, 0.9f); }
+        RenderSettings.ambientLight = new Color(0.54f, 0.52f, 0.50f);   // warm-neutral
+        RenderSettings.fogColor = new Color(0.80f, 0.78f, 0.74f);
+        RenderSettings.fogDensity = 0.00015f;                              // a little haze in the distance
+        if (sunLight != null)
+        {
+            sunLight.intensity = 1.20f;
+            sunLight.color = new Color(1.00f, 0.90f, 0.76f);               // the warmth lives here
+            sunLight.transform.rotation = ClearSunRotation;
+        }
         DynamicGI.UpdateEnvironment();
     }
+
+    /// <summary>Sun low and warm: 25 deg elevation, from the south-east. Set from
+    /// SetSkyClear rather than only at start-up, so a clear mission that follows a weather
+    /// mission gets the same sky the first one did.</summary>
+    static readonly Quaternion ClearSunRotation = Quaternion.Euler(25f, -55f, 0f);
 
     /// <summary>Overcast HDRI, dimmer sun, shorter visibility. `severity` 0..1 also
     /// pulls the ambient down and the fog up, so heavy weather reads as heavier.</summary>
@@ -158,10 +184,10 @@ public static class WorldBuilder
         sunGo.transform.SetParent(parent);
         var sun = sunGo.AddComponent<Light>();
         sun.type = LightType.Directional;
-        sun.color = new Color(1f, 0.97f, 0.9f);
+        sun.color = new Color(1.00f, 0.90f, 0.76f);
         sun.intensity = 1.2f;
         sun.shadows = LightShadows.Soft;
-        sunGo.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
+        sunGo.transform.rotation = ClearSunRotation;     // SetSkyClear re-asserts this
         RenderSettings.sun = sun;
         sunLight = sun;
 
@@ -329,15 +355,47 @@ public static class WorldBuilder
         return t * t * (3f - 2f * t);
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GROUND LOOK: GREEN TEMPERATE — chosen from the level-design renders
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // The Level project's LevelDesignShots rendered four terrain looks from a flare
+    // viewpoint added specifically to judge them, and this is the one that held up:
+    //
+    //   * CURRENT (6 m grass tile) read as flat paint on short final — the tile was too
+    //     coarse to give any near-field detail at the flare, which is where a pilot looks.
+    //   * DRY SEASON turned the field to desert, and the airfield is specified as grass.
+    //   * WORN AIRFIELD's dirt wear band showed a striped tiling artifact — a defect, not
+    //     a look.
+    //   * GREEN TEMPERATE keeps the ground unmistakably grass and carries the finest tile
+    //     of the four (2.5 m), so the flare gains real texture.
+    //
+    // APPEARANCE ONLY. Nothing here reads or writes a height: BuildTerrain, Height and
+    // PadFlatten are not touched, so take-off and every mission's ground clearance are
+    // unaffected by construction, not merely by intent.
+    //
+    // NOTE, because it changes what a layer MEANS: there is only one grass layer, so
+    // light/dark patchiness cannot come from the alphamap alone. Layer 1 is therefore
+    // tinted to a DARK GRASS shade rather than dirt, which turns the existing
+    // grass<->dirt blend into light-green <-> dark-green. On steep ground, where the
+    // baseline put a little dirt, that dirt is now dark grass; rock still dominates there.
+    const float GrassTile = 2.5f, DirtTile = 5.0f, RockTile = 9f, SandTile = 5.0f, SnowTile = 10f;
+    static readonly Color GrassTint = new Color(0.58f, 0.82f, 0.44f);   const float GrassSat = 1.25f;
+    static readonly Color DirtTint  = new Color(0.30f, 0.50f, 0.24f);   const float DirtSat  = 1.10f;   // dark grass, not dirt
+    /// <summary>Fraction of open grass that turns to the dark-grass layer, and the size
+    /// of one patch in WORLD metres — physical, so it cannot silently change if the
+    /// alphamap resolution ever moves.</summary>
+    const float PatchAmount = 0.55f, PatchScale = 190f;
+
     static TerrainLayer[] BuildLayers()
     {
         return new[]
         {
-            Layer(TerrainTextures.Grass(), 6f),
-            Layer(TerrainTextures.Dirt(), 5f),
-            Layer(TerrainTextures.Rock(), 9f),
-            Layer(TerrainTextures.Sand(), 5f),
-            Layer(TerrainTextures.Snow(), 10f),
+            Layer(TerrainTextures.Tint(TerrainTextures.Grass(), GrassTint, GrassSat), GrassTile),
+            Layer(TerrainTextures.Tint(TerrainTextures.Dirt(),  DirtTint,  DirtSat),  DirtTile),
+            Layer(TerrainTextures.Rock(), RockTile),
+            Layer(TerrainTextures.Sand(), SandTile),
+            Layer(TerrainTextures.Snow(), SnowTile),
         };
     }
 
@@ -379,6 +437,24 @@ public static class WorldBuilder
                 float rock = Mathf.Max(steep, Smooth(620f, 920f, worldY)) * (1f - snow) * (1f - sand);
                 float dirt = steep * 0.4f * (1f - snow) * (1f - sand);
                 float grass = Mathf.Max(0.02f, (1f - snow) * (1f - sand) * (1f - steep));
+
+                // ── light/dark grass patchiness (the green-temperate look) ──────────
+                // Redistributes OPEN grass into layer 1, which is tinted dark grass above.
+                // Snow, rock and the coastal sand rule are left exactly as they are, so
+                // the mountains and the shoreline stay the same place they always were.
+                {
+                    float open = grass;
+                    float p1 = Mathf.PerlinNoise(wx / PatchScale + 13.7f,
+                                                 wz / PatchScale + 41.3f);
+                    float p2 = Mathf.PerlinNoise(wx / (PatchScale * 0.31f) + 5.1f,
+                                                 wz / (PatchScale * 0.31f) + 9.4f);
+                    float patch = Mathf.Clamp01(p1 * 0.70f + p2 * 0.30f);
+                    float toDark = open * PatchAmount * patch;
+                    toDark = Mathf.Min(toDark, Mathf.Max(0f, grass - 0.02f));
+                    grass -= toDark;
+                    dirt  += toDark;
+                    grass = Mathf.Max(0.02f, grass);
+                }
 
                 float sum = grass + dirt + rock + sand + snow + 1e-4f;
                 map[zi, xi, 0] = grass / sum;

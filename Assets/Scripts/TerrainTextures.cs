@@ -50,6 +50,45 @@ public static class TerrainTextures
         return tex;
     }
 
+    /// <summary>A tinted COPY of a ground texture: saturation scaled about its own
+    /// luminance, then multiplied by <paramref name="mul"/>. The source is untouched.
+    ///
+    /// WHY A TINT AND NOT A RECOLOURED ProceduralGrass(). The ground textures are REAL
+    /// CC0 photographs in StreamingAssets/Terrain/*.jpg; Load() returns those and only
+    /// falls back to the procedural generator when a file is absent, so while the .jpg
+    /// files exist the procedural constants change nothing on screen. Colour has to be
+    /// applied to the LOADED image.
+    ///
+    /// EVERY TINT MULTIPLIER PASSED IN IS BELOW 1.0, AND THAT IS A RULE. The photographs
+    /// are already bright; a multiplier above 1 clips against 1.0 under a lit scene and
+    /// the ground goes to flat paper — clipping destroys exactly the tonal range that makes
+    /// a tile READ as texture. A tint darkens; the light supplies the brightness.
+    /// Measured on the level-design renders, where two of four variants lost their
+    /// texture entirely to this before the rule was adopted.</summary>
+    public static Texture2D Tint(Texture2D src, Color mul, float sat)
+    {
+        if (src == null) return null;
+
+        var px = src.GetPixels();
+        for (int i = 0; i < px.Length; i++)
+        {
+            Color c = px[i];
+            // Rec.601 luma — desaturating toward luma keeps the texture's tonal detail,
+            // which is the whole reason a photo reads as ground and a flat colour does not.
+            float lum = c.r * 0.299f + c.g * 0.587f + c.b * 0.114f;
+            c.r = Mathf.Clamp01(Mathf.Lerp(lum, c.r, sat) * mul.r);
+            c.g = Mathf.Clamp01(Mathf.Lerp(lum, c.g, sat) * mul.g);
+            c.b = Mathf.Clamp01(Mathf.Lerp(lum, c.b, sat) * mul.b);
+            px[i] = c;
+        }
+
+        var dst = new Texture2D(src.width, src.height, TextureFormat.RGB24, true)
+        { wrapMode = TextureWrapMode.Repeat, anisoLevel = 4 };
+        dst.SetPixels(px);
+        dst.Apply(true);
+        return dst;
+    }
+
     static Texture2D FromStreamingAssets(string name) => StreamingImage("Terrain/" + name + ".jpg");
 
     /// <summary>Load a JPG/PNG from StreamingAssets at runtime, or null if absent/unreadable.</summary>

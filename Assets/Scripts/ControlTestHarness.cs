@@ -113,6 +113,7 @@ public class ControlTestHarness : MonoBehaviour
         yield return TestRudderPedalsFollowTheRudder();
         yield return TestSystemsStillReachable();
         yield return TestDisplaysDoNotLeakIntoTheWorld();
+        yield return TestWindscreenIsClear();
         yield return TestOwnershipHandback();
         yield return TestReset();
         yield return TestFrameRateIndependence();
@@ -571,6 +572,36 @@ public class ControlTestHarness : MonoBehaviour
               "phys.trim=" + ac.trim.ToString("F2"));
         for (int i = 0; i < 10; i++) { ctl.SetTrim(0f); yield return null; }
         ctl.ClearOverrides(); yield return WaitFrames(2);
+    }
+
+    /// <summary>THE WINDSCREEN MUST TRANSMIT LIGHT.
+    ///
+    /// The GLB ships its "Window" material as a 37%-opaque dark grey pane, which halves
+    /// the brightness of everything outside as seen from the seat — found when the
+    /// level-design renders and the pilot view disagreed by a constant factor on every
+    /// surface. RealCockpit clears it at load; this asserts it actually took, on the real
+    /// material property, because setting the wrong property is a silent no-op.</summary>
+    IEnumerator TestWindscreenIsClear()
+    {
+        Section("WINDSCREEN  (the pilot must see the world at its designed brightness)");
+        Transform ws = null;
+        foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+            if (t.name == "Object_37") ws = t;
+        var r = ws != null ? ws.GetComponent<Renderer>() : null;
+        Check("the windscreen (Object_37) exists and is drawn", r != null && r.enabled,
+              ws == null ? "MISSING" : (r == null ? "no renderer" : (r.enabled ? "ok" : "DISABLED")));
+        if (r == null) yield break;
+        var m = r.sharedMaterial;
+        string prop = m.HasProperty("baseColorFactor") ? "baseColorFactor"
+                    : m.HasProperty("_BaseColor") ? "_BaseColor" : m.HasProperty("_Color") ? "_Color" : null;
+        Check("its material exposes an albedo property", prop != null,
+              "shader=" + m.shader.name + " prop=" + (prop ?? "NONE"));
+        if (prop == null) yield break;
+        Color c = m.GetColor(prop);
+        Check("the pane is mostly clear, not the GLB's 37% dark grey",
+              c.a < 0.20f && c.r > 0.75f && c.g > 0.75f && c.b > 0.75f,
+              prop + "=" + c.ToString("F2") + " (shipped as (0.14,0.14,0.14,0.37))");
+        yield break;
     }
 
     /// <summary>THE DISPLAYS' SYMBOLOGY MUST NOT BE VISIBLE TO ANY WORLD CAMERA.
