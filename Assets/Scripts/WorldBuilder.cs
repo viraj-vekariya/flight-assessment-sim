@@ -38,35 +38,14 @@ public static class WorldBuilder
     static float[] zoneY;
 
     static Terrain terrain;
-    static Mesh roof4, treeCone;
+    static Mesh treeCone;
 
-    // ---- palettes (buildings/trees) ----
-    static readonly Color[] CityWalls =
-    {
-        new Color(0.62f, 0.62f, 0.64f), new Color(0.55f, 0.66f, 0.72f),
-        new Color(0.70f, 0.66f, 0.58f), new Color(0.48f, 0.50f, 0.55f),
-        new Color(0.66f, 0.60f, 0.66f),
-    };
-    static readonly Color RoofGrey = new Color(0.30f, 0.30f, 0.33f);
-    static readonly Color CityGround = new Color(0.24f, 0.24f, 0.26f);
-    static readonly Color RoadGrey = new Color(0.34f, 0.34f, 0.37f);
-    static readonly Color[] HouseWalls =
-    {
-        new Color(0.88f, 0.84f, 0.74f), new Color(0.74f, 0.78f, 0.70f),
-        new Color(0.80f, 0.72f, 0.66f), new Color(0.72f, 0.76f, 0.82f),
-    };
-    static readonly Color[] RoofColors =
-    {
-        new Color(0.55f, 0.22f, 0.18f), new Color(0.35f, 0.26f, 0.20f), new Color(0.30f, 0.32f, 0.36f),
-    };
-    static readonly Color BarnRed = new Color(0.55f, 0.16f, 0.14f);
-    static readonly Color SiloColor = new Color(0.80f, 0.80f, 0.82f);
+    // ---- palette (fallback trees) ----
     static readonly Color Trunk = new Color(0.34f, 0.24f, 0.12f);
     static readonly Color Leaf = new Color(0.17f, 0.40f, 0.18f);
 
     public static RunwayInfo BuildEnvironment(Transform parent)
     {
-        roof4 = MeshUtil.Cone(4, 1f, 1f);
         treeCone = MeshUtil.Cone(8, 1f, 1f);
 
         SetupDayLighting(parent);
@@ -576,136 +555,56 @@ public static class WorldBuilder
         Paint(rw, new Color(0.16f, 0.16f, 0.18f));
         SurfaceTag.Add(rw, SurfaceKind.Runway);
 
-        for (int i = -9; i <= 9; i++)
+        // Painted surface: ICAO markings for runway 01/19 (piano keys, designators,
+        // centreline, aiming points, side stripes, touchdown-zone rubber) on one quad
+        // 1.5 cm above the pavement. No collider: the cube underneath is the surface.
+        var paint = new GameObject("RunwayMarkings");
+        paint.transform.SetParent(parent);
+        paint.transform.position = new Vector3(0f, 0.415f, 0f);
+        var mesh = new Mesh { name = "RunwayMarkings" };
+        mesh.vertices = new[] { new Vector3(-15f, 0f, -300f), new Vector3(-15f, 0f, 300f), new Vector3(15f, 0f, 300f), new Vector3(15f, 0f, -300f) };
+        mesh.uv = new[] { new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(1f, 0f) };
+        mesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
+        mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+        mesh.RecalculateBounds();
+        paint.AddComponent<MeshFilter>().sharedMesh = mesh;
+        if (_std == null) _std = Shader.Find("Standard");
+        var mat = new Material(_std) { mainTexture = CityTextures.Runway("01", "19"), color = Color.white };
+        mat.SetFloat("_Glossiness", 0.12f);
+        paint.AddComponent<MeshRenderer>().sharedMaterial = mat;
+
+        Windsock(parent, new Vector3(-45f, 0f, -200f));
+    }
+
+    /// <summary>A windsock on a mast beside the threshold (orange/white, 1:1 cone).</summary>
+    static void Windsock(Transform parent, Vector3 basePos)
+    {
+        var mast = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        mast.name = "WindsockMast";
+        mast.transform.SetParent(parent);
+        mast.transform.position = basePos + new Vector3(0f, 3.2f, 0f);
+        mast.transform.localScale = new Vector3(0.12f, 3.2f, 0.12f);
+        SimUtil.Destroy(mast.GetComponent<Collider>());
+        Paint(mast, new Color(0.85f, 0.85f, 0.85f));
+        for (int k = 0; k < 5; k++)
         {
-            var dash = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            dash.transform.SetParent(parent);
-            dash.transform.localScale = new Vector3(1f, 0.02f, 12f);
-            dash.transform.position = new Vector3(0f, 0.41f, i * 30f);
-            SimUtil.Destroy(dash.GetComponent<Collider>());
-            Paint(dash, Color.white);
-        }
-        foreach (int end in new[] { -290, 290 })
-        {
-            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            bar.transform.SetParent(parent);
-            bar.transform.localScale = new Vector3(26f, 0.02f, 3f);
-            bar.transform.position = new Vector3(0f, 0.41f, end);
-            SimUtil.Destroy(bar.GetComponent<Collider>());
-            Paint(bar, Color.white);
+            float r = Mathf.Lerp(0.45f, 0.25f, k / 4f);
+            var seg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            seg.name = "WindsockSeg";
+            seg.transform.SetParent(parent);
+            seg.transform.position = basePos + new Vector3(0.45f + k * 0.72f, 6.1f - k * 0.10f, 0f);
+            seg.transform.rotation = Quaternion.Euler(0f, 0f, 90f - 8f);
+            seg.transform.localScale = new Vector3(r * 2f, 0.36f, r * 2f);
+            SimUtil.Destroy(seg.GetComponent<Collider>());
+            Paint(seg, k % 2 == 0 ? new Color(0.95f, 0.36f, 0.08f) : new Color(0.95f, 0.95f, 0.93f));
         }
     }
 
 
-    // ================= SETTLEMENTS (on terrain) =================
-    static void BuildSettlements(Transform parent)
-    {
-        BuildCity(parent, new Vector3(250f, 0f, 1950f));
-        BuildSuburb(parent, new Vector3(-950f, 0f, 1500f));
-        BuildSuburb(parent, new Vector3(1250f, 0f, 1050f));
-        BuildFarm(parent, new Vector3(-1250f, 0f, -300f));
-        // (v26: removed the 3 cosmetic "road" strips — they were thin collider-less
-        // slabs that floated on the terrain near the runway and looked like stray
-        // scripts. The city already has its own internal road grid.)
-    }
-
-    static void BuildCity(Transform parent, Vector3 center)
-    {
-        Random.InitState(9001);
-        const int nx = 10, nz = 10;
-        const float block = 64f, road = 16f;
-        float foot = block - road;
-        Vector3 origin = center - new Vector3((nx - 1) * block * 0.5f, 0f, (nz - 1) * block * 0.5f);
-        float gy = GroundY(center.x, center.z);
-
-        DecoAt("CityGround", parent, center.x, center.z, gy + 0.04f, new Vector3(nx * block, 0.06f, nz * block), CityGround);
-        for (int i = 0; i <= nx; i++)
-            DecoAt("Road", parent, origin.x + i * block - block * 0.5f, center.z, gy + 0.08f, new Vector3(road * 0.55f, 0.04f, nz * block), RoadGrey);
-        for (int j = 0; j <= nz; j++)
-            DecoAt("Road", parent, center.x, origin.z + j * block - block * 0.5f, gy + 0.08f, new Vector3(nx * block, 0.04f, road * 0.55f), RoadGrey);
-
-        Vector2 mid = new Vector2((nx - 1) * 0.5f, (nz - 1) * 0.5f);
-        for (int i = 0; i < nx; i++)
-            for (int j = 0; j < nz; j++)
-            {
-                Vector3 b = origin + new Vector3(i * block, 0f, j * block);
-                if (Random.value < 0.10f) { ParkBlock(parent, b.x, b.z, foot); continue; }
-
-                float distN = Vector2.Distance(new Vector2(i, j), mid) / (nx * 0.5f);
-                float tall = Mathf.Lerp(130f, 14f, Mathf.Clamp01(distN));
-                int per = Random.Range(1, 5);
-                for (int k = 0; k < per; k++)
-                {
-                    float w = Random.Range(11f, foot * 0.42f), d = Random.Range(11f, foot * 0.42f);
-                    float ht = Mathf.Max(9f, Random.Range(tall * 0.55f, tall) * Random.Range(0.75f, 1.1f));
-                    float ox = Random.Range(-foot * 0.22f, foot * 0.22f), oz = Random.Range(-foot * 0.22f, foot * 0.22f);
-                    float bx = b.x + ox, bz = b.z + oz;
-                    if (ModelLibrary.TryBuilding(parent, bx, bz, GroundY(bx, bz), ht, false)) continue;   // CC0 model
-                    Solid("Tower", parent, bx, bz, new Vector3(w, ht, d), CityWalls[Random.Range(0, CityWalls.Length)]);  // fallback
-                    if (ht > 38f) DecoAt("RoofCap", parent, bx, bz, GroundY(bx, bz) + ht + 0.9f, new Vector3(w * 0.5f, 1.8f, d * 0.5f), RoofGrey);
-                }
-            }
-    }
-
-    static void ParkBlock(Transform parent, float x, float z, float foot)
-    {
-        DecoAt("Park", parent, x, z, GroundY(x, z) + 0.06f, new Vector3(foot, 0.05f, foot), new Color(0.28f, 0.48f, 0.24f));
-        for (int t = 0; t < 4; t++)
-            Tree(parent, x + Random.Range(-foot * 0.3f, foot * 0.3f), z + Random.Range(-foot * 0.3f, foot * 0.3f));
-    }
-
-    static void BuildSuburb(Transform parent, Vector3 center)
-    {
-        Random.InitState((int)(center.x * 7f) ^ 991);
-        const int cols = 7, rows = 5; const float gap = 26f;
-        for (int i = 0; i < cols; i++)
-            for (int j = 0; j < rows; j++)
-            {
-                float x = center.x + (i - (cols - 1) * 0.5f) * gap + Random.Range(-3f, 3f);
-                float z = center.z + (j - (rows - 1) * 0.5f) * gap + Random.Range(-3f, 3f);
-                House(parent, x, z, HouseWalls[Random.Range(0, HouseWalls.Length)], RoofColors[Random.Range(0, RoofColors.Length)]);
-            }
-    }
-
-    static void House(Transform parent, float x, float z, Color wall, Color roof)
-    {
-        float gy = GroundY(x, z);
-        if (ModelLibrary.TryBuilding(parent, x, z, gy, Random.Range(7f, 10f), true)) return;   // CC0 house model
-        float w = Random.Range(8f, 13f), d = Random.Range(8f, 13f), ht = Random.Range(4f, 6.5f);
-        Solid("House", parent, x, z, new Vector3(w, ht, d), wall);
-        MeshUtil.MeshObject("Roof", roof4, parent, new Vector3(x, gy + ht, z), new Vector3(w * 0.82f, ht * 0.6f, d * 0.82f), roof);
-    }
-
-    static void BuildFarm(Transform parent, Vector3 center)
-    {
-        Random.InitState(2027);
-        float bw = 26f, bd = 16f, bh = 9f;
-        float gy = GroundY(center.x, center.z);
-        Solid("Barn", parent, center.x, center.z, new Vector3(bw, bh, bd), BarnRed);
-        MeshUtil.MeshObject("BarnRoof", roof4, parent, new Vector3(center.x, gy + bh, center.z), new Vector3(bw * 0.8f, bh * 0.7f, bd * 0.86f), RoofColors[1]);
-        Silo(parent, center.x + bw * 0.6f, center.z, 3.5f, 12f);
-        Silo(parent, center.x + bw * 0.6f + 9f, center.z, 3.5f, 12f);
-        House(parent, center.x - bw, center.z + 14f, HouseWalls[0], RoofColors[0]);
-    }
-
-    static void Silo(Transform parent, float x, float z, float r, float ht)
-    {
-        float gy = GroundY(x, z);
-        var g = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        g.name = "Silo";
-        g.transform.SetParent(parent);
-        g.transform.position = new Vector3(x, gy + ht * 0.5f, z);
-        g.transform.localScale = new Vector3(r * 2f, ht * 0.5f, r * 2f);
-        Paint(g, SiloColor);
-        SurfaceTag.Add(g, SurfaceKind.Obstacle);
-
-        var dome = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        dome.transform.SetParent(parent);
-        dome.transform.position = new Vector3(x, gy + ht, z);
-        dome.transform.localScale = new Vector3(r * 2f, r * 1.1f, r * 2f);
-        SimUtil.Destroy(dome.GetComponent<Collider>());
-        Paint(dome, SiloColor);
-    }
+    // ================= SETTLEMENTS =================
+    // The town, suburbs, industry, transport, airport buildings, farmland and hill
+    // woods are all generated by CityBuilder (merged chunk meshes, System.Random).
+    static void BuildSettlements(Transform parent) => CityBuilder.Build(parent);
 
     static void BuildForests(Transform parent)
     {
@@ -741,31 +640,6 @@ public static class WorldBuilder
         SimUtil.Destroy(trunk.GetComponent<Collider>());
         Paint(trunk, Trunk);
         MeshUtil.MeshObject("Canopy", treeCone, parent, new Vector3(x, gy + s * 0.6f, z), new Vector3(s * 0.7f, s, s * 0.7f), Leaf);
-    }
-
-    // ---- building helpers: position by terrain height ----
-    static GameObject Solid(string name, Transform parent, float x, float z, Vector3 scale, Color c)
-    {
-        var g = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        g.name = name;
-        g.transform.SetParent(parent);
-        g.transform.position = new Vector3(x, GroundY(x, z) + scale.y * 0.5f, z);
-        g.transform.localScale = scale;
-        Paint(g, c);
-        SurfaceTag.Add(g, SurfaceKind.Obstacle);
-        return g;
-    }
-
-    static GameObject DecoAt(string name, Transform parent, float x, float z, float y, Vector3 scale, Color c)
-    {
-        var g = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        g.name = name;
-        g.transform.SetParent(parent);
-        g.transform.position = new Vector3(x, y, z);
-        g.transform.localScale = scale;
-        SimUtil.Destroy(g.GetComponent<Collider>());
-        Paint(g, c);
-        return g;
     }
 
     // shared-material cache (buildings/trees by colour)

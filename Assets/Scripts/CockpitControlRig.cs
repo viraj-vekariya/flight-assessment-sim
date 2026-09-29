@@ -792,16 +792,21 @@ public class CockpitControlRig : MonoBehaviour
         pivot.localRotation = Quaternion.identity;
 
         // Hub, tilted on a CHILD so the animation cannot overwrite the orientation.
-        var hub = Cylinder(pivot, Vector3.zero, 0.017f, 0.005f, new Color(0.22f, 0.22f, 0.24f));
+        var hub = Cylinder(pivot, Vector3.zero, 0.0165f, 0.006f, new Color(0.10f, 0.10f, 0.11f));
         hub.localRotation = Quaternion.Euler(0f, 0f, 90f);   // axis across the cockpit
-        Gloss(hub, 0.30f);
-        // Rim ribs in the Y-Z plane, so rotation about X visibly winds the wheel.
-        for (int i = 0; i < 10; i++)
+        Gloss(hub, 0.22f);
+        // Knurled rubber rim: many fine ribs in the Y-Z plane, so the wheel reads as a
+        // moulded trim wheel (not a cog) and rotation about X still visibly winds it.
+        for (int i = 0; i < 28; i++)
         {
-            float a = i * Mathf.PI * 2f / 10f;
-            Metal(Gloss(Box(pivot, new Vector3(0f, Mathf.Sin(a) * 0.016f, Mathf.Cos(a) * 0.016f),
-                            new Vector3(0.016f, 0.004f, 0.004f), Steel), 0.45f), 0.5f);
+            float a = i * Mathf.PI * 2f / 28f;
+            var rib = Box(pivot, new Vector3(0f, Mathf.Sin(a) * 0.0165f, Mathf.Cos(a) * 0.0165f),
+                          new Vector3(0.0118f, 0.0019f, 0.0019f), new Color(0.07f, 0.07f, 0.075f));
+            rib.localRotation = Quaternion.Euler(-a * Mathf.Rad2Deg, 0f, 0f);
+            Gloss(rib, 0.15f);
         }
+        // white nose-up index stripe across the rim, as real trim wheels carry
+        Gloss(Box(pivot, new Vector3(0f, 0f, -0.0172f), new Vector3(0.0120f, 0.0024f, 0.0012f), White), 0.3f);
 
         c.spec = new ControlSpec
         {

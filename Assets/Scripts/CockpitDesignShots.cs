@@ -79,6 +79,16 @@ public class CockpitDesignShots : MonoBehaviour
         // ── the view the participant actually gets ────────────────────────────────
         yield return Shot(Vector3.zero, Vector3.zero, -1f, "00_pilot_view.png");   // the REAL pilot view
 
+        // -worldshots: only the scenery set (city, aerodrome, in-flight pilot views).
+        if (HasArg("-worldshots"))
+        {
+            yield return WorldShots();
+            Debug.Log("[DESIGN] wrote shots to " + dir);
+            ControlCheckMode.Exit();
+            Done();
+            yield break;
+        }
+
         // LOOK UP AND AROUND. These exist because of a specific defect: the two glass
         // displays build their symbology as world objects on private layers, parented to
         // their own off-screen cameras, and the MFD's camera sits 500 m ABOVE the
@@ -125,6 +135,8 @@ public class CockpitDesignShots : MonoBehaviour
         yield return Shot(Vector3.zero, new Vector3(38f, -20f, 0f), 30f, "02_brake_handle_off.png");
         // The MFD, framed on its own so the compass labels can be read.
         yield return Shot(Vector3.zero, new Vector3(16f, 11f, 0f), 22f, "04_mfd.png");
+
+        yield return WorldShots();
 
         IdentifyRenderers();
         DumpDisplayLeak();
@@ -342,4 +354,78 @@ public class CockpitDesignShots : MonoBehaviour
     }
 
     void Done() { Finished = true; }
+
+    static bool HasArg(string a)
+    {
+        foreach (var x in System.Environment.GetCommandLineArgs()) if (x == a) return true;
+        return false;
+    }
+
+    // ── SCENERY ─────────────────────────────────────────────────────────────────
+    // The cockpit shots above cannot judge the world: from the parked aeroplane the
+    // city is a smudge 2 km away. These put the pilot's eye where a pilot would
+    // actually see the town — on a downwind leg, over the approach, low over the
+    // outskirts — plus free cameras for layout review. The aeroplane is made
+    // kinematic for each in-flight shot so it cannot fall while the frame renders,
+    // then restored and parked again.
+    IEnumerator WorldShots()
+    {
+        var gm = GameManager.Instance;
+        var rb = gm.Aircraft.GetComponent<Rigidbody>();
+
+        // in-flight pilot views: (aircraft position, heading-deg, pitch-deg, file)
+        yield return FlyShot(rb, new Vector3(-900f, 320f, 600f), 45f, 4f, "10_fly_toward_city.png");
+        yield return FlyShot(rb, new Vector3(0f, 180f, 900f), 10f, 6f, "11_fly_over_outskirts.png");
+        yield return FlyShot(rb, new Vector3(1400f, 260f, 3400f), 215f, 5f, "12_fly_downtown_edge.png");
+        yield return FlyShot(rb, new Vector3(0f, 90f, -1800f), 0f, 3f, "13_fly_final_approach.png");
+        yield return FlyShot(rb, new Vector3(-600f, 450f, -400f), 60f, 8f, "14_fly_climbout_left.png");
+
+        var gmRunway = gm.Runway;
+        gm.Aircraft.ResetTo(gmRunway.Start, gmRunway.Rot, false, 0f);
+        if (rb != null) rb.isKinematic = false;
+
+        // free cameras (detached from the eye)
+        shotCam.transform.SetParent(null, true);
+        yield return FreeShot(new Vector3(-700f, 520f, 700f), new Vector3(250f, 20f, 1950f), 50f, "20_city_oblique.png");
+        yield return FreeShot(new Vector3(250f, 1500f, 1950f - 1f), new Vector3(250f, 0f, 1950f), 45f, "21_city_plan.png");
+        yield return FreeShot(new Vector3(420f, 70f, 1500f), new Vector3(250f, 60f, 1950f), 60f, "22_city_street_level.png");
+        yield return FreeShot(new Vector3(-1400f, 380f, 900f), new Vector3(-950f, 0f, 1500f), 50f, "23_suburb.png");
+        yield return FreeShot(new Vector3(300f, 260f, -700f), new Vector3(0f, 0f, 200f), 55f, "24_aerodrome.png");
+        yield return FreeShot(new Vector3(0f, 2400f, 600f), new Vector3(0f, 0f, 1200f), 60f, "25_world_overview.png");
+        shotCam.transform.SetParent(eye, false);
+    }
+
+    IEnumerator FlyShot(Rigidbody rb, Vector3 pos, float heading, float pitchDown, string file)
+    {
+        var ac = GameManager.Instance.Aircraft;
+        var rot = Quaternion.Euler(0f, heading, 0f);
+        ac.ResetTo(pos, rot, true, 50f);
+        if (rb != null) { rb.isKinematic = true; }
+        ac.transform.SetPositionAndRotation(pos, rot);
+        yield return new WaitForSecondsRealtime(0.4f);
+        yield return Shot(Vector3.zero, new Vector3(pitchDown, 0f, 0f), -1f, file);
+    }
+
+    IEnumerator FreeShot(Vector3 pos, Vector3 lookAt, float fov, string file)
+    {
+        shotCam.transform.position = pos;
+        shotCam.transform.rotation = Quaternion.LookRotation(lookAt - pos);
+        shotCam.fieldOfView = fov;
+        var rt = new RenderTexture(W, H, 24);
+        float far = shotCam.farClipPlane;
+        shotCam.farClipPlane = Mathf.Max(far, 20000f);
+        shotCam.targetTexture = rt;
+        shotCam.Render();
+        RenderTexture.active = rt;
+        var tex = new Texture2D(W, H, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, W, H), 0, 0);
+        tex.Apply();
+        shotCam.targetTexture = null;
+        shotCam.farClipPlane = far;
+        RenderTexture.active = null;
+        File.WriteAllBytes(Path.Combine(dir, file), tex.EncodeToPNG());
+        Destroy(tex); Destroy(rt);
+        Debug.Log("[DESIGN]   wrote " + file);
+        yield return null;
+    }
 }
