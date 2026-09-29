@@ -1,13 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Three round analogue instruments either side of the displays — a standby airspeed
-/// indicator, an engine TACHOMETER and a standby altimeter — live, driven by the same
-/// aircraft state as the PFD.
-///
-/// (29 Sep 2026: the standby ATTITUDE indicator that first sat between the MFD and the
-/// altimeter was replaced by the tachometer on request — it repeated the PFD's attitude
-/// display, while engine RPM was shown nowhere in the cockpit.)
+/// The three STANDBY instruments every G1000 Cessna 172 carries on its panel — a mechanical
+/// airspeed indicator, attitude indicator and altimeter — live, driven by the same aircraft
+/// state as the PFD.
 ///
 /// They are what makes the panel read as a real aeroplane's rather than two screens on a
 /// board: round, black-faced, white-marked instruments with the standard airspeed arcs.
@@ -16,7 +12,7 @@ using UnityEngine;
 /// Placement is in RealCockpitModel (holder) space, on the only clear panel either side of
 /// the displays, measured from the pilot's view:
 ///   * ASI         left of the PFD   (PFD's left edge x = -0.1134; panel edge ~ -0.157)
-///   * tachometer  right of the MFD  (MFD's right edge x = 0.0886; panel edge ~ 0.158)
+///   * attitude    right of the MFD  (MFD's right edge x = 0.0886; panel edge ~ 0.158)
 ///   * altimeter   outboard of it
 /// all at y = 0.500 (the displays' centre line is 0.492), ABOVE the control placards and
 /// clear of every control's capture volume, and standing proud of the panel face like the
@@ -27,7 +23,8 @@ using UnityEngine;
 public class StandbyInstruments : MonoBehaviour
 {
     CessnaPhysics phys;
-    Transform asiNeedle, altLong, altShort, tachNeedle;
+    Transform asiNeedle, altLong, altShort;
+    Mesh adiMesh; Vector2[] adiUv; Vector3[] adiPos; float adiR;
 
     const float Z = 0.7535f;
     static Shader textShader;
@@ -42,10 +39,8 @@ public class StandbyInstruments : MonoBehaviour
         asiNeedle = Needle(asi, 0.0118f, 0.0011f, Color.white);
         AsiNumbers(asi, 0.0145f);
 
-        var tach = Gauge(root, "Tachometer", new Vector3(0.1050f, 0.5000f, Z), 0.0138f, TachFace());
-        tachNeedle = Needle(tach, 0.0115f, 0.0011f, Color.white);
-        tachNeedle.localRotation = Quaternion.Euler(0f, 0f, TachStart);
-        TachNumbers(tach, 0.0138f);
+        var adi = Gauge(root, "StandbyADI", new Vector3(0.1050f, 0.5000f, Z), 0.0138f, null);
+        BuildAdi(adi, 0.0138f);
 
         var alt = Gauge(root, "StandbyALT", new Vector3(0.1350f, 0.5000f, Z), 0.0138f, AltFace());
         altShort = Needle(alt, 0.0075f, 0.0016f, Color.white);
@@ -65,17 +60,21 @@ public class StandbyInstruments : MonoBehaviour
         float a = Mathf.Max(0f, phys.AltitudeM);
         if (altLong) altLong.localRotation = Quaternion.Euler(0f, 0f, -Mathf.Repeat(a, 1000f) / 1000f * 360f);
         if (altShort) altShort.localRotation = Quaternion.Euler(0f, 0f, -Mathf.Repeat(a, 10000f) / 10000f * 360f);
-        // tachometer: 0..3000 rpm over 270 degrees, clockwise from 7:30
-        if (tachNeedle)
+        // attitude: rotate + shift the ball's texture coordinates under the fixed face
+        if (adiMesh != null)
         {
-            var sys = AircraftSystems.Instance;
-            float rpm = Mathf.Clamp(sys != null ? sys.RPM : phys.Throttle01 * 2700f, 0f, 3000f);
-            tachNeedle.localRotation = Quaternion.Euler(0f, 0f, TachStart - rpm / 3000f * TachSweep);
+            float roll = phys.RollDeg * Mathf.Deg2Rad, pitch = phys.PitchDeg;
+            float c = Mathf.Cos(roll), s = Mathf.Sin(roll);
+            for (int i = 0; i < adiPos.Length; i++)
+            {
+                // disc point in units of the radius, rotated by bank, offset by pitch
+                float x = adiPos[i].x / adiR, y = adiPos[i].y / adiR;
+                float rx = c * x - s * y, ry = s * x + c * y;
+                adiUv[i] = new Vector2(0.5f + rx * 0.3f, 0.5f + ry * 0.3f + Mathf.Clamp(pitch, -35f, 35f) * 0.015f);
+            }
+            adiMesh.uv = adiUv;
         }
     }
-
-    // needle angle convention: Euler z, positive = anticlockwise from 12 o'clock
-    const float TachStart = 135f, TachSweep = 270f;
 
     // ── construction ────────────────────────────────────────────────────────
     Transform Gauge(Transform root, string name, Vector3 pos, float r, Texture2D face)
@@ -193,6 +192,42 @@ public class StandbyInstruments : MonoBehaviour
         return pivot;
     }
 
+    void BuildAdi(Transform gauge, float r)
+    {
+        // the moving ball: a disc whose UVs are rewritten every frame
+        var mr = Disc(gauge, r, 0f, Color.white, AdiBall(), 0.2f);
+        var mf = mr.GetComponent<MeshFilter>();
+        adiMesh = Instantiate(mf.sharedMesh);
+        mf.sharedMesh = adiMesh;
+        adiPos = adiMesh.vertices;
+        adiUv = adiMesh.uv;
+        adiR = r;
+        // fixed symbology in front: orange wings, centre dot, bank index at the top
+        var o = new Color(1f, 0.55f, 0.08f);
+        Bar(gauge, new Vector3(-0.0060f, 0f, -0.0004f), new Vector2(0.0060f, 0.0010f), o);
+        Bar(gauge, new Vector3( 0.0060f, 0f, -0.0004f), new Vector2(0.0060f, 0.0010f), o);
+        Bar(gauge, new Vector3(0f, 0f, -0.0004f), new Vector2(0.0014f, 0.0014f), o);
+        for (int k = -3; k <= 3; k++)
+        {
+            float a = k * 30f * Mathf.Deg2Rad;
+            var b = Bar(gauge, new Vector3(Mathf.Sin(a) * r * 0.9f, Mathf.Cos(a) * r * 0.9f, -0.0004f), new Vector2(0.0006f, k == 0 ? 0.0028f : 0.0018f), Color.white);
+            b.localRotation = Quaternion.Euler(0f, 0f, -k * 30f);
+        }
+    }
+
+    static Transform Bar(Transform parent, Vector3 pos, Vector2 size, Color col)
+    {
+        var g = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        var c = g.GetComponent<Collider>(); if (c) Destroy(c);
+        g.transform.SetParent(parent, false);
+        g.transform.localPosition = pos;
+        g.transform.localScale = new Vector3(size.x, size.y, 1f);
+        var mr = g.GetComponent<MeshRenderer>();
+        mr.sharedMaterial = new Material(Shader.Find("Unlit/Color")) { color = col };
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return g.transform;
+    }
+
     // ── dial textures ───────────────────────────────────────────────────────
     const int T = 256;
 
@@ -266,31 +301,24 @@ public class StandbyInstruments : MonoBehaviour
         return t;
     }
 
-    /// <summary>Tachometer face: 0-3000 rpm over 270 degrees from 7:30, ticks every 100,
-    /// majors every 500, green arc 2100-2700 (C172S normal operating range), red line at 2700.</summary>
-    static Texture2D TachFace()
+    static Texture2D AdiBall()
     {
         var t = NewTex(); var px = new Color[T * T];
-        Color face = new Color(0.035f, 0.035f, 0.04f), wht = new Color(0.92f, 0.92f, 0.90f);
-        Color green = new Color(0.10f, 0.70f, 0.20f), red = new Color(0.85f, 0.08f, 0.06f);
+        Color sky = new Color(0.20f, 0.50f, 0.85f), gnd = new Color(0.45f, 0.30f, 0.14f), wht = Color.white;
         for (int y = 0; y < T; y++)
             for (int x = 0; x < T; x++)
             {
-                Polar(x, y, out float r, out float a);
-                Color c = face;
-                // a is clockwise from 12; the scale starts at 225 (7:30) and runs clockwise
-                float s = Mathf.Repeat(a - 225f, 360f);
-                if (s <= TachSweep + 0.5f)
+                float u = (x + 0.5f) / T, v = (y + 0.5f) / T;
+                Color c = v > 0.5f ? sky : gnd;
+                if (Mathf.Abs(v - 0.5f) < 0.004f) c = wht;
+                // pitch marks every 10 degrees (0.15 uv), 5-degree half marks
+                foreach (int k in new[] { -2, -1, 1, 2 })
                 {
-                    float rpm = s / TachSweep * 3000f;
-                    if (r > 0.87f && r < 0.95f && rpm >= 2100f && rpm <= 2700f) c = green;
-                    if (r > 0.78f && r < 0.97f && Mathf.Abs(rpm - 2700f) < 14f) c = red;
-                    float m100 = Mathf.Abs(Mathf.Repeat(rpm + 50f, 100f) - 50f);
-                    float m500 = Mathf.Abs(Mathf.Repeat(rpm + 250f, 500f) - 250f);
-                    if (r > 0.72f && r < 0.86f && m500 < 9f) c = wht;
-                    else if (r > 0.78f && r < 0.86f && m100 < 7f) c = wht;
+                    float vy = 0.5f + k * 0.15f;
+                    if (Mathf.Abs(v - vy) < 0.003f && Mathf.Abs(u - 0.5f) < 0.07f) c = wht;
+                    float vh = 0.5f + (k - Mathf.Sign(k) * 0.5f) * 0.15f;
+                    if (Mathf.Abs(v - vh) < 0.0025f && Mathf.Abs(u - 0.5f) < 0.035f && Mathf.Abs(k) >= 1) c = wht;
                 }
-                if (r > 0.985f) c = face * 0.6f;
                 c.a = 1f;
                 px[y * T + x] = c;
             }
@@ -307,17 +335,6 @@ public class StandbyInstruments : MonoBehaviour
             Label(g, new Vector3(Mathf.Sin(a) * r * 0.55f, Mathf.Cos(a) * r * 0.55f, -0.0002f), v.ToString(), 0.0021f);
         }
         Label(g, new Vector3(0f, -r * 0.30f, -0.0002f), "km/h", 0.0013f);
-    }
-
-    void TachNumbers(Transform g, float r)
-    {
-        for (int k = 0; k <= 30; k += 5)
-        {
-            float a = (225f + k / 30f * TachSweep) * Mathf.Deg2Rad;   // clockwise from 12
-            Label(g, new Vector3(Mathf.Sin(a) * r * 0.56f, Mathf.Cos(a) * r * 0.56f, -0.0002f), k.ToString(), 0.0022f);
-        }
-        Label(g, new Vector3(0f, r * 0.28f, -0.0002f), "RPM", 0.0013f);
-        Label(g, new Vector3(0f, -r * 0.34f, -0.0002f), "x100", 0.0011f);
     }
 
     void AltNumbers(Transform g, float r)
