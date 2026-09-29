@@ -374,6 +374,11 @@ public class CockpitDesignShots : MonoBehaviour
         var rb = gm.Aircraft.GetComponent<Rigidbody>();
 
         // in-flight pilot views: (aircraft position, heading-deg, pitch-deg, file)
+        // moving-map range through a climb-out: just off the runway, then higher
+        yield return FlyShot(rb, new Vector3(0f, 9f, 250f), 0f, 12f, "15_map_09m.png", 3f);
+        yield return FlyShot(rb, new Vector3(0f, 60f, 700f), 0f, 12f, "16_map_60m.png", 3f);
+        yield return FlyShot(rb, new Vector3(0f, 250f, 1500f), 0f, 12f, "17_map_250m.png", 3f);
+        yield return FlyShot(rb, new Vector3(0f, 600f, 2500f), 0f, 12f, "18_map_600m.png", 3f);
         yield return FlyShot(rb, new Vector3(-900f, 320f, 600f), 45f, 4f, "10_fly_toward_city.png");
         yield return FlyShot(rb, new Vector3(0f, 180f, 900f), 10f, 6f, "11_fly_over_outskirts.png");
         yield return FlyShot(rb, new Vector3(1400f, 260f, 3400f), 215f, 5f, "12_fly_downtown_edge.png");
@@ -395,14 +400,14 @@ public class CockpitDesignShots : MonoBehaviour
         shotCam.transform.SetParent(eye, false);
     }
 
-    IEnumerator FlyShot(Rigidbody rb, Vector3 pos, float heading, float pitchDown, string file)
+    IEnumerator FlyShot(Rigidbody rb, Vector3 pos, float heading, float pitchDown, string file, float settle = 0.4f)
     {
         var ac = GameManager.Instance.Aircraft;
         var rot = Quaternion.Euler(0f, heading, 0f);
         ac.ResetTo(pos, rot, true, 50f);
         if (rb != null) { rb.isKinematic = true; }
         ac.transform.SetPositionAndRotation(pos, rot);
-        yield return new WaitForSecondsRealtime(0.4f);
+        yield return new WaitForSecondsRealtime(settle);
         yield return Shot(Vector3.zero, new Vector3(pitchDown, 0f, 0f), -1f, file);
     }
 

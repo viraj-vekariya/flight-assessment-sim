@@ -267,25 +267,60 @@ public class LiveMFD : MonoBehaviour
         var gm = GameManager.Instance;
         var eng = gm != null ? gm.ScenarioRunner : null;
         bool onGround = phys != null && phys.Grounded;
+        Vector3 a = aircraft.position;
 
-        float want = onGround ? 250f : 1500f;
+        // 29 Sep 2026 — the range used to be 250 m on the wheels and 1500 m (-> the 2000 m
+        // step) the instant they left the ground. So at lift-off, 5-10 m up, the map jumped
+        // 8x in one frame, and jumped again when a waypoint became active. Now:
+        //   * on the ground 500 m: the whole runway, taxiway and apron are in the picture
+        //     (at 250 m the display was mostly empty grass);
+        //   * in the air the wanted range grows with height above the ground, 500 m at
+        //     lift-off (held to 80 m AGL) to 2 km by 450 m AGL, so the climb-out zooms out progressively;
+        //   * it still widens to hold the active waypoint;
+        //   * hysteresis: zoom OUT as soon as it is needed, zoom IN only when the picture
+        //     needs less than 60 % of the current range, and never within 4 s of a change;
+        //   * the change is animated (about a second), not a one-frame jump.
+        float agl = a.y - WorldBuilder.SampleGroundY(a.x, a.z);
+        float want = onGround ? 500f : Mathf.Lerp(500f, 2000f, Mathf.InverseLerp(80f, 450f, agl));
         if (eng != null && eng.Active && eng.HasWaypoint)
         {
-            Vector3 w = eng.WaypointPos, a = aircraft.position;
+            Vector3 w = eng.WaypointPos;
             float d = Vector2.Distance(new Vector2(a.x, a.z), new Vector2(w.x, w.z));
-            want = Mathf.Max(want, d * 1.25f);
+            want = Mathf.Max(want, d * 1.2f);
         }
-        // Standard-ish range steps, so the picture settles instead of breathing.
-        float[] steps = { 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f };
+        float[] steps = { 500f, 1000f, 2000f, 4000f, 8000f, 16000f };
         float chosen = steps[steps.Length - 1];
         foreach (float st in steps) if (want <= st) { chosen = st; break; }
 
-        if (Mathf.Abs(chosen - rangeM) < 1f) return;
-        rangeM = chosen;
+        if (rangeTarget <= 0f) { rangeTarget = chosen; rangeM = chosen; ApplyRange(); }
+        bool zoomOut = chosen > rangeTarget;
+        bool zoomIn = chosen < rangeTarget && want < rangeTarget * 0.6f && Time.time - lastRangeChange > 4f;
+        if (zoomOut || zoomIn)
+        {
+            rangeTarget = chosen;
+            lastRangeChange = Time.time;
+            Debug.Log($"[MFD] range -> {chosen:F0} m (agl {agl:F0} m, want {want:F0})");
+            if (rngText != null) rngText.text = FormatDistance(rangeTarget * 0.5f);
+        }
+
+        if (Mathf.Abs(rangeM - rangeTarget) > 0.5f)
+        {
+            // ease in log space so each doubling takes the same time
+            float k = 1f - Mathf.Exp(-Time.deltaTime * 3f);
+            rangeM = Mathf.Exp(Mathf.Lerp(Mathf.Log(rangeM), Mathf.Log(rangeTarget), k));
+            if (Mathf.Abs(rangeM - rangeTarget) <= 0.5f) rangeM = rangeTarget;
+            ApplyRange();
+        }
+    }
+
+    float rangeTarget = -1f, lastRangeChange = -99f;
+
+    void ApplyRange()
+    {
         mapCam.orthographicSize = rangeM;
         // Keep every symbol the same size on screen as the range changes.
         if (symRoot != null) symRoot.localScale = Vector3.one * (rangeM / mapSize);
-        if (rngText != null) rngText.text = FormatDistance(rangeM * 0.5f);
+        if (rngText != null) rngText.text = FormatDistance(rangeTarget * 0.5f);
         // The far clip has to reach the ground from the camera's height whatever the range.
         mapCam.farClipPlane = Mathf.Max(3000f, height * 3f);
     }
