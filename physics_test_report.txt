@@ -1,5 +1,5 @@
 PHYSICS TEST REPORT — does it fly like a Cessna 172?
-Generated 2026-09-03 11:11
+Generated 2026-09-29 15:05
 
 == AEROPLANE — the constants the rest of the report is judged against
    mass 1100 kg   wing 16.2 m2   maxThrust 2800 N
@@ -9,12 +9,12 @@ Generated 2026-09-03 11:11
    OK    full-flap stall speed matches a real 172 (40 kt +-15%)   [41.45 kt]
 
 == BANK -> TURN   (roll in, hold, does it go round?)
-   RIGHT bank: held   40.0 deg -> heading changed    17.6 deg in 6 s, track moved    75.4 m sideways
-   OK    RIGHT bank actually banks   [40.04 deg]
-   OK    RIGHT bank changes heading   [17.63 deg in 6 s]
-   OK    RIGHT bank turns the RIGHT WAY   [17.63 deg]
-   OK    RIGHT bank moves the flight path sideways   [75.44 m]
-   OK    RIGHT path curves the same way the nose goes   [75.44 m]
+   RIGHT bank: held   40.3 deg -> heading changed    18.4 deg in 6 s, track moved    77.3 m sideways
+   OK    RIGHT bank actually banks   [40.32 deg]
+   OK    RIGHT bank changes heading   [18.36 deg in 6 s]
+   OK    RIGHT bank turns the RIGHT WAY   [18.36 deg]
+   OK    RIGHT bank moves the flight path sideways   [77.28 m]
+   OK    RIGHT path curves the same way the nose goes   [77.28 m]
    LEFT bank: held  -40.0 deg -> heading changed   -17.6 deg in 6 s, track moved   -75.4 m sideways
    OK    LEFT bank actually banks   [40.04 deg]
    OK    LEFT bank changes heading   [17.63 deg in 6 s]
@@ -40,7 +40,7 @@ Generated 2026-09-03 11:11
           25 |   80.5 deg
           35 |   85.3 deg
           45 |   68.1 deg
-   OK    controls are responsive at approach speed (45 m/s)   [68.09 deg in 1 s]
+   OK    controls are responsive at approach speed (45 m/s)   [68.08 deg in 1 s]
           60 |   43.8 deg
 
 == DIRECTIONAL STABILITY   (kick the rudder, release, sideslip must wash out)
@@ -53,7 +53,7 @@ Generated 2026-09-03 11:11
       t=3    spd  43.2  vs   3.10  pitch    7.0  bank    0.0  AoA   2.9  thrust   2800N  power 1.00  thr 1.00  stalled False
       t=6    spd  45.6  vs   3.79  pitch    7.0  bank    0.0  AoA   2.2  thrust   2800N  power 1.00  thr 1.00  stalled False
       t=9    spd  47.7  vs   4.33  pitch    7.0  bank    0.0  AoA   1.8  thrust   2800N  power 1.00  thr 1.00  stalled False
-   climb 4.40 m/s (866 fpm) at 49.4 m/s, pitch 7.0 deg
+   climb 4.40 m/s (865 fpm) at 49.4 m/s, pitch 7.0 deg
    OK    climbs at full power (1-8 m/s)   [4.40 m/s]
 
 == STALL   (power off, decelerate gently to the break, then hands off)
