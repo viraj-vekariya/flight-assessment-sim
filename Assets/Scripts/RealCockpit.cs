@@ -210,6 +210,7 @@ public class RealCockpit : MonoBehaviour
         }
         ClearTheGlass(holder.transform);
         RetrimInterior(holder.transform);
+        CloseCentreStrip(holder.transform);
         CentreGroup(holder.transform, seatBodyTwinNodes);
 
         // Yoke: the model's OWN wheel — kept exactly as Blender has it, just cut to one,
@@ -268,7 +269,7 @@ public class RealCockpit : MonoBehaviour
         // Make the right glass screen a LIVE moving map (top-down world view).
         var mfd = holder.AddComponent<LiveMFD>();
         mfd.Build(phys.transform, holder.transform,
-            new Vector3(0.0461f, 0.4921f, 0.7535f),   // right MFD centre, same treatment
+            new Vector3(0.0461f - MfdShift, 0.4921f, 0.7535f),   // right MFD centre, slid left (CloseCentreStrip)
             Quaternion.identity,
             new Vector2(0.085f, 0.056f),
             CockpitBuilder.CockpitLayer);
@@ -576,6 +577,67 @@ public class RealCockpit : MonoBehaviour
             if (!has) { b = new Bounds(p, Vector3.zero); has = true; } else b.Encapsulate(p);
         }
         return has;
+    }
+
+    // ── CENTRE STRIP REMOVED (6 Oct 2026, on request) ─────────────────────────
+    // The bezel mesh Object_83 is ONE mesh holding both displays' surrounds AND the
+    // 27 mm strip between them (x -0.0255 .. -0.001, holder space, measured from the GLB:
+    // PFD surround ends at -0.026, MFD surround starts at +0.0014). The strip is deleted
+    // and everything of the right display — its surround (rest of Object_83), its glass
+    // (the right quad of Object_88) and the LiveMFD quad — slides left by MfdShift so the
+    // two displays sit side by side with a 3 mm seam. The freed space on the right becomes
+    // the gap between the map and the standby dials (StandbyInstruments).
+    // A backing plate in the panel's own material sits behind the display block, because the panel mesh
+    // behind the bezel is not guaranteed to be closed where the strip and the old MFD
+    // edge used to be.
+    public const float StripX0 = -0.0255f, StripX1 = -0.001f, MfdShift = 0.024f;
+
+    static void CloseCentreStrip(Transform model)
+    {
+        int dropped = 0, moved = 0;
+        foreach (var name in new[] { "Object_83", "Object_88" })
+        {
+            var t = FindDeep(model, name);
+            var mf = t != null ? t.GetComponent<MeshFilter>() : null;
+            if (mf == null || mf.sharedMesh == null) { Debug.LogWarning("[RealCockpit] centre strip: " + name + " not found"); continue; }
+            var mesh = Instantiate(mf.sharedMesh);
+            var verts = mesh.vertices;
+            var shiftSet = new bool[verts.Length];
+            float ModelX(int i) => model.InverseTransformPoint(t.TransformPoint(verts[i])).x;
+            for (int sm = 0; sm < mesh.subMeshCount; sm++)
+            {
+                var tris = mesh.GetTriangles(sm);
+                var keep = new List<int>(tris.Length);
+                for (int i = 0; i < tris.Length; i += 3)
+                {
+                    float cx = (ModelX(tris[i]) + ModelX(tris[i + 1]) + ModelX(tris[i + 2])) / 3f;
+                    if (cx > StripX0 && cx < StripX1) { dropped++; continue; }
+                    if (cx >= StripX1) { shiftSet[tris[i]] = shiftSet[tris[i + 1]] = shiftSet[tris[i + 2]] = true; }
+                    keep.Add(tris[i]); keep.Add(tris[i + 1]); keep.Add(tris[i + 2]);
+                }
+                mesh.SetTriangles(keep, sm);
+            }
+            Vector3 d = t.InverseTransformVector(model.TransformVector(new Vector3(-MfdShift, 0f, 0f)));
+            for (int i = 0; i < verts.Length; i++) if (shiftSet[i]) { verts[i] += d; moved++; }
+            mesh.vertices = verts;
+            mesh.RecalculateBounds();
+            mf.mesh = mesh;
+        }
+
+        // backing plate behind the display block, panel grey
+        var plate = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        plate.name = "DisplayBacking";
+        var col = plate.GetComponent<Collider>(); if (col) Destroy(col);
+        plate.transform.SetParent(model, false);
+        plate.transform.localPosition = new Vector3(-0.012f, 0.4921f, 0.7615f);
+        plate.transform.localScale = new Vector3(0.215f, 0.066f, 1f);
+        // wear the panel's own material, so wherever it shows it reads as more panel
+        var panel = FindDeep(model, "Object_81");
+        var pr = panel != null ? panel.GetComponent<Renderer>() : null;
+        if (pr != null) plate.GetComponent<Renderer>().sharedMaterial = pr.sharedMaterial;
+        else plate.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.25f, 0.25f, 0.26f) };
+        plate.layer = CockpitBuilder.CockpitLayer;
+        Debug.Log($"[RealCockpit] centre strip removed: {dropped} triangles dropped, {moved} vertices of the right display slid {MfdShift * 1000f:F0} mm left");
     }
 
     /// <summary>Re-colour the cabin trim. The model ships its side walls and door cards in

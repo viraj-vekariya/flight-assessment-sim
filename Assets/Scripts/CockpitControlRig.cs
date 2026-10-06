@@ -805,8 +805,16 @@ public class CockpitControlRig : MonoBehaviour
             rib.localRotation = Quaternion.Euler(-a * Mathf.Rad2Deg, 0f, 0f);
             Gloss(rib, 0.15f);
         }
-        // white nose-up index stripe across the rim, as real trim wheels carry
-        Gloss(Box(pivot, new Vector3(0f, 0f, -0.0172f), new Vector3(0.0120f, 0.0024f, 0.0012f), White), 0.3f);
+        // White index stripe across the rim. At neutral it faces the pilot's EYE — which is
+        // ~35° above the wheel's axis — not straight aft, so the whole ±90° travel stays on
+        // the visible face (straight-aft placement hid it under the wheel at full nose-up).
+        var stripe = Box(pivot, Quaternion.Euler(35f, 0f, 0f) * new Vector3(0f, 0f, -0.0172f),
+                         new Vector3(0.0120f, 0.0024f, 0.0012f), White);
+        stripe.localRotation = Quaternion.Euler(35f, 0f, 0f);
+        Gloss(stripe, 0.3f);
+        // which way is which, engraved above and below the wheel
+        Label(c.transform, new Vector3(0f,  0.0245f, -0.004f), "NOSE DN", DetentText, White);
+        Label(c.transform, new Vector3(0f, -0.0245f, -0.004f), "NOSE UP", DetentText, White);
 
         c.spec = new ControlSpec
         {
@@ -819,7 +827,14 @@ public class CockpitControlRig : MonoBehaviour
             captureRadius = 0.038f,     // 45 mm to the brake; must not reach it
             smoothingTau = 0.06f,
             visual = pivot, visualIsRotation = true,
-            visualAxis = Vector3.right, visualTravel = 160f,   // degrees at full trim
+            // ±90° = 180° lock to lock (was ±160° = 320°). At ±160° the white index
+            // stripe went round the BACK of the wheel and out of sight, so the pilot could
+            // not tell nose-up trim from nose-down. Within ±90° it always stays on the
+            // visible face: stripe BELOW centre = nose UP, ABOVE centre = nose DOWN.
+            // visualAxis is LEFT so the face rolls DOWN for nose-up: the same way the hand
+            // drags (axis = down) and the way a real 172 wheel rolls. With Vector3.right the
+            // stripe rose while the hand pulled down — the wheel turned against the hand.
+            visualAxis = Vector3.left, visualTravel = 90f,     // degrees at full trim, each way
         };
         Configure(c);
         c.SetSilently(0f);

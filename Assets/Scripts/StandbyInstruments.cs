@@ -12,7 +12,9 @@ using UnityEngine;
 /// Placement is in RealCockpitModel (holder) space, on the only clear panel either side of
 /// the displays, measured from the pilot's view:
 ///   * ASI         left of the PFD   (PFD's left edge x = -0.1134; panel edge ~ -0.157)
-///   * attitude    right of the MFD  (MFD's right edge x = 0.0886; panel edge ~ 0.158)
+///   * attitude    right of the MFD. Since 6 Oct 2026 the MFD has slid 24 mm left
+///                 (RealCockpit.CloseCentreStrip), so its surround now ends at x 0.0674;
+///                 the dials moved ~11 mm left and keep a ~10 mm gap after the map.
 ///   * altimeter   outboard of it
 /// all at y = 0.500 (the displays' centre line is 0.492), ABOVE the control placards and
 /// clear of every control's capture volume, and standing proud of the panel face like the
@@ -39,10 +41,10 @@ public class StandbyInstruments : MonoBehaviour
         asiNeedle = Needle(asi, 0.0118f, 0.0011f, Color.white);
         AsiNumbers(asi, 0.0145f);
 
-        var adi = Gauge(root, "StandbyADI", new Vector3(0.1050f, 0.5000f, Z), 0.0138f, null);
+        var adi = Gauge(root, "StandbyADI", new Vector3(0.0936f, 0.5000f, Z), 0.0138f, null);
         BuildAdi(adi, 0.0138f);
 
-        var alt = Gauge(root, "StandbyALT", new Vector3(0.1350f, 0.5000f, Z), 0.0138f, AltFace());
+        var alt = Gauge(root, "StandbyALT", new Vector3(0.1271f, 0.5000f, Z), 0.0138f, AltFace());
         altShort = Needle(alt, 0.0075f, 0.0016f, Color.white);
         altLong = Needle(alt, 0.0118f, 0.0010f, Color.white);
         AltNumbers(alt, 0.0138f);
