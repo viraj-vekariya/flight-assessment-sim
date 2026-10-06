@@ -67,6 +67,6 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "FlightAssessmentSim - UI.slnx",
+    "dotnet.defaultSolution": "FlightAssessmentSim - BTP Final.slnx",
     "dotnet.enableWorkspaceBasedDevelopment": false
 }

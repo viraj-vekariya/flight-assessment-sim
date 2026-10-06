@@ -174,11 +174,22 @@ public static class PlayCapture
         EditorApplication.EnterPlaymode();
     }
 
+    /// <summary>Renders the world/lighting design shots (LevelDesignShots, -levelshots).
+    ///
+    ///   Unity -batchmode -projectPath &lt;p&gt; -executeMethod PlayCapture.RunLevelShots \
+    ///         -levelshots -lighting=N -logFile level.log        (N = 0..3)</summary>
+    public static void RunLevelShots() { RunDesignShots(); }
+
     static void TickDesignShots()
     {
         if (!EditorApplication.isPlaying) return;
         if (!entered) { entered = true; t0 = EditorApplication.timeSinceStartup; }
-        bool done = CockpitDesignShots.Finished;
+        // Either shot harness satisfies this tick. Only one of them ever boots — each is
+        // gated on its own command-line flag (-designshots / -levelshots) — so an OR here
+        // cannot let one finish on the other's behalf. Without it, running the level
+        // shots through this entry point would wait 900 s on CockpitDesignShots.Finished,
+        // which never sets, and then exit 1 with twelve perfectly good PNGs on disk.
+        bool done = CockpitDesignShots.Finished || LevelDesignShots.Finished;
         bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
         if (!done && !timedOut) return;
         if (timedOut && !done) Debug.LogError("[DESIGNSHOTS] HARD TIMEOUT");

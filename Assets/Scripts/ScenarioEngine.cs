@@ -16,8 +16,8 @@
 //
 // SCORING IS NOT THE POINT. The engine still computes the legacy score (the campaign
 // needs it), but for an experiment mission the score is NEVER shown to the
-// participant before the workload questionnaire, because a visible score would bias
-// the self-report. What the experiment consumes is the telemetry, the markers, the
+// participant, because a visible score would bias how they fly the rest of the
+// session. What the experiment consumes is the telemetry, the markers, the
 // objective performance metrics and the participant's own NASA-TLX.
 
 using System.Collections.Generic;
@@ -1221,10 +1221,9 @@ public class ScenarioEngine : MonoBehaviour
                             Current.Id + "|" + Headline("COMPLETE"), ac);
             Experiment.Mark(EventMarkers.MissionEnd, Current.Id, ac);
             Experiment.WriteOutcome(Metrics, ok ? "SUCCESS" : "INCOMPLETE");
-            // NOT closed here. The NASA-TLX questionnaire that follows is still part
-            // of the recorded period (the EEG is still running), so TLX_START and
-            // TLX_SUBMIT must land in the same events.csv on the same clock.
-            // GameManager calls CloseTrialLog() once the response is submitted.
+            // NOT closed here — GameManager calls CloseTrial() the instant the trial
+            // ends, which is now immediately after this. Kept as two steps because the
+            // crash path below reaches the same place by a different route.
             Result.Passed = ok;
         }
         else
@@ -1250,7 +1249,7 @@ public class ScenarioEngine : MonoBehaviour
             Experiment.Mark(EventMarkers.MissionFailure, Current.Id + "|crash", ac);
             Experiment.Mark(EventMarkers.MissionEnd, Current.Id, ac);
             Experiment.WriteOutcome(Metrics, "CRASHED");
-            // Left open for the questionnaire — see Complete().
+            // Closed by GameManager.CloseTrial(), same as Complete().
         }
         else
         {
@@ -1504,18 +1503,15 @@ public class ScenarioEngine : MonoBehaviour
     /// <summary>Mark the start of the post-trial questionnaire. The questionnaire
     /// period is recorded but is NOT a task epoch — the analysis must exclude it,
     /// which it can only do if the boundary is timestamped.</summary>
-    public void MarkTlxStart()
-    { if (IsExperiment && Experiment.Open) Experiment.Mark(EventMarkers.TlxStart, Current != null ? Current.Id : ""); }
-
-    /// <summary>Mark the submitted response and close the trial's files.</summary>
-    public void MarkTlxSubmitAndClose(float rtlx, int bedford)
+    /// <summary>Close the trial's files. Called the moment the trial ends.
+    ///
+    /// This used to be MarkTlxSubmitAndClose, driven by the participant pressing SUBMIT
+    /// on the post-trial NASA-TLX form. That form has been removed, so nothing else
+    /// would ever close the trial — telemetry, events and metadata would be left open
+    /// and the run would lose its last flush. Closing here is not optional tidying.</summary>
+    public void CloseTrial()
     {
-        if (IsExperiment && Experiment.Open)
-        {
-            Experiment.Mark(EventMarkers.TlxSubmit,
-                            "rtlx=" + rtlx.ToString("F1") + ";bedford=" + bedford);
-            Experiment.Close();
-        }
+        if (IsExperiment && Experiment.Open) Experiment.Close();
     }
 
     void Show(string msg) { Banner = msg; BannerUntil = Time01 + 4.5f; }

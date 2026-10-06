@@ -14,8 +14,7 @@ using UnityEngine;
 ///
 /// The menu shows each mission's Predicted Load Index so the experimenter can see
 /// the design's own ordering at a glance. That number is a PREDICTION from the
-/// workload model, never a measurement, and it is never shown during a trial or
-/// before the questionnaire.
+/// workload model, never a measurement, and it is never shown during a trial.
 /// </summary>
 public class MenuUI : MonoBehaviour
 {

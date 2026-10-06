@@ -18,31 +18,24 @@ using UnityEngine;
 /// CLI = 0 → no degradation (performed identically under load vs. baseline).
 /// CLI = 100 → maximum possible performance collapse.
 ///
-/// Also folds in the per-trial NASA-TLX (RTLX)/BEDFORD self-reports (Phase 5) so the
-/// behavioural CLI can be correlated against the validated subjective workload scales.
+/// The per-trial NASA-TLX/BEDFORD self-reports it used to fold in have been removed
+/// from this project, so the report is now purely behavioural.
 ///
 /// Output: FlightSimData/{PID}/Reports/{PID}_S{N}_{stamp}.json
 /// </summary>
 public static class SessionReporter
 {
     public static float  LastCLI      { get; private set; }
-    public static float  LastMeanRTLX { get; private set; }
-    public static float  LastMeanBedford { get; private set; }
     public static string LastFilePath { get; private set; } = "";
 
     // ---- public entry point -----------------------------------------------
 
-    /// <param name="workload">Per-trial ratings, same order/count as <paramref name="results"/>
-    /// (index i's rating belongs to results[i]) — GameManager keeps them in lockstep since a
-    /// trial can't advance without the questionnaire being submitted first.</param>
-    public static void Generate(List<ScenarioResult> results, List<WorkloadRating> workload = null)
+    public static void Generate(List<ScenarioResult> results)
     {
         if (results == null || results.Count == 0) return;
 
         float cli = ComputeCLI(results);
         LastCLI = cli;
-        LastMeanRTLX = Mean(workload, w => w.RTLX);
-        LastMeanBedford = Mean(workload, w => w.Bedford);
 
         string pid     = ParticipantManager.FilePrefix;
         string sesTag  = ParticipantManager.SessionTag;
@@ -54,17 +47,9 @@ public static class SessionReporter
         string path = Path.Combine(dir, $"{pid}_{sesTag}_{stamp}.json");
         LastFilePath = path;
 
-        string json = BuildJSON(results, workload, cli, stamp);
+        string json = BuildJSON(results, cli, stamp);
         File.WriteAllText(path, json, Encoding.UTF8);
-        Debug.Log($"[SessionReporter] Written: {path}  CLI={cli:F1}  meanRTLX={LastMeanRTLX:F1}  meanBEDFORD={LastMeanBedford:F1}");
-    }
-
-    static float Mean(List<WorkloadRating> ws, System.Func<WorkloadRating, float> sel)
-    {
-        if (ws == null || ws.Count == 0) return 0f;
-        float sum = 0f;
-        foreach (var w in ws) sum += sel(w);
-        return sum / ws.Count;
+        Debug.Log($"[SessionReporter] Written: {path}  CLI={cli:F1}");
     }
 
     // ---- CLI computation --------------------------------------------------
@@ -103,7 +88,7 @@ public static class SessionReporter
 
     // ---- JSON builder (manual — avoids JsonUtility Dictionary limitations) -
 
-    static string BuildJSON(List<ScenarioResult> results, List<WorkloadRating> workload, float cli, string stamp)
+    static string BuildJSON(List<ScenarioResult> results, float cli, string stamp)
     {
         var ci = CultureInfo.InvariantCulture;
         var sb = new StringBuilder();
@@ -114,7 +99,6 @@ public static class SessionReporter
         float  load  = 0f;
         for (int i = 1; i < results.Count; i++) load += results[i].Score;
         if (results.Count > 1) load /= (results.Count - 1);
-        bool haveWorkload = workload != null && workload.Count == results.Count;
 
         sb.AppendLine("{");
         sb.AppendLine($"  \"participant_id\": {J(pid)},");
@@ -122,8 +106,6 @@ public static class SessionReporter
         sb.AppendLine($"  \"iso_datetime\": {J(System.DateTime.Now.ToString("o"))},");
         sb.AppendLine($"  \"sim_version\": \"v36\",");
         sb.AppendLine($"  \"cognitive_load_index\": {cli.ToString("F1", ci)},");
-        sb.AppendLine($"  \"mean_rtlx\": {LastMeanRTLX.ToString("F1", ci)},");
-        sb.AppendLine($"  \"mean_bedford\": {LastMeanBedford.ToString("F1", ci)},");
         sb.AppendLine($"  \"baseline_score\": {base_.ToString("F1", ci)},");
         sb.AppendLine($"  \"loaded_score_mean\": {load.ToString("F1", ci)},");
         sb.AppendLine($"  \"score_delta\": {(load - base_).ToString("F1", ci)},");
@@ -145,18 +127,7 @@ public static class SessionReporter
             sb.AppendLine($"      \"errors\": {Component(r, "Errors").ToString("F1", ci)},");
             sb.AppendLine($"      \"completion\": {Component(r, "Completion").ToString("F1", ci)},");
             sb.AppendLine($"      \"smoothness\": {Component(r, "Smoothness").ToString("F1", ci)},");
-            sb.AppendLine($"      \"landing\": {Component(r, "Landing").ToString("F1", ci)},");
-            if (haveWorkload)
-            {
-                var w = workload[i];
-                sb.AppendLine($"      \"rtlx\": {w.RTLX.ToString("F1", ci)},");
-                sb.AppendLine($"      \"bedford\": {w.Bedford}");
-            }
-            else
-            {
-                sb.AppendLine( "      \"rtlx\": null,");
-                sb.AppendLine( "      \"bedford\": null");
-            }
+            sb.AppendLine($"      \"landing\": {Component(r, "Landing").ToString("F1", ci)}");
             sb.Append(i < results.Count - 1 ? "    }," : "    }");
             sb.AppendLine();
         }

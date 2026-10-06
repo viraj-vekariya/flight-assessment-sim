@@ -13,21 +13,44 @@ public static class ParticipantManager
     /// <summary>True once the participant entry screen has been confirmed.</summary>
     public static bool IsSet => !string.IsNullOrEmpty(ID);
 
-    /// <summary>
-    /// Register the participant. Session number auto-increments per participant
-    /// (stored in PlayerPrefs under a participant-scoped key so different IDs
-    /// don't share session counts).
-    /// </summary>
+    /// <summary>Register the participant, and work out which VISIT this is.
+    ///
+    /// The visit number is counted from the DATA TREE — the number of session folders
+    /// already under experiment/&lt;PID&gt;/ — not from PlayerPrefs.
+    ///
+    /// PlayerPrefs was the previous source and it demonstrably did not work: participant
+    /// P002 has two session folders on disk and BOTH are named S01, because the counter is
+    /// only persisted by RecordSessionComplete() and a participant who stops part-way
+    /// through (which is the normal case when someone flies five missions today and five
+    /// tomorrow) never reaches it. Two visits then collide on the session number and only
+    /// the timestamp tells them apart.
+    ///
+    /// Counting folders cannot drift from the data, survives a cleared PlayerPrefs, and
+    /// is correct even if the participant quits mid-trial every single time.</summary>
     public static void SetID(string id)
     {
         ID      = id.Trim().ToUpper();
-        Session = PlayerPrefs.GetInt(SessCountKey(), 0) + 1;
+        Session = CountVisitsOnDisk() + 1;
     }
 
-    /// <summary>
-    /// Persist the completed session counter so the next launch of the same
-    /// participant ID starts on session N+1.
-    /// </summary>
+    /// <summary>How many session folders this participant already has. Counted, never
+    /// cached — the folders are the record.</summary>
+    static int CountVisitsOnDisk()
+    {
+        try
+        {
+            string dir = System.IO.Path.Combine(ExperimentLogger.ExperimentRoot, FilePrefix);
+            if (!System.IO.Directory.Exists(dir)) return 0;
+            int n = 0;
+            foreach (var d in System.IO.Directory.GetDirectories(dir))
+                if (System.IO.Path.GetFileName(d).StartsWith("S")) n++;
+            return n;
+        }
+        catch { return 0; }   // unreadable disk must never block a participant starting
+    }
+
+    /// <summary>Kept for callers; the visit number no longer depends on it being
+    /// reached, so a participant who quits half-way is still counted correctly.</summary>
     public static void RecordSessionComplete()
     {
         if (!IsSet) return;

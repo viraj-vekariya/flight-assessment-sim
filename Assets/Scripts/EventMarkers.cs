@@ -77,6 +77,12 @@ public static class EventMarkers
     public const string GoAroundCommanded = "GO_AROUND_COMMANDED";
     public const string GoAroundInitiated = "GO_AROUND_INITIATED";
     public const string Touchdown         = "TOUCHDOWN";
+    // ---- recording integrity ----
+    /// <summary>Real time jumped while the trial was recording — the app was paused,
+    /// backgrounded, or the editor stalled. t_mission does NOT advance across this, so
+    /// the hole is invisible unless it is marked. See ExperimentLogger.Sample().</summary>
+    public const string RecordingGap       = "RECORDING_GAP";
+
     public const string Crash             = "CRASH";
     public const string Stall             = "STALL";
 
@@ -91,9 +97,6 @@ public static class EventMarkers
     public const string BrakeApplied      = "BRAKE_APPLIED";
     public const string BrakeReleased     = "BRAKE_RELEASED";
 
-    // ---- self-report ----
-    public const string TlxStart          = "TLX_START";
-    public const string TlxSubmit         = "TLX_SUBMIT";
 
     /// <summary>Every marker tag, for the test harness and for the analysis-side
     /// schema check. Keep in sync when adding a marker above.</summary>
@@ -110,6 +113,6 @@ public static class EventMarkers
         BrakeApplied, BrakeReleased,
         ConfigChange, WeatherOnset, WeatherEnd, TrafficOnset,
         GoAroundCommanded, GoAroundInitiated, Touchdown, Crash, Stall,
-        TlxStart, TlxSubmit
+        RecordingGap
     };
 }
