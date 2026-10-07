@@ -1,6 +1,6 @@
 COCKPIT CONTROL TEST
 ====================
-generated 2026-09-29 17:10:45
+generated 2026-10-07 05:21:54
 unity 6000.0.77f1
 
 controls built: 5
@@ -27,7 +27,7 @@ modality      : Desktop
 
 ── THROTTLE REACH  (the mouse must resolve to the knob, not the yoke)
    OK    aiming at the knob at idle selects the throttle   [selected=throttle | yoke ray-dist=69mm radius=58mm range=194mm; throttle ray-dist=18mm radius=40mm range=220mm ELIGIBLE; flaps ray-dist=50mm radius=38mm range=232mm; brake ray-dist=171mm radius=38mm range=173mm; trim ray-dist=215mm radius=38mm range=163mm]
-   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=75mm radius=58mm range=197mm; throttle ray-dist=19mm radius=40mm range=224mm ELIGIBLE; flaps ray-dist=45mm radius=38mm range=237mm; brake ray-dist=176mm radius=38mm range=173mm; trim ray-dist=220mm radius=38mm range=162mm]
+   OK    aiming at the knob at full power selects the throttle   [selected=throttle | yoke ray-dist=75mm radius=58mm range=197mm; throttle ray-dist=20mm radius=40mm range=224mm ELIGIBLE; flaps ray-dist=45mm radius=38mm range=237mm; brake ray-dist=176mm radius=38mm range=173mm; trim ray-dist=220mm radius=38mm range=162mm]
 
 ── FLAP LEVER  (detents -> selected flap)
    OK    detent UP selected   [selected=UP]
@@ -122,8 +122,8 @@ modality      : Desktop
    OK    SystemsInput present and enabled (H/J/K/L live)   [enabled=True]
 
 ── DISPLAY LAYERS  (symbology may only be seen by its own camera)
-   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
    OK    world camera 'CockpitCamera' excludes the display layers   [cullingMask=0xFFFF8BFF display bits=0x0]
+   OK    world camera 'ExternalCamera' excludes the display layers   [cullingMask=0xFFFF87FF display bits=0x0]
 
 ── WINDSCREEN  (the pilot must see the world at its designed brightness)
    OK    the windscreen (Object_37) exists and is drawn   [ok]
