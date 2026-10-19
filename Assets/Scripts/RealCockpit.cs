@@ -683,90 +683,17 @@ public class RealCockpit : MonoBehaviour
         propPivot.rotation = model.rotation;
         foreach (var t in nodes) t.SetParent(propPivot, true);
 
-        // Which of the nodes are BLADES (long, thin) and which is the spinner: a blade's
-        // extent across the disc is several times the spinner's (0.52 m vs 0.14 m here). Only blades get swapped
-        // for the blur disc; the spinner keeps turning visibly, as it does in life.
-        float radius = 0f;
-        foreach (var t in nodes)
-        {
-            var r = t.GetComponent<Renderer>(); if (r == null) continue;
-            float acrossWorld = Mathf.Max(r.bounds.size.x, r.bounds.size.y);
-            if (acrossWorld < 0.3f) continue;   // blades measure ~0.5 m in the scaled model, the spinner 0.14 m
-            propBlades.Add(r);
-            // disc radius = the farthest blade vertex from the spin axis
-            var mf = t.GetComponent<MeshFilter>();
-            if (mf != null && mf.sharedMesh != null)
-                foreach (var v in mf.sharedMesh.vertices)
-                {
-                    Vector3 lp = propPivot.InverseTransformPoint(t.TransformPoint(v));
-                    radius = Mathf.Max(radius, new Vector2(lp.x, lp.y).magnitude * propPivot.lossyScale.x);
-                }
-            else radius = Mathf.Max(radius, acrossWorld * 0.5f);
-        }
-        if (propBlades.Count > 0) BuildPropDisc(radius);
-        Debug.Log($"[RealCockpit] prop: {propBlades.Count} blade renderer(s) of {nodes.Count} nodes, disc radius {radius:F2} m");
     }
 
-    // ── PROPELLER BLUR ────────────────────────────────────────────────────────
-    // A turning propeller is never seen as a blade: at 700-2700 rpm the eye (and any
-    // camera at 60-90 fps) sees a faint, tinted disc with a brighter ring where the tip
-    // stripes are. Drawing the blade rotating at the true rate strobes into a slowly
-    // wandering blade — the "static prop" the old cockpit showed in flight. So above a
-    // few hundred rpm the blades are hidden and a translucent disc is shown instead;
-    // below that (engine stopped or windmilling slowly) the real blade turns.
-    readonly List<Renderer> propBlades = new List<Renderer>();
-    Transform propDisc; Material propDiscMat;
-    float propAngle; Quaternion propDiscBase;
-
-    void BuildPropDisc(float radius)
-    {
-        const int N = 256;
-        var tex = new Texture2D(N, N, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
-        var px = new Color[N * N];
-        var rnd = new System.Random(7);
-        var streak = new float[64];
-        for (int i = 0; i < 64; i++) streak[i] = (float)rnd.NextDouble();
-        for (int y = 0; y < N; y++)
-            for (int x = 0; x < N; x++)
-            {
-                float dx = (x + 0.5f) / N * 2f - 1f, dy = (y + 0.5f) / N * 2f - 1f;
-                float r = Mathf.Sqrt(dx * dx + dy * dy);
-                float ang = Mathf.Atan2(dy, dx) / (2f * Mathf.PI) + 0.5f;
-                float a = 0f; Color c = new Color(0.10f, 0.10f, 0.11f);
-                if (r < 1f && r > 0.12f)
-                {
-                    // blade chord shadow, heavier inboard, fading at the tip
-                    a = Mathf.Lerp(0.11f, 0.05f, r);
-                    // two painted tip stripes -> two faint bright rings
-                    if ((r > 0.86f && r < 0.905f) || (r > 0.93f && r < 0.965f)) { c = new Color(0.95f, 0.95f, 0.92f); a = 0.07f; }
-                    // subtle angular shimmer
-                    a *= 0.92f + 0.16f * streak[Mathf.FloorToInt(ang * 64f) % 64];
-                    a *= Mathf.Clamp01((1f - r) * 30f);   // soft outer edge
-                }
-                c.a = a;
-                px[y * N + x] = c;
-            }
-        tex.SetPixels(px); tex.Apply(true);
-
-        var m = new Mesh { name = "PropDisc" };
-        m.vertices = new[] { new Vector3(-radius, -radius, 0f), new Vector3(-radius, radius, 0f), new Vector3(radius, radius, 0f), new Vector3(radius, -radius, 0f) };
-        m.uv = new[] { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) };
-        m.triangles = new[] { 0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2 };   // double-sided
-        m.RecalculateBounds();
-        var go = new GameObject("PropDisc");
-        go.layer = CockpitBuilder.CockpitLayer;
-        propDisc = go.transform;
-        propDisc.SetParent(propPivot.parent, false);
-        propDisc.position = propPivot.position;
-        propDisc.rotation = propPivot.rotation;
-        propDiscBase = propDisc.localRotation;
-        go.AddComponent<MeshFilter>().sharedMesh = m;
-        propDiscMat = new Material(Shader.Find("Sprites/Default")) { mainTexture = tex };
-        var mr = go.AddComponent<MeshRenderer>();
-        mr.sharedMaterial = propDiscMat;
-        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        go.SetActive(false);
-    }
+    // ── PROPELLER ─────────────────────────────────────────────────────────────
+    // 19 Oct 2026, on request: no blur disc. The disc was shown whenever the engine model
+    // said >300 rpm — and the engine IDLES at 700 rpm, so the "propeller" was a spinning
+    // disc from the moment the trial began, throttle or not, which read as fake. The real
+    // blades are always drawn now and are driven by the THROTTLE: closed throttle = the
+    // propeller stands still; open it and the prop spins up, close it and it runs down.
+    // Spin-up and run-down are eased (rotating inertia) rather than instant, and an engine
+    // failure stops it whatever the throttle says.
+    float propRate;   // current spin, deg/s
 
     // Slide a group of nodes by ONE common offset so the geometry that is ACTUALLY drawn
     // (the vertices referenced by the current triangles — after any KeepHalf cut) is centred on
@@ -879,25 +806,13 @@ public class RealCockpit : MonoBehaviour
 
         if (propPivot != null)
         {
-            // True engine speed where the systems model exists (idle 700 rpm with the
-            // throttle closed, windmilling after a failure); throttle-scaled otherwise.
             var sys = AircraftSystems.Instance;
-            float rpm = sys != null ? sys.RPM : phys.Throttle01 * propSpinMax / 6f;
-            bool blur = propDisc != null && rpm > 300f;
-            if (propDisc != null && propDisc.gameObject.activeSelf != blur)
-            {
-                propDisc.gameObject.SetActive(blur);
-                foreach (var r in propBlades) if (r != null) r.enabled = !blur;
-            }
-            if (blur)
-            {
-                // the disc turns slowly so the shimmer lives; denser at high rpm
-                propAngle += Time.deltaTime * 90f;
-                propDisc.localRotation = propDiscBase * Quaternion.Euler(0f, 0f, propAngle);
-                propDiscMat.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.55f, 1f, Mathf.InverseLerp(300f, 2400f, rpm)));
-                propPivot.Rotate(0f, 0f, 1500f * Time.deltaTime, Space.Self);   // spinner
-            }
-            else propPivot.Rotate(0f, 0f, rpm * 6f * Time.deltaTime, Space.Self);
+            bool dead = sys != null && sys.Engine == EngineState.Failed;
+            float target = dead ? 0f : propSpinMax * phys.Throttle01;
+            // ~2.5 s to spin up to full, ~5 s to run down — a propeller has inertia
+            float accel = target > propRate ? propSpinMax / 2.5f : propSpinMax / 5f;
+            propRate = Mathf.MoveTowards(propRate, target, accel * Time.deltaTime);
+            if (propRate > 0.01f) propPivot.Rotate(0f, 0f, propRate * Time.deltaTime, Space.Self);
         }
     }
 
