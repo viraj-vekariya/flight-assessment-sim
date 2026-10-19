@@ -397,7 +397,27 @@ public class CockpitDesignShots : MonoBehaviour
         yield return FreeShot(new Vector3(-1400f, 380f, 900f), new Vector3(-950f, 0f, 1500f), 50f, "23_suburb.png");
         yield return FreeShot(new Vector3(300f, 260f, -700f), new Vector3(0f, 0f, 200f), 55f, "24_aerodrome.png");
         yield return FreeShot(new Vector3(0f, 2400f, 600f), new Vector3(0f, 0f, 1200f), 60f, "25_world_overview.png");
+        // exterior tail: elevator + trim tab at neutral and at full nose-up trim
+        yield return TailShots();
         shotCam.transform.SetParent(eye, false);
+    }
+
+    IEnumerator TailShots()
+    {
+        var ac = GameManager.Instance.Aircraft;
+        int mask = shotCam.cullingMask;
+        shotCam.cullingMask = ~(CockpitBuilder.DisplayOnlyMask | (1 << CockpitBuilder.CockpitLayer));
+        Vector3 tail = ac.transform.TransformPoint(new Vector3(0f, 0.4f, -3.4f));
+        Vector3 cam = ac.transform.TransformPoint(new Vector3(6.5f, 0.55f, -3.45f));   // square-on side view of the tail
+        foreach (var (t, file) in new[] { (0f, "30_tail_trim_neutral.png"), (1f, "31_tail_trim_noseup.png"), (-1f, "32_tail_trim_nosedown.png") })
+        {
+            ac.trim = t;
+            yield return new WaitForSecondsRealtime(0.3f);
+            Debug.Log($"[DESIGN] tail trim={t:F1} elevatorCmd={ac.ElevatorCmd:F2}");
+            yield return FreeShot(cam, tail, 40f, file);
+        }
+        ac.trim = 0f;
+        shotCam.cullingMask = mask;
     }
 
     IEnumerator FlyShot(Rigidbody rb, Vector3 pos, float heading, float pitchDown, string file, float settle = 0.4f)

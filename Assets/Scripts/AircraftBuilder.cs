@@ -51,6 +51,11 @@ public static class AircraftBuilder
                                new Vector3(2.4f, 0.12f, 0.5f), trim);
         Transform elev = Hinge(root.transform, new Vector3(0f, 0.4f, -3.1f),
                                new Vector3(3.4f, 0.12f, 0.5f), white);
+        // Elevator TRIM TAB: a small hinged strip on the elevator's trailing edge (right
+        // side, inboard — where a 172 has it), in the accent colour so it can be picked out
+        // from the chase view. ControlSurfaces deflects it opposite to the trim it holds.
+        Transform trimTab = Hinge(elev, new Vector3(0.75f, 0f, -0.5f), new Vector3(0.75f, 0.06f, 0.16f), trim);
+        trimTab.name = "TrimTabHinge";
         Transform rudd = HingeYaw(root.transform, new Vector3(0f, 0.85f, -3.1f),
                                   new Vector3(0.14f, 0.95f, 0.5f), trim);
 
@@ -86,6 +91,7 @@ public static class AircraftBuilder
         surfaces.aileronLeft = ailL; surfaces.aileronRight = ailR;
         surfaces.flapLeft = flpL; surfaces.flapRight = flpR;
         surfaces.elevator = elev; surfaces.rudder = rudd;
+        surfaces.trimTab = trimTab;
         surfaces.propeller = propPivot.transform;
 
         // Hide the whole exterior from the cockpit camera so no wings/fuselage/
