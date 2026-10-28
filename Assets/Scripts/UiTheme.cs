@@ -52,6 +52,22 @@ public static class UiTheme
 
     public static void End() { GUI.matrix = Matrix4x4.identity; }
 
+    /// <summary>HUD scaling: uniform by HEIGHT, no letter-box, so an overlay drawn at
+    /// the canvas edge sits at the screen edge. The canvas is H tall and HudW wide.
+    /// On a Retina Mac the window is ~3400 px wide, and an unscaled 14 px label is
+    /// unreadable; this keeps every in-flight overlay the size it was designed at.</summary>
+    public static float HudScale { get; private set; } = 1f;
+    public static float HudW { get; private set; } = W;
+
+    public static void BeginHud()
+    {
+        HudScale = Mathf.Max(0.4f, Screen.height / H);
+        HudW = Screen.width / HudScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(HudScale, HudScale, 1f));
+    }
+
+    public static void EndHud() { GUI.matrix = Matrix4x4.identity; }
+
     /// <summary>Darken the whole window. Call BEFORE Begin() (screen space).</summary>
     public static void DimScreen(float alpha)
     {

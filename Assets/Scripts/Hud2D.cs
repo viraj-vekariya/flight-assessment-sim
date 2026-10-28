@@ -70,6 +70,7 @@ public class Hud2D : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null || gm.State != GameState.Flying || gm.Aircraft == null) return;
         Init();
+        UiTheme.BeginHud();
         var ac = gm.Aircraft;
 
         // ── Left-corner flight data panel ──────────────────────────────────
@@ -135,11 +136,12 @@ public class Hud2D : MonoBehaviour
                     Vector3 wp = acT.TransformPoint(new Vector3(Dials[i].localX, i < 3 ? RowTopY : RowBotY, DialZ));
                     Vector3 sp = cam.WorldToScreenPoint(wp);
                     if (sp.z < 0f) continue;   // behind camera — skip
+                    sp.x /= UiTheme.HudScale; sp.y /= UiTheme.HudScale;   // pixels -> HUD canvas
 
                     // sit the label in the lower-centre of the face — a fixed 20 px
                     // below the projected dial centre (consistent across all 6 dials)
                     float gx = sp.x - boxW * 0.5f;
-                    float gy = Screen.height - sp.y + 20f;
+                    float gy = UiTheme.H - sp.y + 20f;
 
                     GUI.DrawTexture(new Rect(gx, gy, boxW, 2f), accent);                 // cyan top border
                     GUI.DrawTexture(new Rect(gx, gy + 2f, boxW, nameH), labelBgDark);
@@ -153,17 +155,17 @@ public class Hud2D : MonoBehaviour
 
         // ── Stall warnings ──────────────────────────────────────────────────
         if (ac.Stalled)
-            GUI.Label(new Rect(Screen.width/2f-120, 24, 240, 36), "STALL", warnStyle);
+            GUI.Label(new Rect(UiTheme.HudW/2f-120, 24, 240, 36), "STALL", warnStyle);
         else if (ac.StallWarning)
         {
             var prev = GUI.color; GUI.color = new Color(1f, 0.75f, 0.2f);
-            GUI.Label(new Rect(Screen.width/2f-140, 24, 280, 36), "STALL WARNING", warnStyle);
+            GUI.Label(new Rect(UiTheme.HudW/2f-140, 24, 280, 36), "STALL WARNING", warnStyle);
             GUI.color = prev;
         }
 
         // ── Landing quality line ────────────────────────────────────────────
         if (ac.Grounded && !ac.Crashed && ac.Landing != LandingTier.None)
-            GUI.Label(new Rect(Screen.width/2f-160, 60, 320, 24),
+            GUI.Label(new Rect(UiTheme.HudW/2f-160, 60, 320, 24),
                 $"LANDING: {ac.Landing}   sink {ac.TouchdownSink:F1} m/s  bank {ac.TouchdownBank:F0}°",
                 statusStyle);
 
@@ -172,17 +174,18 @@ public class Hud2D : MonoBehaviour
         if (eng2 != null && eng2.Active)
         {
             const float bw = 720;
-            float bx = Screen.width/2f - bw/2f, by = Screen.height - 40;
+            float bx = UiTheme.HudW/2f - bw/2f, by = UiTheme.H - 40;
             GUI.DrawTexture(new Rect(bx, by, bw, 30), barBg);
             GUI.Label(new Rect(bx, by, bw, 30), eng2.StatusText(), statusStyle);
         }
         else if (gm.Level != null)
         {
             const float bw = 720;
-            float bx = Screen.width/2f - bw/2f, by = Screen.height - 40;
+            float bx = UiTheme.HudW/2f - bw/2f, by = UiTheme.H - 40;
             GUI.DrawTexture(new Rect(bx, by, bw, 30), barBg);
             GUI.Label(new Rect(bx, by, bw, 30), gm.Level.StatusText(), statusStyle);
         }
+        UiTheme.EndHud();
     }
 
     void Row(float x, float y, float w, string lbl, string val, string unit)

@@ -46,8 +46,19 @@ public static class BuildTool
     /// glass cockpit came up blank. Kept in code so a new Shader.Find is one line here.</summary>
     static readonly string[] RuntimeShaders =
     {
+        // looked up by name in code
         "Standard", "Unlit/Color", "Unlit/Texture", "Unlit/Transparent Colored",
-        "Sprites/Default", "Skybox/Procedural", "Skybox/Panoramic", "GUI/3D Text Shader",
+        "Sprites/Default", "Skybox/Procedural", "Skybox/Panoramic", "GUI/Text Shader",
+        "Particles/Standard Unlit",
+        // the GLB cockpit: glTFast builds its materials at load time from these package
+        // shaders. Without them every cockpit renderer comes up with no material, the
+        // 'Window' glass is never found, and the cabin renders magenta in a player.
+        "glTF/PbrMetallicRoughness", "glTF/PbrSpecularGlossiness", "glTF/Unlit",
+        // the terrain has no material template, so it uses the engine's default terrain
+        // shader, which nothing in the project references as an asset.
+        "Nature/Terrain/Standard",
+        "Hidden/TerrainEngine/Splatmap/Standard-Base", "Hidden/TerrainEngine/Splatmap/Standard-AddPass",
+        "Hidden/TerrainEngine/Splatmap/Standard-BaseGen",
     };
 
     static void EnsureShadersIncluded()

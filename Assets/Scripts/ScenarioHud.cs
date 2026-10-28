@@ -31,11 +31,12 @@ public class ScenarioHud : MonoBehaviour
         var e = gm.ScenarioRunner;
         if (!e.Active) return;
         Init();
+        UiTheme.BeginHud();
 
-        float cx = Screen.width / 2f;
+        float cx = UiTheme.HudW / 2f;
 
         // status bar (just above the bottom Hud2D level bar)
-        GUI.Label(new Rect(cx - 380f, Screen.height - 66f, 760f, 22f), e.StatusText(), status);
+        GUI.Label(new Rect(cx - 380f, UiTheme.H - 66f, 760f, 22f), e.StatusText(), status);
 
         // event banner
         if (e.Banner != "")
@@ -47,15 +48,15 @@ public class ScenarioHud : MonoBehaviour
 
         // weather / fault flags top-right
         float fy = 92f;
-        if (e.WeatherActive) { GUI.color = new Color(0.5f, 0.7f, 1f); GUI.Label(new Rect(Screen.width - 150f, fy, 140f, 20f), "WEATHER", flag); fy += 20f; }
-        if (e.FaultActive) { GUI.color = new Color(1f, 0.7f, 0.2f); GUI.Label(new Rect(Screen.width - 150f, fy, 140f, 20f), "INSTRUMENT FAULT", flag); }
+        if (e.WeatherActive) { GUI.color = new Color(0.5f, 0.7f, 1f); GUI.Label(new Rect(UiTheme.HudW - 150f, fy, 140f, 20f), "WEATHER", flag); fy += 20f; }
+        if (e.FaultActive) { GUI.color = new Color(1f, 0.7f, 0.2f); GUI.Label(new Rect(UiTheme.HudW - 150f, fy, 140f, 20f), "INSTRUMENT FAULT", flag); }
         GUI.color = Color.white;
 
         // ── during the in-task baseline, keep the objective on screen ──────────────
         // The baseline segment is the EEG reference, so it must not be a period where
         // the participant is confused about what they are supposed to be doing.
         if (e.IsExperiment && e.Segment == "BASELINE" && e.Mission != null)
-            GUI.Label(new Rect(cx - 300f, Screen.height - 132f, 600f, 44f),
+            GUI.Label(new Rect(cx - 300f, UiTheme.H - 132f, 600f, 44f),
                       "OBJECTIVE: " + e.Mission.Objective, brief);
 
         // ── checklist / drill panel ────────────────────────────────────────────────
@@ -88,7 +89,7 @@ public class ScenarioHud : MonoBehaviour
             void Ann(string text, Color col)
             {
                 GUI.color = col;
-                GUI.Label(new Rect(Screen.width - 230f, ay, 220f, 20f), text, annun);
+                GUI.Label(new Rect(UiTheme.HudW - 230f, ay, 220f, 20f), text, annun);
                 ay += 19f;
                 GUI.color = Color.white;
             }
@@ -114,5 +115,6 @@ public class ScenarioHud : MonoBehaviour
             GUI.Label(new Rect(cx - 160f, 36f, 320f, 24f),
                 $"{arrow}  {e.WaypointName}   {dist:F0} m   {(rel >= 0 ? "R" : "L")}{Mathf.Abs(rel):F0}°", wpt);
         }
+        UiTheme.EndHud();
     }
 }

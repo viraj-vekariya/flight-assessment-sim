@@ -69,9 +69,25 @@ public class UiDesignShots : MonoBehaviour
         SetEnum(menu, "overlay", 3); yield return Shot("help");
         SetEnum(menu, "overlay", 0);
 
-        // 3. one mission at 8x, hands off, then the results page
-        Time.timeScale = 8f;
+        // 3. the world and the cockpit, from the pilot's seat and from outside
+        gm.StartFlight(FlightMode.FreeFlight);
+        yield return new WaitForSecondsRealtime(3f);
+        yield return Shot("flight_cockpit");
+        var vm = gm.GetComponent<ViewManager>();
+        SetEnum(vm, "view", 1);
+        vm.GetType().GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(vm, null);
+        yield return null; yield return null;
+        yield return Shot("flight_chase");
+        SetEnum(vm, "view", 0);
+        vm.GetType().GetMethod("Apply", BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(vm, null);
+        gm.BackToMenu();
+        yield return null; yield return null;
+
+        // 4. one mission: the in-flight overlays at normal speed, then 8x to the results page
         gm.StartSingleMission("L3");
+        yield return new WaitForSecondsRealtime(4f);
+        yield return Shot("flight_mission_hud");
+        Time.timeScale = 8f;
         t0 = Time.realtimeSinceStartup;
         while (gm.State != GameState.Results)
         {
@@ -82,21 +98,10 @@ public class UiDesignShots : MonoBehaviour
         yield return null; yield return null;
         yield return Shot("results_mission");
 
-        // 4. back in the hub with L3 marked
+        // 5. back in the hub with L3 marked
         gm.Confirm();
         yield return null; yield return null;
         yield return Shot("hub_after_mission");
-
-        // 5. free flight ended
-        gm.StartFlight(FlightMode.FreeFlight);
-        yield return new WaitForSecondsRealtime(1f);
-        gm.Aircraft.throttle = 0f;
-        yield return null;
-        // end it the way Esc would not (Esc goes to the hub); crash state is the other
-        // free-flight ending, so photograph the plain "flight ended" via the level path
-        gm.BackToMenu();
-        yield return null;
-        yield return Shot("hub_final");
 
         Debug.Log("[UISHOTS] " + n + " screenshots in " + dir);
         Done();

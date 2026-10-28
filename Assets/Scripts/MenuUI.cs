@@ -417,8 +417,8 @@ public class MenuUI : MonoBehaviour
         if (UiTheme.Button(new Rect(x, by, 180f, 42f), "BACK", UiTheme.Line, true, false, 14, TextAnchor.MiddleCenter, "Esc"))
             overlay = Overlay.None;
         if (UiTheme.Button(new Rect(p.xMax - 30f - 360f, by, 360f, 42f), "START MISSION  " + m.Id, col, true, true, 16, TextAnchor.MiddleCenter, "Enter"))
-            Start(gm, m.Id);
-        if (UiTheme.Key(KeyCode.Return) || UiTheme.Key(KeyCode.KeypadEnter)) Start(gm, m.Id);
+            StartMission(gm, m.Id);
+        if (UiTheme.Key(KeyCode.Return) || UiTheme.Key(KeyCode.KeypadEnter)) StartMission(gm, m.Id);
         else if (UiTheme.Key(KeyCode.Escape)) overlay = Overlay.None;
     }
 
@@ -431,7 +431,7 @@ public class MenuUI : MonoBehaviour
         return y + 14f;
     }
 
-    void Start(GameManager gm, string id)
+    void StartMission(GameManager gm, string id)
     {
         overlay = Overlay.None;
         gm.StartSingleMission(id);

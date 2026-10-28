@@ -40,13 +40,10 @@ public class ExperimentUI : MonoBehaviour
         var gm = GameManager.Instance;
         if (gm == null) return;
         Styles();
-
-        if (gm.State == GameState.Baseline && gm.Baseline != null && gm.Baseline.Running)
-        {
-            DrawBaseline(gm);
-            return;
-        }
-        if (gm.State == GameState.Menu && gm.ExperimentRunning) DrawStatusStrip(gm);
+        UiTheme.BeginHud();
+        if (gm.State == GameState.Baseline && gm.Baseline != null && gm.Baseline.Running) DrawBaseline(gm);
+        else if (gm.State == GameState.Menu && gm.ExperimentRunning) DrawStatusStrip(gm);
+        UiTheme.EndHud();
     }
 
     void DrawBaseline(GameManager gm)
@@ -54,11 +51,11 @@ public class ExperimentUI : MonoBehaviour
         var b = gm.Baseline;
         // Full-screen flat field. For the eyes-closed block the screen is left dark
         // on purpose — no bright panel behind closed lids.
-        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), black);
+        GUI.DrawTexture(new Rect(0, 0, UiTheme.HudW, UiTheme.H), black);
 
         float remain = Mathf.Max(0f, b.Duration - b.Elapsed);
         float w = 640f, h = 300f;
-        var r = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
+        var r = new Rect((UiTheme.HudW - w) / 2f, (UiTheme.H - h) / 2f, w, h);
 
         GUILayout.BeginArea(r);
         GUILayout.Space(10);
@@ -81,13 +78,13 @@ public class ExperimentUI : MonoBehaviour
         if (b.Kind == BaselineKind.RestEyesOpen)
         {
             var c = new GUIStyle(big) { fontSize = 40 };
-            GUI.Label(new Rect(Screen.width / 2f - 30f, Screen.height * 0.78f, 60f, 60f), "+", c);
+            GUI.Label(new Rect(UiTheme.HudW / 2f - 30f, UiTheme.H * 0.78f, 60f, 60f), "+", c);
         }
     }
 
     void DrawStatusStrip(GameManager gm)
     {
-        var r = new Rect(10f, Screen.height - 92f, Screen.width - 20f, 82f);
+        var r = new Rect(10f, UiTheme.H - 92f, UiTheme.HudW - 20f, 82f);
         GUI.Box(r, "");
         GUILayout.BeginArea(new Rect(r.x + 10f, r.y + 6f, r.width - 20f, r.height - 12f));
         GUILayout.Label("EXPERIMENT IN PROGRESS   ·   " + gm.ExperimentStatus, mono);
