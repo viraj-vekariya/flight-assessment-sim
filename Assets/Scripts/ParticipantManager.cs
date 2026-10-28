@@ -31,6 +31,15 @@ public static class ParticipantManager
     {
         ID      = id.Trim().ToUpper();
         Session = CountVisitsOnDisk() + 1;
+        ParticipantProgress.Refresh();
+    }
+
+    /// <summary>Back to "nobody": the entry screen is shown again. Only valid from the
+    /// hub, never mid-session (GameManager.ChangeParticipant guards that).</summary>
+    public static void Clear()
+    {
+        ID = ""; Session = 1;
+        ParticipantProgress.Refresh();
     }
 
     /// <summary>How many session folders this participant already has. Counted, never

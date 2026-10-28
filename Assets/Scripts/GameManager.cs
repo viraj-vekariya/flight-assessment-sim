@@ -193,6 +193,35 @@ public class GameManager : MonoBehaviour
 
     void OnApplicationQuit() => LSLSync.Shutdown();
 
+    /// <summary>Back to the participant entry screen. Only from the hub, never while a
+    /// session is running — a session's folders are keyed to the participant.</summary>
+    public void ChangeParticipant()
+    {
+        if (State != GameState.Menu || ExperimentRunning) return;
+        ParticipantManager.Clear();
+        ParticipantReady = false;
+    }
+
+    /// <summary>From the results page straight into another single mission, without a
+    /// detour through the hub. Mirrors Enter on the results page when a next mission
+    /// exists. Not used inside the lab session, which has its own queue.</summary>
+    public void ContinueToMission(string missionId)
+    {
+        if (State != GameState.Results || ExperimentRunning || inSession || SessionReportActive) return;
+        Confirm();
+        if (State == GameState.Menu) StartSingleMission(missionId);
+    }
+
+    /// <summary>What Enter on the results page should do: continue the lab session if
+    /// one is running, otherwise the next unflown mission, otherwise the hub.</summary>
+    public void ConfirmOrNext()
+    {
+        if (State != GameState.Results) return;
+        if (!ScenarioActive || ExperimentRunning || inSession || SessionReportActive) { Confirm(); return; }
+        string next = ParticipantProgress.NextMissionId();
+        if (next != null) ContinueToMission(next); else Confirm();
+    }
+
     // ---- Phase 2 scenario flow ----
     public void OpenScenarioMenu() => InScenarioMenu = true;
     public void CloseScenarioMenu() => InScenarioMenu = false;
@@ -438,7 +467,14 @@ public class GameManager : MonoBehaviour
             case GameState.Results:
                 if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
                 {
-                    if (ScenarioActive) AdvanceSessionOrMenu(); else ToMenu();
+                    ConfirmOrNext();
+                }
+                else if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    // Back to the hub. Inside the lab session Escape does nothing here:
+                    // the session advances on Enter only, so a stray key cannot skip a
+                    // trial or a rest block.
+                    if (!ExperimentRunning) Confirm();
                 }
                 else if (Input.GetKeyDown(KeyCode.R))
                 {

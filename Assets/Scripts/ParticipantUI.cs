@@ -1,124 +1,131 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Full-screen participant ID entry screen shown before the main menu.
-/// Disappears the moment the ID is confirmed; never shown again during the session.
+/// The first screen: who is flying. A code is typed (or picked from the people
+/// already on this computer), the visit number is worked out from the data tree,
+/// and the hub opens. Shown again only if "Change participant" is used in the hub.
 /// </summary>
 public class ParticipantUI : MonoBehaviour
 {
-    string inputText = "";
-    string errorMsg  = "";
-    bool   focused   = false;
-
-    GUIStyle bigTitle, subtitle, body, field, btn, err;
-
-    void Styles()
-    {
-        if (bigTitle != null) return;
-        bigTitle = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 28, fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleCenter,
-            normal = { textColor = Color.white }
-        };
-        subtitle = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 16,
-            alignment = TextAnchor.MiddleCenter,
-            normal = { textColor = new Color(0.75f, 0.85f, 1f) }
-        };
-        body = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 14, normal = { textColor = new Color(0.85f, 0.85f, 0.85f) }
-        };
-        field = new GUIStyle(GUI.skin.textField)
-        {
-            fontSize = 22, fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleCenter,
-            fixedHeight = 38
-        };
-        btn = new GUIStyle(GUI.skin.button)
-        {
-            fontSize = 17, fontStyle = FontStyle.Bold, fixedHeight = 40
-        };
-        err = new GUIStyle(GUI.skin.label)
-        {
-            fontSize = 13, normal = { textColor = new Color(1f, 0.4f, 0.3f) }
-        };
-    }
+    string input = "";
+    string error = "";
+    bool wantFocus = true;
+    bool wasReady;
+    List<ParticipantProgress.Person> people;
+    float peopleAt = -1f;
+    Vector2 scroll;
 
     void OnGUI()
     {
         var gm = GameManager.Instance;
-        if (gm == null || gm.ParticipantReady) return;
-        Styles();
+        if (gm == null) return;
+        if (gm.ParticipantReady) { wasReady = true; return; }
+        if (wasReady) { wasReady = false; wantFocus = true; people = null; }   // came back via Change participant
 
-        // dim overlay
-        var prev = GUI.color;
-        GUI.color = new Color(0f, 0f, 0f, 0.80f);
-        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-        GUI.color = prev;
+        if (people == null || Time.unscaledTime - peopleAt > 5f) { people = ParticipantProgress.PeopleOnDisk(); peopleAt = Time.unscaledTime; }
 
-        float pw = 520f, ph = 330f;
-        var pr = new Rect((Screen.width - pw) * 0.5f, (Screen.height - ph) * 0.5f, pw, ph);
-        GUI.Box(pr, "");
+        UiTheme.DimScreen(0.86f);
+        UiTheme.Begin();
 
-        GUILayout.BeginArea(new Rect(pr.x + 40, pr.y + 28, pw - 80, ph - 56));
+        float pw = 980f, ph = 520f;
+        var p = new Rect((UiTheme.W - pw) / 2f, (UiTheme.H - ph) / 2f, pw, ph);
+        UiTheme.Box(p);
+        UiTheme.Fill(new Rect(p.x, p.y, pw, 4f), UiTheme.Accent);
 
-        GUILayout.Label("CESSNA FLIGHT SIMULATOR", bigTitle);
-        GUILayout.Space(4);
-        GUILayout.Label("Research Data Collection — Participant Entry", subtitle);
-        GUILayout.Space(24);
+        // ── left: the form ──────────────────────────────────────────────────────
+        float lx = p.x + 40f, ly = p.y + 34f, lw = 520f;
+        UiTheme.Label(new Rect(lx, ly, lw, 36f), "FLIGHT ASSESSMENT SIM", UiTheme.H1);
+        UiTheme.Label(new Rect(lx, ly + 36f, lw, 22f), "Cognitive-workload study  ·  Cessna 172  ·  42 missions per participant", UiTheme.Small);
 
-        GUILayout.Label("Enter your Participant ID  (e.g. P001, P002, CTRL03)", body);
-        GUILayout.Space(6);
-
+        ly += 92f;
+        UiTheme.Label(new Rect(lx, ly, lw, 20f), "PARTICIPANT CODE", UiTheme.Small, UiTheme.Faint);
+        ly += 24f;
         GUI.SetNextControlName("pid_field");
-        inputText = GUILayout.TextField(inputText, 12, field);
-        inputText = inputText.ToUpper();
+        var fr = new Rect(lx, ly, lw, 52f);
+        UiTheme.Fill(fr, new Color(0.04f, 0.05f, 0.07f, 1f));
+        UiTheme.Frame(fr, string.IsNullOrEmpty(error) ? UiTheme.Line : UiTheme.Bad);
+        string typed = GUI.TextField(fr, input, 12, UiTheme.Field);
+        if (typed != input) { input = typed.ToUpperInvariant(); error = ""; }
+        ly += 60f;
+        UiTheme.Label(new Rect(lx, ly, lw, 20f),
+            "A study code such as P001 — never a name. A new code starts a new participant.", UiTheme.Small);
+        ly += 20f;
+        UiTheme.Label(new Rect(lx, ly, lw, 20f),
+            "Visits are counted from the data folder, so stopping half-way and coming back later is fine.", UiTheme.Small);
+        ly += 30f;
+        if (!string.IsNullOrEmpty(error))
+            UiTheme.Label(new Rect(lx, ly, lw, 22f), "⚠  " + error, UiTheme.Body, UiTheme.Bad);
+        ly += 34f;
 
-        if (!string.IsNullOrEmpty(errorMsg))
+        string trimmed = input.Trim();
+        bool canGo = trimmed.Length >= 1;
+        string preview = "";
+        if (canGo)
         {
-            GUILayout.Space(4);
-            GUILayout.Label(errorMsg, err);
+            var known = people.Find(x => x.Id == trimmed);
+            preview = known != null
+                ? $"Returning participant — visit {known.Visits + 1}, {known.Done} of {ParticipantProgress.Total} missions done"
+                : "New participant — visit 1, nothing flown yet";
+        }
+        UiTheme.Label(new Rect(lx, ly, lw, 20f), preview, UiTheme.Body, UiTheme.Accent);
+        ly += 32f;
+        if (UiTheme.Button(new Rect(lx, ly, lw, 54f), "CONTINUE", UiTheme.Accent, canGo, true, 18, TextAnchor.MiddleCenter, "Enter"))
+            Confirm(gm);
+        if (UiTheme.Key(KeyCode.Return) || UiTheme.Key(KeyCode.KeypadEnter)) Confirm(gm);
+
+        // ── right: people already on this computer ──────────────────────────────
+        float rx = p.x + 620f, ry = p.y + 34f, rw = 320f;
+        UiTheme.Label(new Rect(rx, ry, rw, 24f), "ON THIS COMPUTER", UiTheme.H3);
+        UiTheme.Label(new Rect(rx, ry + 24f, rw, 20f), "Click to pick a returning participant", UiTheme.Small);
+        ry += 56f;
+        var listRect = new Rect(rx, ry, rw, ph - 120f);
+        UiTheme.Fill(listRect, new Color(0.08f, 0.09f, 0.12f, 1f));
+        UiTheme.Frame(listRect, UiTheme.Line);
+        if (people.Count == 0)
+        {
+            UiTheme.Label(new Rect(rx + 14f, ry + 14f, rw - 28f, 40f), "No participants yet.\nThe first code typed on the left starts the list.", UiTheme.Small);
         }
         else
         {
-            GUILayout.Space(4 + err.fixedHeight > 0 ? 20 : 4);
+            float rowH = 54f;
+            var view = new Rect(0, 0, rw - 18f, people.Count * rowH);
+            scroll = GUI.BeginScrollView(new Rect(rx + 1f, ry + 1f, rw - 2f, listRect.height - 2f), scroll, view);
+            for (int i = 0; i < people.Count; i++)
+            {
+                var pe = people[i];
+                var r = new Rect(4f, i * rowH + 4f, view.width - 8f, rowH - 8f);
+                bool sel = pe.Id == trimmed;
+                if (UiTheme.Button(r, "", sel ? UiTheme.Accent : UiTheme.Line, true, false, 14, TextAnchor.MiddleLeft))
+                { input = pe.Id; error = ""; GUI.FocusControl("pid_field"); }
+                UiTheme.Label(new Rect(r.x + 14f, r.y + 4f, 120f, 22f), pe.Id, UiTheme.H3);
+                string done = pe.Done + "/" + ParticipantProgress.Total + " done";
+                UiTheme.Label(new Rect(r.x + 14f, r.y + 24f, r.width - 28f, 18f),
+                    pe.Visits + (pe.Visits == 1 ? " visit  ·  " : " visits  ·  ") + done + (pe.Partial > 0 ? "  ·  " + pe.Partial + " partial" : ""),
+                    UiTheme.Small);
+                UiTheme.Bar(new Rect(r.xMax - 90f, r.y + 8f, 76f, 12f), (float)pe.Done / ParticipantProgress.Total, UiTheme.Good);
+            }
+            GUI.EndScrollView();
         }
 
-        GUILayout.Space(12);
+        UiTheme.Label(new Rect(p.x + 40f, p.yMax - 30f, pw - 80f, 20f),
+            "Data folder: " + ExperimentLogger.ExperimentRoot, UiTheme.Small, UiTheme.Faint);
 
-        if (GUILayout.Button("CONFIRM  →", btn))
-            TryConfirm(gm);
+        UiTheme.End();
 
-        // Enter key to confirm
-        if (Event.current.type == EventType.KeyDown &&
-            (Event.current.keyCode == KeyCode.Return ||
-             Event.current.keyCode == KeyCode.KeypadEnter))
-        {
-            TryConfirm(gm);
-            Event.current.Use();
-        }
-
-        GUILayout.EndArea();
-
-        // auto-focus the text field on the first frame
-        if (!focused)
-        {
-            GUI.FocusControl("pid_field");
-            focused = true;
-        }
+        if (wantFocus && Event.current.type == EventType.Repaint) { GUI.FocusControl("pid_field"); wantFocus = false; }
     }
 
-    void TryConfirm(GameManager gm)
+    void Confirm(GameManager gm)
     {
-        string id = inputText.Trim();
-        if (id.Length < 1)       { errorMsg = "ID cannot be empty."; return; }
-        if (id.Length > 12)      { errorMsg = "ID too long (max 12 characters)."; return; }
-
-        errorMsg = "";
+        string id = input.Trim().ToUpperInvariant();
+        if (id.Length < 1) { error = "Type a participant code first."; return; }
+        if (id.Length > 12) { error = "Codes are at most 12 characters."; return; }
+        foreach (char c in id)
+            if (!char.IsLetterOrDigit(c) && c != '_' && c != '-') { error = "Letters, digits, - and _ only — it becomes a folder name."; return; }
+        error = "";
         ParticipantManager.SetID(id);
         gm.SetParticipantReady();
+        ParticipantProgress.Refresh();
     }
 }

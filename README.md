@@ -17,9 +17,12 @@ This folder is the merge of two working copies that forked from the same commit:
 
 ## Run
 
-Open the folder in Unity Hub and press Play. The flow is: participant ID → menu →
-free flight to learn the aeroplane → missions, each 300 s, recorded automatically.
-Nothing has to be filled in after a mission.
+Open the folder in Unity Hub and press Play. The flow is: participant code → hub →
+briefing → mission (300 s, recorded automatically) → results → next briefing. Free
+flight is there to learn the aeroplane first; nothing has to be filled in after a
+mission. The hub marks each of the 42 missions DONE / STARTED / next from the data
+on disk, so a participant can stop at any point and carry on another day. See
+`INTERFACE.md`.
 
 Mission data lands in `<persistentDataPath>/FlightSimData/experiment/<PID>/<SESSION>/T<nn>_<MISSION>/`
 (`telemetry.csv` at 50 Hz, `events.csv`, `trial.json`, `metadata.json`,
@@ -59,6 +62,6 @@ does the same for macOS.
 
 ## Documents
 
-Start with `FINAL_PROJECT_README.md`, then `FINAL_EXPERIMENT_PROTOCOL.md`,
+Start with `FINAL_PROJECT_README.md` and `INTERFACE.md`, then `FINAL_EXPERIMENT_PROTOCOL.md`,
 `MISSION_BANK_DESIGN.md`, `FINAL_TELEMETRY_SCHEMA.md` and `DATA_MANAGEMENT.md`.
 `NASA_TLX.md` describes the post-trial questionnaire that this build no longer shows.

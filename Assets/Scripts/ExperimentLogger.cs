@@ -109,6 +109,19 @@ public class ExperimentLogger
     public static string SessionId { get; private set; } = "";
     public static int Seed { get; private set; }
 
+    /// <summary>What the last closed trial actually recorded — the same facts as its
+    /// trial.json, kept in memory so the results page can show them without re-reading
+    /// the file it just wrote.</summary>
+    public class TrialSummary
+    {
+        public string MissionId = "", Dir = "";
+        public int Rows, Expected, Gaps;
+        public bool Complete, Continuous;
+        public double MaxGapS;
+        public bool Usable => Complete && Continuous;
+    }
+    public static TrialSummary LastTrial { get; private set; }
+
     /// <summary>Monotonic host clock. The master time base for everything.</summary>
     public static double HostNow => Time.realtimeSinceStartupAsDouble;
     /// <summary>UTC unix seconds, millisecond resolution.</summary>
@@ -286,6 +299,14 @@ public class ExperimentLogger
         sb.AppendLine("  \"note\": \"complete=false means the participant did not fly this trial to the end. Exclude it, or handle it explicitly — never pool it with complete trials.\"");
         sb.AppendLine("}");
         File.WriteAllText(Path.Combine(TrialDir, "trial.json"), sb.ToString(), Utf8NoBom);
+
+        LastTrial = new TrialSummary
+        {
+            MissionId = mission != null ? mission.Id : "", Dir = TrialDir,
+            Rows = telemRows, Expected = expected, Gaps = gapCount,
+            Complete = complete, Continuous = maxGapS < DiscontinuityS, MaxGapS = maxGapS,
+        };
+        ParticipantProgress.Refresh();   // the hub's "done" marks come from this file
     }
 
     /// <summary>Mission time, driven by the engine so it matches event scheduling.</summary>

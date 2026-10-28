@@ -35,7 +35,7 @@ from collections import defaultdict
 # Participant ids that are NOT people. The mission battery runs as TEST01 and writes
 # folders that are identical in shape to a real participant's — 86 of them on the
 # development machine alone. Pooling those into a dataset is not a hypothetical risk.
-SYNTHETIC_PIDS = {"TEST01", "SHOTS", "DESIGN", "LEVEL", "CTEST", "UNKN"}
+SYNTHETIC_PIDS = {"TEST01", "SHOTS", "DESIGN", "LEVEL", "CTEST", "UNKN", "UISHOT"}
 
 TELEM_HZ = 50.0
 EXPECTED_COLS = 82

@@ -38,6 +38,40 @@ public static class BuildTool
     [MenuItem("Tools/Experiment/Build macOS (development)")]
     public static void BuildMac() => Build(BuildTarget.StandaloneOSX, "macOS", ExeStem + ".app");
 
+    /// <summary>Every shader this project looks up by name at runtime. The world, the
+    /// cockpit displays and the sky are all built in code with Shader.Find, and a
+    /// player only ships shaders that some ASSET references or that are listed under
+    /// Graphics > Always Included. Nothing here is an asset, so without this list the
+    /// first player build threw ArgumentNullException (shader) in LivePFD.Build and the
+    /// glass cockpit came up blank. Kept in code so a new Shader.Find is one line here.</summary>
+    static readonly string[] RuntimeShaders =
+    {
+        "Standard", "Unlit/Color", "Unlit/Texture", "Unlit/Transparent Colored",
+        "Sprites/Default", "Skybox/Procedural", "Skybox/Panoramic", "GUI/3D Text Shader",
+    };
+
+    static void EnsureShadersIncluded()
+    {
+        var gs = UnityEngine.Rendering.GraphicsSettings.GetGraphicsSettings();
+        var so = new SerializedObject(gs);
+        var arr = so.FindProperty("m_AlwaysIncludedShaders");
+        int added = 0;
+        foreach (var name in RuntimeShaders)
+        {
+            var sh = Shader.Find(name);
+            if (sh == null) { Debug.LogWarning("[BuildTool] shader not found in editor: " + name); continue; }
+            bool present = false;
+            for (int i = 0; i < arr.arraySize; i++)
+                if (arr.GetArrayElementAtIndex(i).objectReferenceValue == sh) { present = true; break; }
+            if (present) continue;
+            arr.InsertArrayElementAtIndex(arr.arraySize);
+            arr.GetArrayElementAtIndex(arr.arraySize - 1).objectReferenceValue = sh;
+            added++;
+        }
+        if (added > 0) { so.ApplyModifiedProperties(); AssetDatabase.SaveAssets(); }
+        Debug.Log("[BuildTool] always-included shaders: " + arr.arraySize + " (" + added + " added)");
+    }
+
     static void Build(BuildTarget target, string label, string exeName)
     {
         // Fail LOUDLY and specifically if the platform module is missing. Unity cannot
@@ -57,6 +91,8 @@ public static class BuildTool
             if (Application.isBatchMode) EditorApplication.Exit(2);
             return;
         }
+
+        EnsureShadersIncluded();
 
         string root = Path.GetDirectoryName(Application.dataPath);
         string outDir = Path.Combine(root, "Builds", label);

@@ -180,6 +180,12 @@ public static class PlayCapture
     ///         -levelshots -lighting=N -logFile level.log        (N = 0..3)</summary>
     public static void RunLevelShots() { RunDesignShots(); }
 
+    /// <summary>Photographs every menu screen (UiDesignShots, -uishots).
+    ///
+    ///   Unity -batchmode -projectPath &lt;p&gt; -executeMethod PlayCapture.RunUiShots \
+    ///         -uishots -logFile ui.log</summary>
+    public static void RunUiShots() { RunDesignShots(); }
+
     static void TickDesignShots()
     {
         if (!EditorApplication.isPlaying) return;
@@ -189,7 +195,7 @@ public static class PlayCapture
         // cannot let one finish on the other's behalf. Without it, running the level
         // shots through this entry point would wait 900 s on CockpitDesignShots.Finished,
         // which never sets, and then exit 1 with twelve perfectly good PNGs on disk.
-        bool done = CockpitDesignShots.Finished || LevelDesignShots.Finished;
+        bool done = CockpitDesignShots.Finished || LevelDesignShots.Finished || UiDesignShots.Finished;
         bool timedOut = EditorApplication.timeSinceStartup - t0 > 900.0;
         if (!done && !timedOut) return;
         if (timedOut && !done) Debug.LogError("[DESIGNSHOTS] HARD TIMEOUT");

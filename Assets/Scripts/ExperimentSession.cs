@@ -146,7 +146,7 @@ public static class ExperimentSession
     /// <summary>Break runs of three or more consecutive trials of the same workload
     /// class by swapping the offending trial with the nearest later trial of a
     /// different class. Deterministic, order-preserving elsewhere.</summary>
-    static List<string> DeClumpClasses(List<string> order)
+    public static List<string> DeClumpClasses(List<string> order)
     {
         var outp = new List<string>(order);
         for (int i = 2; i < outp.Count; i++)
