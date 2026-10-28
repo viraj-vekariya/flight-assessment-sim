@@ -397,6 +397,15 @@ public class CockpitDesignShots : MonoBehaviour
         yield return FreeShot(new Vector3(-1400f, 380f, 900f), new Vector3(-950f, 0f, 1500f), 50f, "23_suburb.png");
         yield return FreeShot(new Vector3(300f, 260f, -700f), new Vector3(0f, 0f, 200f), 55f, "24_aerodrome.png");
         yield return FreeShot(new Vector3(0f, 2400f, 600f), new Vector3(0f, 0f, 1200f), 60f, "25_world_overview.png");
+        // more of the scenery, district by district (CityBuilder layout)
+        yield return FreeShot(new Vector3(300f, 170f, 1100f), new Vector3(900f, 40f, 1800f), 50f, "40_downtown_skyline.png");
+        yield return FreeShot(new Vector3(870f, 22f, 1480f), new Vector3(880f, 45f, 1800f), 65f, "41_downtown_street.png");
+        yield return FreeShot(new Vector3(1600f, 220f, -1400f), new Vector3(1100f, 0f, -300f), 50f, "42_industrial.png");
+        yield return FreeShot(new Vector3(-900f, 260f, -2100f), new Vector3(-1500f, 0f, -800f), 55f, "43_farmland.png");
+        yield return FreeShot(new Vector3(470f, 45f, 560f), new Vector3(640f, 3f, 680f), 55f, "44_highway_rail.png");
+        yield return FreeShot(new Vector3(-1350f, 160f, 1120f), new Vector3(-1100f, 0f, 1450f), 50f, "45_town_centre.png");
+        yield return FreeShot(new Vector3(-90f, 55f, -410f), new Vector3(-220f, 6f, -545f), 55f, "46_airport_buildings.png");
+        yield return FreeShot(new Vector3(-2600f, 700f, -2600f), new Vector3(300f, 0f, 1200f), 55f, "47_whole_valley.png");
         // exterior tail: elevator + trim tab at neutral and at full nose-up trim
         yield return TailShots();
         shotCam.transform.SetParent(eye, false);
